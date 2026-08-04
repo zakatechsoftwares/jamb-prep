@@ -1,0 +1,914 @@
+{
+  "bank_version": "seed-0.1",
+  "exam": "JAMB UTME",
+  "generated": "2026-07-31",
+  "provenance": "ai-authored, original items written against the official syllabus; not reproductions of past papers",
+  "review_status": "ALL ITEMS REQUIRE HUMAN SUBJECT REVIEW BEFORE GOING LIVE",
+  "items": [
+    {
+      "id": "eng-lex-0001",
+      "subject": "Use of English",
+      "topic": "Lexis and Structure",
+      "subtopic": "Antonyms",
+      "objective": "Identify words opposite in meaning to a word used in context",
+      "cognitive_level": "comprehension",
+      "author_difficulty": 0.45,
+      "expected_time_seconds": 30,
+      "stem": "Choose the option that is most nearly OPPOSITE in meaning to the word in italics.\n\nThe chairman's remarks were construed as *conciliatory*.",
+      "options": {
+        "A": "amicable",
+        "B": "belligerent",
+        "C": "tactful",
+        "D": "cordial"
+      },
+      "correct_option": "B",
+      "explanation": "'Conciliatory' means intended to pacify or win goodwill. Its opposite is 'belligerent', meaning hostile or aggressive. 'Amicable', 'tactful' and 'cordial' are all near-synonyms of conciliatory, not opposites.",
+      "method_steps": [
+        "Establish the meaning of the italicised word: conciliatory = peace-making, placatory.",
+        "Scan the options for a word carrying hostility rather than harmony.",
+        "Eliminate amicable, tactful and cordial as synonyms; belligerent remains."
+      ],
+      "status": "draft_ai",
+      "needs_review": true
+    },
+    {
+      "id": "eng-lex-0002",
+      "subject": "Use of English",
+      "topic": "Lexis and Structure",
+      "subtopic": "Synonyms",
+      "objective": "Identify words nearest in meaning to a word used in context",
+      "cognitive_level": "comprehension",
+      "author_difficulty": 0.4,
+      "expected_time_seconds": 30,
+      "stem": "Choose the option nearest in meaning to the word in italics.\n\nThe new levy has *exacerbated* the housing crisis in the city.",
+      "options": {
+        "A": "eased",
+        "B": "worsened",
+        "C": "explained",
+        "D": "delayed"
+      },
+      "correct_option": "B",
+      "explanation": "'Exacerbate' means to make an already bad situation worse. 'Eased' is the direct opposite; 'explained' and 'delayed' do not convey intensification.",
+      "method_steps": [
+        "Note the negative context: a crisis.",
+        "Recall that exacerbate carries the sense of aggravating or intensifying.",
+        "Select 'worsened'."
+      ],
+      "status": "draft_ai",
+      "needs_review": true
+    },
+    {
+      "id": "eng-int-0003",
+      "subject": "Use of English",
+      "topic": "Lexis and Structure",
+      "subtopic": "Sentence interpretation",
+      "objective": "Interpret idiomatic expressions in context",
+      "cognitive_level": "comprehension",
+      "author_difficulty": 0.5,
+      "expected_time_seconds": 35,
+      "stem": "Musa is a chip off the old block. This means that Musa",
+      "options": {
+        "A": "is a stubborn and difficult person",
+        "B": "closely resembles his parent in character",
+        "C": "is much younger than his father",
+        "D": "has been disowned by his family"
+      },
+      "correct_option": "B",
+      "explanation": "'A chip off the old block' describes someone who strongly resembles a parent in temperament, manner or ability, the image being a fragment cut from the same piece of wood.",
+      "method_steps": [
+        "Identify the expression as an idiom, not a literal statement.",
+        "Recall the image: a chip taken from a block is made of the same material.",
+        "Match to the option about resemblance to a parent."
+      ],
+      "status": "draft_ai",
+      "needs_review": true
+    },
+    {
+      "id": "eng-oral-0004",
+      "subject": "Use of English",
+      "topic": "Oral Forms",
+      "subtopic": "Vowel sounds",
+      "objective": "Distinguish between diphthongs in similar words",
+      "cognitive_level": "application",
+      "author_difficulty": 0.6,
+      "expected_time_seconds": 30,
+      "stem": "Choose the word that has a DIFFERENT vowel sound from the others.",
+      "options": {
+        "A": "bear",
+        "B": "dare",
+        "C": "fear",
+        "D": "hair"
+      },
+      "correct_option": "C",
+      "explanation": "'Bear', 'dare' and 'hair' all contain the diphthong /eə/. 'Fear' contains /ɪə/, a different diphthong. Spelling is misleading here: 'bear' and 'fear' look alike but do not rhyme.",
+      "method_steps": [
+        "Say each word aloud rather than trusting the spelling.",
+        "Group bear, dare and hair as rhyming on /eə/.",
+        "Isolate fear as /ɪə/."
+      ],
+      "status": "draft_ai",
+      "needs_review": true
+    },
+    {
+      "id": "eng-oral-0005",
+      "subject": "Use of English",
+      "topic": "Oral Forms",
+      "subtopic": "Word stress",
+      "objective": "Identify the stressed syllable in polysyllabic words",
+      "cognitive_level": "application",
+      "author_difficulty": 0.55,
+      "expected_time_seconds": 25,
+      "stem": "In the word PHOTOGRAPHER, the stress falls on the",
+      "options": {
+        "A": "first syllable",
+        "B": "second syllable",
+        "C": "third syllable",
+        "D": "fourth syllable"
+      },
+      "correct_option": "B",
+      "explanation": "The word divides as pho-TO-gra-pher, with primary stress on the second syllable. Note the contrast with PHO-to-graph (first syllable) and pho-to-GRAPH-ic (third), a common source of error.",
+      "method_steps": [
+        "Break the word into syllables: pho / to / gra / pher.",
+        "Pronounce it naturally and locate the loudest, longest syllable.",
+        "Confirm: second syllable."
+      ],
+      "status": "draft_ai",
+      "needs_review": true
+    },
+    {
+      "id": "eng-str-0006",
+      "subject": "Use of English",
+      "topic": "Lexis and Structure",
+      "subtopic": "Concord",
+      "objective": "Apply subject-verb agreement rules with correlative conjunctions",
+      "cognitive_level": "application",
+      "author_difficulty": 0.55,
+      "expected_time_seconds": 30,
+      "stem": "Neither the principal nor the teachers ______ present at the meeting.",
+      "options": {
+        "A": "was",
+        "B": "were",
+        "C": "is",
+        "D": "has been"
+      },
+      "correct_option": "B",
+      "explanation": "With 'neither ... nor', the verb agrees with the subject nearer to it. The nearer subject is 'the teachers', which is plural, so the plural verb 'were' is required. The past tense is fixed by the completed event.",
+      "method_steps": [
+        "Identify the correlative conjunction: neither ... nor.",
+        "Apply the proximity rule: agree with the nearer subject.",
+        "The nearer subject 'teachers' is plural, so choose 'were'."
+      ],
+      "status": "draft_ai",
+      "needs_review": true
+    },
+    {
+      "id": "eng-str-0007",
+      "subject": "Use of English",
+      "topic": "Lexis and Structure",
+      "subtopic": "Prepositions",
+      "objective": "Select the preposition required by a given verb",
+      "cognitive_level": "recall",
+      "author_difficulty": 0.35,
+      "expected_time_seconds": 25,
+      "stem": "The soldiers were accused ______ looting the village.",
+      "options": {
+        "A": "for",
+        "B": "with",
+        "C": "of",
+        "D": "in"
+      },
+      "correct_option": "C",
+      "explanation": "The verb 'accuse' takes the preposition 'of' before the offence: accused of stealing, accused of negligence. 'Charged with' takes 'with', which is the confusion this item tests.",
+      "method_steps": [
+        "Recall the fixed pattern: accuse someone OF something.",
+        "Distinguish from 'charge someone WITH something'.",
+        "Select 'of'."
+      ],
+      "status": "draft_ai",
+      "needs_review": true
+    },
+    {
+      "id": "eng-str-0008",
+      "subject": "Use of English",
+      "topic": "Lexis and Structure",
+      "subtopic": "Collocation",
+      "objective": "Select the word that collocates correctly in a fixed expression",
+      "cognitive_level": "application",
+      "author_difficulty": 0.5,
+      "expected_time_seconds": 25,
+      "stem": "The company's profits have been on the ______ since the new manager took over.",
+      "options": {
+        "A": "increase",
+        "B": "addition",
+        "C": "raise",
+        "D": "growth"
+      },
+      "correct_option": "A",
+      "explanation": "'On the increase' is the established collocation meaning rising steadily. 'On the addition', 'on the raise' and 'on the growth' are not idiomatic in English, even though the individual words carry a similar sense.",
+      "method_steps": [
+        "Recognise that the blank sits inside a fixed phrase beginning 'on the'.",
+        "Test each option in the phrase and reject the unidiomatic ones.",
+        "Select 'increase'."
+      ],
+      "status": "draft_ai",
+      "needs_review": true
+    },
+
+    {
+      "id": "mth-alg-0009",
+      "subject": "Mathematics",
+      "topic": "Algebra",
+      "subtopic": "Simultaneous linear equations",
+      "objective": "Solve a pair of simultaneous linear equations in two variables",
+      "cognitive_level": "application",
+      "author_difficulty": 0.4,
+      "expected_time_seconds": 55,
+      "stem": "If 3x − 2y = 10 and x + y = 5, find the value of x.",
+      "options": { "A": "2", "B": "3", "C": "4", "D": "5" },
+      "correct_option": "C",
+      "explanation": "From the second equation, x = 5 − y. Substituting into the first: 3(5 − y) − 2y = 10, giving 15 − 5y = 10, so y = 1 and x = 4. Check: 3(4) − 2(1) = 10. ✓",
+      "method_steps": [
+        "Make x the subject of the simpler equation: x = 5 − y.",
+        "Substitute into 3x − 2y = 10 to get 15 − 3y − 2y = 10.",
+        "Solve 15 − 5y = 10 to obtain y = 1.",
+        "Back-substitute: x = 5 − 1 = 4."
+      ],
+      "status": "draft_ai",
+      "needs_review": true
+    },
+    {
+      "id": "mth-com-0010",
+      "subject": "Mathematics",
+      "topic": "Number and Numeration",
+      "subtopic": "Simple interest",
+      "objective": "Compute simple interest and the resulting amount",
+      "cognitive_level": "application",
+      "author_difficulty": 0.35,
+      "expected_time_seconds": 50,
+      "stem": "Find the amount when ₦20,000 is invested at 5% per annum simple interest for 3 years.",
+      "options": { "A": "₦21,000", "B": "₦23,000", "C": "₦23,150", "D": "₦26,000" },
+      "correct_option": "B",
+      "explanation": "Simple interest = PRT/100 = (20,000 × 5 × 3)/100 = ₦3,000. The amount is principal plus interest = 20,000 + 3,000 = ₦23,000. Option C is the compound-interest answer, included to catch candidates who apply the wrong formula.",
+      "method_steps": [
+        "Identify P = 20,000, R = 5, T = 3.",
+        "Apply I = PRT/100 = 3,000.",
+        "Amount = P + I = 23,000."
+      ],
+      "status": "draft_ai",
+      "needs_review": true
+    },
+    {
+      "id": "mth-log-0011",
+      "subject": "Mathematics",
+      "topic": "Number and Numeration",
+      "subtopic": "Logarithms",
+      "objective": "Apply the laws of logarithms to simplify an expression",
+      "cognitive_level": "application",
+      "author_difficulty": 0.5,
+      "expected_time_seconds": 50,
+      "stem": "Evaluate log₁₀ 40 + log₁₀ 25 − log₁₀ 10.",
+      "options": { "A": "1", "B": "2", "C": "3", "D": "10" },
+      "correct_option": "B",
+      "explanation": "Combine using the product and quotient laws: log(40 × 25 ÷ 10) = log(1000 ÷ 10) = log 100 = 2, since 10² = 100.",
+      "method_steps": [
+        "Apply log a + log b = log(ab): log(40 × 25) = log 1000.",
+        "Apply log a − log b = log(a/b): log(1000/10) = log 100.",
+        "Evaluate log₁₀ 100 = 2."
+      ],
+      "status": "draft_ai",
+      "needs_review": true
+    },
+    {
+      "id": "mth-sta-0012",
+      "subject": "Mathematics",
+      "topic": "Statistics",
+      "subtopic": "Measures of central tendency",
+      "objective": "Determine an unknown value given the mean of a data set",
+      "cognitive_level": "application",
+      "author_difficulty": 0.35,
+      "expected_time_seconds": 45,
+      "stem": "The mean of the numbers 2, 5, x, 8 and 11 is 7. Find the value of x.",
+      "options": { "A": "7", "B": "8", "C": "9", "D": "10" },
+      "correct_option": "C",
+      "explanation": "The mean of 5 numbers is 7, so their total is 5 × 7 = 35. The four known values sum to 2 + 5 + 8 + 11 = 26, so x = 35 − 26 = 9.",
+      "method_steps": [
+        "Total = mean × count = 7 × 5 = 35.",
+        "Sum the known values: 26.",
+        "x = 35 − 26 = 9."
+      ],
+      "status": "draft_ai",
+      "needs_review": true
+    },
+    {
+      "id": "mth-prb-0013",
+      "subject": "Mathematics",
+      "topic": "Statistics",
+      "subtopic": "Probability",
+      "objective": "Calculate the probability of a complementary event",
+      "cognitive_level": "application",
+      "author_difficulty": 0.4,
+      "expected_time_seconds": 45,
+      "stem": "A bag contains 4 red, 5 blue and 3 green balls. If one ball is drawn at random, what is the probability that it is NOT blue?",
+      "options": { "A": "5/12", "B": "7/12", "C": "1/3", "D": "3/4" },
+      "correct_option": "B",
+      "explanation": "There are 12 balls in total and 7 that are not blue (4 red + 3 green), so the probability is 7/12. Equivalently, 1 − 5/12 = 7/12. Option A is the probability that the ball IS blue.",
+      "method_steps": [
+        "Total outcomes = 4 + 5 + 3 = 12.",
+        "Favourable outcomes (not blue) = 4 + 3 = 7.",
+        "Probability = 7/12."
+      ],
+      "status": "draft_ai",
+      "needs_review": true
+    },
+    {
+      "id": "mth-geo-0014",
+      "subject": "Mathematics",
+      "topic": "Geometry and Trigonometry",
+      "subtopic": "Angles in polygons",
+      "objective": "Apply the angle sum of a quadrilateral",
+      "cognitive_level": "application",
+      "author_difficulty": 0.35,
+      "expected_time_seconds": 45,
+      "stem": "The angles of a quadrilateral are 3x, 2x, 4x and 6x. Find the value of x.",
+      "options": { "A": "20", "B": "24", "C": "30", "D": "36" },
+      "correct_option": "B",
+      "explanation": "The interior angles of a quadrilateral sum to 360°. So 3x + 2x + 4x + 6x = 15x = 360, giving x = 24.",
+      "method_steps": [
+        "Recall the angle sum of a quadrilateral: 360°.",
+        "Add the coefficients: 3 + 2 + 4 + 6 = 15.",
+        "Solve 15x = 360 to get x = 24."
+      ],
+      "status": "draft_ai",
+      "needs_review": true
+    },
+    {
+      "id": "mth-ind-0015",
+      "subject": "Mathematics",
+      "topic": "Number and Numeration",
+      "subtopic": "Indices",
+      "objective": "Simplify expressions involving the laws of indices",
+      "cognitive_level": "application",
+      "author_difficulty": 0.55,
+      "expected_time_seconds": 50,
+      "stem": "Simplify (2^(n+1) × 2^(2n)) ÷ 2^(3n).",
+      "options": { "A": "1", "B": "2", "C": "2^n", "D": "2^(n+1)" },
+      "correct_option": "B",
+      "explanation": "Add the indices in the numerator: (n + 1) + 2n = 3n + 1. Subtract the denominator index: (3n + 1) − 3n = 1. So the expression simplifies to 2¹ = 2, independent of n.",
+      "method_steps": [
+        "Apply aᵐ × aⁿ = a^(m+n) to the numerator: 2^(3n+1).",
+        "Apply aᵐ ÷ aⁿ = a^(m−n): 2^(3n+1−3n).",
+        "Simplify the index to 1, giving 2."
+      ],
+      "status": "draft_ai",
+      "needs_review": true
+    },
+    {
+      "id": "mth-cal-0016",
+      "subject": "Mathematics",
+      "topic": "Calculus",
+      "subtopic": "Differentiation of polynomials",
+      "objective": "Differentiate a polynomial and evaluate the derivative at a point",
+      "cognitive_level": "application",
+      "author_difficulty": 0.5,
+      "expected_time_seconds": 55,
+      "stem": "If y = 3x³ − 5x² + 4x − 7, find dy/dx at x = 1.",
+      "options": { "A": "2", "B": "3", "C": "4", "D": "5" },
+      "correct_option": "B",
+      "explanation": "Differentiating term by term gives dy/dx = 9x² − 10x + 4. Substituting x = 1: 9 − 10 + 4 = 3. Note that the constant −7 differentiates to zero.",
+      "method_steps": [
+        "Differentiate each term using d/dx(axⁿ) = anx^(n−1).",
+        "Obtain dy/dx = 9x² − 10x + 4.",
+        "Substitute x = 1 to get 3."
+      ],
+      "status": "draft_ai",
+      "needs_review": true
+    },
+
+    {
+      "id": "phy-mec-0017",
+      "subject": "Physics",
+      "topic": "Mechanics",
+      "subtopic": "Newton's second law",
+      "objective": "Apply F = ma to a body undergoing uniform acceleration",
+      "cognitive_level": "application",
+      "author_difficulty": 0.4,
+      "expected_time_seconds": 50,
+      "stem": "A body of mass 5 kg accelerates uniformly from rest to 20 m/s in 4 seconds. Calculate the force acting on it.",
+      "options": { "A": "4 N", "B": "25 N", "C": "100 N", "D": "400 N" },
+      "correct_option": "B",
+      "explanation": "Acceleration a = (v − u)/t = (20 − 0)/4 = 5 m/s². Force F = ma = 5 × 5 = 25 N. Option C is the common error of multiplying mass by velocity instead of acceleration.",
+      "method_steps": [
+        "Find acceleration: a = (v − u)/t = 5 m/s².",
+        "Apply F = ma.",
+        "F = 5 kg × 5 m/s² = 25 N."
+      ],
+      "status": "draft_ai",
+      "needs_review": true
+    },
+    {
+      "id": "phy-mec-0018",
+      "subject": "Physics",
+      "topic": "Mechanics",
+      "subtopic": "Scalars and vectors",
+      "objective": "Distinguish vector quantities from scalar quantities",
+      "cognitive_level": "recall",
+      "author_difficulty": 0.3,
+      "expected_time_seconds": 25,
+      "stem": "Which of the following is a vector quantity?",
+      "options": { "A": "Speed", "B": "Work", "C": "Momentum", "D": "Energy" },
+      "correct_option": "C",
+      "explanation": "Momentum is the product of mass and velocity; because velocity has direction, momentum is a vector. Speed, work and energy are all scalars, having magnitude only.",
+      "method_steps": [
+        "Recall that a vector requires both magnitude and direction.",
+        "Speed is the scalar counterpart of velocity; work and energy are scalars.",
+        "Momentum = mass × velocity, so it inherits direction."
+      ],
+      "status": "draft_ai",
+      "needs_review": true
+    },
+    {
+      "id": "phy-hea-0019",
+      "subject": "Physics",
+      "topic": "Heat Energy",
+      "subtopic": "Specific heat capacity",
+      "objective": "Calculate quantity of heat using Q = mcΔθ",
+      "cognitive_level": "application",
+      "author_difficulty": 0.45,
+      "expected_time_seconds": 55,
+      "stem": "Calculate the quantity of heat required to raise the temperature of 2 kg of water by 10 K. (Specific heat capacity of water = 4200 J kg⁻¹ K⁻¹)",
+      "options": { "A": "8.4 kJ", "B": "42 kJ", "C": "84 kJ", "D": "840 kJ" },
+      "correct_option": "C",
+      "explanation": "Q = mcΔθ = 2 × 4200 × 10 = 84,000 J = 84 kJ. Careless conversion between joules and kilojoules produces the distractors.",
+      "method_steps": [
+        "Write Q = mcΔθ.",
+        "Substitute m = 2, c = 4200, Δθ = 10.",
+        "Q = 84,000 J, which is 84 kJ."
+      ],
+      "status": "draft_ai",
+      "needs_review": true
+    },
+    {
+      "id": "phy-ele-0020",
+      "subject": "Physics",
+      "topic": "Electricity",
+      "subtopic": "Resistors in parallel",
+      "objective": "Compute the effective resistance of resistors in parallel",
+      "cognitive_level": "application",
+      "author_difficulty": 0.45,
+      "expected_time_seconds": 50,
+      "stem": "Two resistors of 4 Ω and 12 Ω are connected in parallel. Calculate their effective resistance.",
+      "options": { "A": "3 Ω", "B": "8 Ω", "C": "16 Ω", "D": "48 Ω" },
+      "correct_option": "A",
+      "explanation": "For two resistors in parallel, R = (R₁R₂)/(R₁ + R₂) = (4 × 12)/16 = 3 Ω. Option C is the series result, a frequent confusion. Note that the parallel resistance is always smaller than the smaller resistor, which is a useful check.",
+      "method_steps": [
+        "Use 1/R = 1/4 + 1/12 = 3/12 + 1/12 = 4/12.",
+        "Invert: R = 12/4 = 3 Ω.",
+        "Sanity check: 3 Ω is less than 4 Ω, as required for parallel."
+      ],
+      "status": "draft_ai",
+      "needs_review": true
+    },
+    {
+      "id": "phy-wav-0021",
+      "subject": "Physics",
+      "topic": "Waves",
+      "subtopic": "Wave equation",
+      "objective": "Apply v = fλ",
+      "cognitive_level": "application",
+      "author_difficulty": 0.3,
+      "expected_time_seconds": 40,
+      "stem": "A wave has a frequency of 50 Hz and a wavelength of 4 m. Calculate its speed.",
+      "options": { "A": "12.5 m/s", "B": "46 m/s", "C": "54 m/s", "D": "200 m/s" },
+      "correct_option": "D",
+      "explanation": "Wave speed v = fλ = 50 × 4 = 200 m/s. The distractors correspond to dividing, subtracting and adding the two given values.",
+      "method_steps": [
+        "Recall v = fλ.",
+        "Substitute f = 50 Hz, λ = 4 m.",
+        "v = 200 m/s."
+      ],
+      "status": "draft_ai",
+      "needs_review": true
+    },
+    {
+      "id": "phy-opt-0022",
+      "subject": "Physics",
+      "topic": "Optics",
+      "subtopic": "Refractive index",
+      "objective": "Relate refractive index to the speed of light in a medium",
+      "cognitive_level": "application",
+      "author_difficulty": 0.5,
+      "expected_time_seconds": 50,
+      "stem": "The refractive index of a glass block is 1.5. If the speed of light in vacuum is 3.0 × 10⁸ m/s, calculate the speed of light in the glass.",
+      "options": {
+        "A": "1.5 × 10⁸ m/s",
+        "B": "2.0 × 10⁸ m/s",
+        "C": "3.0 × 10⁸ m/s",
+        "D": "4.5 × 10⁸ m/s"
+      },
+      "correct_option": "B",
+      "explanation": "Refractive index n = c/v, so v = c/n = (3.0 × 10⁸)/1.5 = 2.0 × 10⁸ m/s. Option D comes from multiplying rather than dividing, which would wrongly imply light travels faster in glass than in vacuum.",
+      "method_steps": [
+        "Write n = c/v.",
+        "Rearrange to v = c/n.",
+        "v = 3.0 × 10⁸ ÷ 1.5 = 2.0 × 10⁸ m/s."
+      ],
+      "status": "draft_ai",
+      "needs_review": true
+    },
+    {
+      "id": "phy-nuc-0023",
+      "subject": "Physics",
+      "topic": "Modern Physics",
+      "subtopic": "Radioactive decay and half-life",
+      "objective": "Determine the fraction of a sample remaining after a number of half-lives",
+      "cognitive_level": "application",
+      "author_difficulty": 0.5,
+      "expected_time_seconds": 50,
+      "stem": "A radioactive substance has a half-life of 5 days. What fraction of the original sample remains undecayed after 20 days?",
+      "options": { "A": "1/4", "B": "1/8", "C": "1/16", "D": "1/32" },
+      "correct_option": "C",
+      "explanation": "The number of half-lives elapsed is 20 ÷ 5 = 4. The fraction remaining is (1/2)⁴ = 1/16.",
+      "method_steps": [
+        "Number of half-lives n = total time ÷ half-life = 4.",
+        "Fraction remaining = (1/2)ⁿ.",
+        "(1/2)⁴ = 1/16."
+      ],
+      "status": "draft_ai",
+      "needs_review": true
+    },
+    {
+      "id": "phy-mac-0024",
+      "subject": "Physics",
+      "topic": "Mechanics",
+      "subtopic": "Machines",
+      "objective": "Relate mechanical advantage, velocity ratio and efficiency",
+      "cognitive_level": "application",
+      "author_difficulty": 0.55,
+      "expected_time_seconds": 55,
+      "stem": "A machine has a velocity ratio of 5 and an efficiency of 80%. Calculate its mechanical advantage.",
+      "options": { "A": "4", "B": "6.25", "C": "16", "D": "25" },
+      "correct_option": "A",
+      "explanation": "Efficiency = (MA ÷ VR) × 100%, so MA = efficiency × VR = 0.80 × 5 = 4. Option B results from dividing VR by the efficiency instead of multiplying.",
+      "method_steps": [
+        "Write efficiency = (MA/VR) × 100.",
+        "Rearrange: MA = (efficiency/100) × VR.",
+        "MA = 0.8 × 5 = 4."
+      ],
+      "status": "draft_ai",
+      "needs_review": true
+    },
+
+    {
+      "id": "che-mol-0025",
+      "subject": "Chemistry",
+      "topic": "Stoichiometry",
+      "subtopic": "The mole concept",
+      "objective": "Calculate the number of moles from a given mass",
+      "cognitive_level": "application",
+      "author_difficulty": 0.4,
+      "expected_time_seconds": 50,
+      "stem": "How many moles are present in 11 g of carbon(IV) oxide? (C = 12, O = 16)",
+      "options": { "A": "0.25", "B": "0.50", "C": "1.00", "D": "4.00" },
+      "correct_option": "A",
+      "explanation": "The molar mass of CO₂ is 12 + (2 × 16) = 44 g/mol. Number of moles = mass ÷ molar mass = 11 ÷ 44 = 0.25 mol.",
+      "method_steps": [
+        "Compute molar mass of CO₂ = 44 g/mol.",
+        "Apply n = m/M.",
+        "n = 11/44 = 0.25 mol."
+      ],
+      "status": "draft_ai",
+      "needs_review": true
+    },
+    {
+      "id": "che-red-0026",
+      "subject": "Chemistry",
+      "topic": "Redox Reactions",
+      "subtopic": "Oxidising and reducing agents",
+      "objective": "Identify the reducing agent in a displacement reaction",
+      "cognitive_level": "comprehension",
+      "author_difficulty": 0.5,
+      "expected_time_seconds": 45,
+      "stem": "In the reaction Zn(s) + CuSO₄(aq) → ZnSO₄(aq) + Cu(s), which species acts as the reducing agent?",
+      "options": { "A": "Zn", "B": "CuSO₄", "C": "ZnSO₄", "D": "Cu" },
+      "correct_option": "A",
+      "explanation": "Zinc is oxidised from 0 to +2, losing electrons. The species that is itself oxidised is the reducing agent, because it donates the electrons that reduce Cu²⁺ to Cu. CuSO₄ is the oxidising agent.",
+      "method_steps": [
+        "Assign oxidation numbers: Zn goes 0 → +2; Cu goes +2 → 0.",
+        "Zn loses electrons, so Zn is oxidised.",
+        "The oxidised species is the reducing agent: Zn."
+      ],
+      "status": "draft_ai",
+      "needs_review": true
+    },
+    {
+      "id": "che-per-0027",
+      "subject": "Chemistry",
+      "topic": "Periodic Table",
+      "subtopic": "Electronic configuration and group",
+      "objective": "Deduce group placement from electronic configuration",
+      "cognitive_level": "application",
+      "author_difficulty": 0.45,
+      "expected_time_seconds": 45,
+      "stem": "An element has the electronic configuration 1s² 2s² 2p⁶ 3s². To which group of the periodic table does it belong?",
+      "options": { "A": "Group 1", "B": "Group 2", "C": "Group 3", "D": "Group 8" },
+      "correct_option": "B",
+      "explanation": "The outermost shell (n = 3) holds two electrons, so the element has two valence electrons and belongs to Group 2. The configuration corresponds to magnesium.",
+      "method_steps": [
+        "Identify the outermost shell: 3s².",
+        "Count valence electrons: 2.",
+        "For s-block elements, group number equals the number of valence electrons: Group 2."
+      ],
+      "status": "draft_ai",
+      "needs_review": true
+    },
+    {
+      "id": "che-org-0028",
+      "subject": "Chemistry",
+      "topic": "Organic Chemistry",
+      "subtopic": "IUPAC nomenclature of alkanes",
+      "objective": "Name a branched alkane using IUPAC rules",
+      "cognitive_level": "application",
+      "author_difficulty": 0.5,
+      "expected_time_seconds": 50,
+      "stem": "What is the IUPAC name of the compound CH₃CH(CH₃)CH₂CH₃?",
+      "options": {
+        "A": "2-methylbutane",
+        "B": "3-methylbutane",
+        "C": "pentane",
+        "D": "2-methylpropane"
+      },
+      "correct_option": "A",
+      "explanation": "The longest continuous carbon chain contains four carbons (butane) with a methyl branch. Numbering from the end that gives the branch the lower locant places the methyl group on carbon 2, so the name is 2-methylbutane. '3-methylbutane' violates the lowest-locant rule.",
+      "method_steps": [
+        "Find the longest chain: four carbons, so the parent is butane.",
+        "Identify the substituent: a methyl group.",
+        "Number from both ends and choose the lower locant: position 2.",
+        "Name: 2-methylbutane."
+      ],
+      "status": "draft_ai",
+      "needs_review": true
+    },
+    {
+      "id": "che-aci-0029",
+      "subject": "Chemistry",
+      "topic": "Acids, Bases and Salts",
+      "subtopic": "pH calculations",
+      "objective": "Calculate the pH of a strong acid of known concentration",
+      "cognitive_level": "application",
+      "author_difficulty": 0.45,
+      "expected_time_seconds": 45,
+      "stem": "Calculate the pH of a 0.001 mol dm⁻³ solution of hydrochloric acid.",
+      "options": { "A": "1", "B": "2", "C": "3", "D": "11" },
+      "correct_option": "C",
+      "explanation": "HCl is a strong monobasic acid that ionises completely, so [H⁺] = 0.001 = 1 × 10⁻³ mol dm⁻³. pH = −log[H⁺] = 3. Option D is the corresponding pOH, offered as a distractor.",
+      "method_steps": [
+        "Recognise HCl as a strong acid: [H⁺] equals the concentration.",
+        "[H⁺] = 1 × 10⁻³ mol dm⁻³.",
+        "pH = −log(10⁻³) = 3."
+      ],
+      "status": "draft_ai",
+      "needs_review": true
+    },
+    {
+      "id": "che-gas-0030",
+      "subject": "Chemistry",
+      "topic": "Gas Laws",
+      "subtopic": "Charles' law",
+      "objective": "Apply Charles' law using absolute temperature",
+      "cognitive_level": "application",
+      "author_difficulty": 0.55,
+      "expected_time_seconds": 60,
+      "stem": "A gas occupies 500 cm³ at 27 °C. What volume will it occupy at 127 °C if the pressure remains constant?",
+      "options": { "A": "375 cm³", "B": "500 cm³", "C": "667 cm³", "D": "2352 cm³" },
+      "correct_option": "C",
+      "explanation": "Temperatures must be converted to kelvin: 27 °C = 300 K and 127 °C = 400 K. By Charles' law, V₁/T₁ = V₂/T₂, so V₂ = 500 × 400/300 ≈ 667 cm³. Option D is the error of using Celsius directly.",
+      "method_steps": [
+        "Convert to kelvin: T₁ = 300 K, T₂ = 400 K.",
+        "Apply V₁/T₁ = V₂/T₂.",
+        "V₂ = 500 × (400/300) ≈ 667 cm³."
+      ],
+      "status": "draft_ai",
+      "needs_review": true
+    },
+    {
+      "id": "che-ele-0031",
+      "subject": "Chemistry",
+      "topic": "Electrolysis",
+      "subtopic": "Products of electrolysis",
+      "objective": "Predict the cathode product in the electrolysis of brine",
+      "cognitive_level": "comprehension",
+      "author_difficulty": 0.5,
+      "expected_time_seconds": 40,
+      "stem": "During the electrolysis of concentrated sodium chloride solution using inert electrodes, the product liberated at the cathode is",
+      "options": { "A": "chlorine", "B": "hydrogen", "C": "sodium", "D": "oxygen" },
+      "correct_option": "B",
+      "explanation": "Although Na⁺ and H⁺ both migrate to the cathode, hydrogen is lower in the electrochemical series and is therefore discharged in preference to sodium. Chlorine is the anode product, not the cathode product.",
+      "method_steps": [
+        "Identify the cations present: Na⁺ and H⁺ (from water).",
+        "Apply the electrochemical series: the ion lower in the series is discharged.",
+        "Hydrogen is discharged at the cathode."
+      ],
+      "status": "draft_ai",
+      "needs_review": true
+    },
+    {
+      "id": "che-org-0032",
+      "subject": "Chemistry",
+      "topic": "Organic Chemistry",
+      "subtopic": "Homologous series",
+      "objective": "State the general molecular formula of alkynes",
+      "cognitive_level": "recall",
+      "author_difficulty": 0.3,
+      "expected_time_seconds": 25,
+      "stem": "The general molecular formula of the alkynes is",
+      "options": {
+        "A": "CₙH₂ₙ₊₂",
+        "B": "CₙH₂ₙ",
+        "C": "CₙH₂ₙ₋₂",
+        "D": "CₙH₂ₙ₋₆"
+      },
+      "correct_option": "C",
+      "explanation": "Alkynes contain a carbon–carbon triple bond and follow CₙH₂ₙ₋₂. Option A is the alkane formula and option B the alkene formula.",
+      "method_steps": [
+        "Recall that each degree of unsaturation removes two hydrogens.",
+        "Alkanes are CₙH₂ₙ₊₂; alkenes with one double bond are CₙH₂ₙ.",
+        "Alkynes, with a triple bond, are CₙH₂ₙ₋₂."
+      ],
+      "status": "draft_ai",
+      "needs_review": true
+    },
+
+    {
+      "id": "bio-exc-0033",
+      "subject": "Biology",
+      "topic": "Excretion",
+      "subtopic": "Structure of the kidney",
+      "objective": "Identify the functional unit of the kidney",
+      "cognitive_level": "recall",
+      "author_difficulty": 0.25,
+      "expected_time_seconds": 20,
+      "stem": "The functional unit of the kidney is the",
+      "options": { "A": "neuron", "B": "nephron", "C": "alveolus", "D": "villus" },
+      "correct_option": "B",
+      "explanation": "The nephron is the microscopic filtering unit of the kidney. The neuron belongs to the nervous system, the alveolus to the lungs and the villus to the small intestine.",
+      "method_steps": [
+        "Associate each option with its organ system.",
+        "Only the nephron belongs to the kidney."
+      ],
+      "status": "draft_ai",
+      "needs_review": true
+    },
+    {
+      "id": "bio-cel-0034",
+      "subject": "Biology",
+      "topic": "Cell Biology",
+      "subtopic": "Cell organelles",
+      "objective": "Relate organelle structure to function",
+      "cognitive_level": "recall",
+      "author_difficulty": 0.3,
+      "expected_time_seconds": 25,
+      "stem": "Which organelle is the principal site of aerobic respiration in the cell?",
+      "options": { "A": "Ribosome", "B": "Golgi apparatus", "C": "Mitochondrion", "D": "Lysosome" },
+      "correct_option": "C",
+      "explanation": "The mitochondrion carries out the Krebs cycle and oxidative phosphorylation, producing most of the cell's ATP. Ribosomes synthesise protein, the Golgi apparatus packages secretions, and lysosomes carry digestive enzymes.",
+      "method_steps": [
+        "Recall the function of each listed organelle.",
+        "Match aerobic ATP production to the mitochondrion."
+      ],
+      "status": "draft_ai",
+      "needs_review": true
+    },
+    {
+      "id": "bio-gen-0035",
+      "subject": "Biology",
+      "topic": "Genetics",
+      "subtopic": "Monohybrid inheritance",
+      "objective": "Predict phenotypic ratios from a monohybrid cross",
+      "cognitive_level": "application",
+      "author_difficulty": 0.45,
+      "expected_time_seconds": 50,
+      "stem": "In pea plants, tallness (T) is dominant over dwarfness (t). What phenotypic ratio is expected from a cross between two heterozygous tall plants?",
+      "options": { "A": "1 : 1", "B": "1 : 2 : 1", "C": "3 : 1", "D": "9 : 3 : 3 : 1" },
+      "correct_option": "C",
+      "explanation": "Tt × Tt gives the genotypes TT, Tt, Tt and tt. Since T is dominant, three offspring are tall and one is dwarf, a phenotypic ratio of 3 : 1. Option B is the genotypic ratio, and option D is the dihybrid ratio.",
+      "method_steps": [
+        "Draw a Punnett square for Tt × Tt.",
+        "Obtain genotypes 1 TT : 2 Tt : 1 tt.",
+        "Group by phenotype: 3 tall : 1 dwarf."
+      ],
+      "status": "draft_ai",
+      "needs_review": true
+    },
+    {
+      "id": "bio-eco-0036",
+      "subject": "Biology",
+      "topic": "Ecology",
+      "subtopic": "Trophic levels",
+      "objective": "Identify the role of decomposers in an ecosystem",
+      "cognitive_level": "recall",
+      "author_difficulty": 0.3,
+      "expected_time_seconds": 25,
+      "stem": "Organisms that break down dead organic matter and return nutrients to the soil are called",
+      "options": { "A": "producers", "B": "herbivores", "C": "decomposers", "D": "predators" },
+      "correct_option": "C",
+      "explanation": "Decomposers, chiefly bacteria and fungi, break down dead organisms and waste, releasing mineral nutrients back into the soil for producers to reuse. This closes the nutrient cycle.",
+      "method_steps": [
+        "Recall the trophic categories: producers, consumers, decomposers.",
+        "Match the description of breaking down dead matter to decomposers."
+      ],
+      "status": "draft_ai",
+      "needs_review": true
+    },
+    {
+      "id": "bio-nut-0037",
+      "subject": "Biology",
+      "topic": "Nutrition",
+      "subtopic": "Functions of the liver",
+      "objective": "Distinguish functions of the liver from those of other organs",
+      "cognitive_level": "comprehension",
+      "author_difficulty": 0.55,
+      "expected_time_seconds": 40,
+      "stem": "Which of the following is NOT a function of the liver?",
+      "options": {
+        "A": "Deamination of excess amino acids",
+        "B": "Production of bile",
+        "C": "Secretion of insulin",
+        "D": "Detoxification of harmful substances"
+      },
+      "correct_option": "C",
+      "explanation": "Insulin is secreted by the beta cells of the islets of Langerhans in the pancreas, not by the liver. Deamination, bile production and detoxification are all genuine liver functions.",
+      "method_steps": [
+        "Note that the question asks for the exception.",
+        "Confirm A, B and D as established liver functions.",
+        "Recall that insulin originates in the pancreas."
+      ],
+      "status": "draft_ai",
+      "needs_review": true
+    },
+    {
+      "id": "bio-hor-0038",
+      "subject": "Biology",
+      "topic": "Coordination and Control",
+      "subtopic": "Plant hormones",
+      "objective": "Relate auxin to tropic responses in plants",
+      "cognitive_level": "comprehension",
+      "author_difficulty": 0.4,
+      "expected_time_seconds": 30,
+      "stem": "The plant hormone chiefly responsible for phototropism is",
+      "options": { "A": "auxin", "B": "ethylene", "C": "abscisic acid", "D": "cytokinin" },
+      "correct_option": "A",
+      "explanation": "Auxin accumulates on the shaded side of a shoot, causing cells there to elongate more and the shoot to bend towards the light. Ethylene promotes ripening, abscisic acid promotes dormancy and stomatal closure, and cytokinin promotes cell division.",
+      "method_steps": [
+        "Recall the principal role of each hormone.",
+        "Link differential cell elongation towards light to auxin distribution."
+      ],
+      "status": "draft_ai",
+      "needs_review": true
+    },
+    {
+      "id": "bio-tra-0039",
+      "subject": "Biology",
+      "topic": "Transport",
+      "subtopic": "Vascular tissue in plants",
+      "objective": "Distinguish the functions of xylem and phloem",
+      "cognitive_level": "recall",
+      "author_difficulty": 0.3,
+      "expected_time_seconds": 25,
+      "stem": "In flowering plants, water and dissolved mineral salts are conducted from the roots to the leaves by the",
+      "options": { "A": "phloem", "B": "xylem", "C": "cambium", "D": "cortex" },
+      "correct_option": "B",
+      "explanation": "Xylem vessels conduct water and mineral salts upwards from root to leaf. Phloem transports manufactured food, cambium is the meristematic layer producing secondary growth, and the cortex is a packing and storage tissue.",
+      "method_steps": [
+        "Separate the two conducting tissues by their cargo.",
+        "Water and minerals travel in xylem; sugars travel in phloem."
+      ],
+      "status": "draft_ai",
+      "needs_review": true
+    },
+    {
+      "id": "bio-evo-0040",
+      "subject": "Biology",
+      "topic": "Evolution",
+      "subtopic": "Theories of evolution",
+      "objective": "Attribute the theory of natural selection to its proponent",
+      "cognitive_level": "recall",
+      "author_difficulty": 0.3,
+      "expected_time_seconds": 25,
+      "stem": "The theory of evolution by natural selection was propounded by",
+      "options": {
+        "A": "Jean-Baptiste Lamarck",
+        "B": "Gregor Mendel",
+        "C": "Charles Darwin",
+        "D": "Louis Pasteur"
+      },
+      "correct_option": "C",
+      "explanation": "Charles Darwin set out natural selection in On the Origin of Species. Lamarck proposed the inheritance of acquired characteristics, Mendel founded genetics, and Pasteur disproved spontaneous generation.",
+      "method_steps": [
+        "Associate each scientist with his principal contribution.",
+        "Natural selection belongs to Darwin."
+      ],
+      "status": "draft_ai",
+      "needs_review": true
+    }
+  ]
+}
