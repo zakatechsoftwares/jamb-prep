@@ -78,7 +78,7 @@ Ask me before adding any dependency not named above.
 ```
 GOAL: Implement the database schema from section 8.4 of the plan.
 
-Read docs/implementation-plan.md section 8.4 and section 7.4 (item
+Read docs/implementation-plan.md section 8.4 and section 7.6 (item
 metadata schema). Write PostgreSQL migrations for every entity listed.
 
 CONSTRAINTS:
@@ -187,13 +187,14 @@ Read docs/item-generation-spec.md. Implement:
    - reject "all/none of the above" and length-outlier options
 
 3. A CLI: `pnpm item-gen --subject chemistry --objective-id 42 --count 10`
-   writing to the database with status 'draft_ai'.
+   writing to the database with status 'generated'.
 
 4. A cost report: tokens and estimated spend per accepted item.
 
-CONSTRAINTS: never write directly to 'approved'. Calculation items get
-flagged for mandatory human review regardless of gate results. Log every
-raw API response to disk for audit.
+CONSTRAINTS: never write directly to 'approved_uncalibrated' or
+'approved_calibrated'. Calculation items get flagged for mandatory human
+review regardless of gate results. Log every raw API response to disk
+for audit.
 
 DONE WHEN: running it against one Chemistry objective produces 10 valid
 items in the database and a gate report showing what was flagged and why.
@@ -208,7 +209,10 @@ A queue-based screen: one item at a time, keyboard-driven (approve /
 reject / edit / skip), showing stem, options, proposed key, explanation,
 the independent-solve verdict, and the syllabus objective.
 
-Prioritise the queue: calculation items first, recall items last.
+Prioritise the queue exactly as docs/implementation-plan.md section 7.9
+specifies: (1) items where the blind second solve disagreed with the
+proposed key, (2) high risk_tier items, (3) items in needs_second_review,
+(4) items flagged by other automated gates, (5) low-risk sampling.
 Track reviewer throughput — accepted items per hour — since that's the
 metric the content budget depends on.
 ```

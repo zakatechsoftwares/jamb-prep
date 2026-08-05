@@ -1,94 +1,39 @@
 **IMPLEMENTATION PLAN**
 
-# **JAMB UTME Preparation Application**
+**JAMB UTME Preparation Application**
 
-**A mobile-first, offline-capable CBT practice and adaptive learning platform**
+*A mobile-first, offline-capable CBT practice and adaptive learning platform*
 
 Document type: Product & Engineering Implementation Plan
 
-Version: 1.0 (Draft for review)
+Version: 3.0 — includes the human review and contribution framework
 
 Date: 31 July 2026
 
 Prepared for: Product Owner / Founding Team
 
-## Table of Contents
+# Table of Contents
 
-- [1. Executive Summary](#1-executive-summary)
-- [2. Product Vision, Objectives and Success Criteria](#2-product-vision-objectives-and-success-criteria)
-  - [2.1 Vision statement](#21-vision-statement)
-  - [2.2 Product objectives](#22-product-objectives)
-  - [2.3 Success criteria (first 12 months post-launch)](#23-success-criteria-first-12-months-post-launch)
-- [3. The Examination Blueprint the Product Must Model](#3-the-examination-blueprint-the-product-must-model)
-- [4. Users, Personas and Jobs to Be Done](#4-users-personas-and-jobs-to-be-done)
-  - [4.1 Primary personas](#41-primary-personas)
-  - [4.2 Core jobs to be done](#42-core-jobs-to-be-done)
-- [5. Competitive Positioning](#5-competitive-positioning)
-- [6. Feature Scope](#6-feature-scope)
-  - [6.1 Release 1 — MVP (must have)](#61-release-1-mvp-must-have)
-  - [6.2 Release 2 — Should have](#62-release-2-should-have)
-  - [6.3 Release 3 — Could have](#63-release-3-could-have)
-  - [6.4 Explicitly out of scope](#64-explicitly-out-of-scope)
-- [7. Content Strategy: The Question Bank](#7-content-strategy-the-question-bank)
-  - [7.1 Target volumes](#71-target-volumes)
-  - [7.2 Sourcing](#72-sourcing)
-  - [7.3 Editorial pipeline](#73-editorial-pipeline)
-  - [7.4 Item metadata schema](#74-item-metadata-schema)
-- [8. System Architecture](#8-system-architecture)
-  - [8.1 Architectural principles](#81-architectural-principles)
-  - [8.2 Recommended technology stack](#82-recommended-technology-stack)
-  - [8.3 Synchronisation design](#83-synchronisation-design)
-  - [8.4 Core data model](#84-core-data-model)
-- [9. The Adaptive Learning Engine](#9-the-adaptive-learning-engine)
-  - [9.1 Item calibration](#91-item-calibration)
-  - [9.2 Ability estimation and mastery](#92-ability-estimation-and-mastery)
-  - [9.3 Item selection policy](#93-item-selection-policy)
-  - [9.4 Spaced repetition](#94-spaced-repetition)
-  - [9.5 The readiness score](#95-the-readiness-score)
-  - [9.6 Pacing analytics](#96-pacing-analytics)
-- [10. User Experience and Interface Design](#10-user-experience-and-interface-design)
-  - [10.1 Design principles](#101-design-principles)
-  - [10.2 Key screens](#102-key-screens)
-  - [10.3 Accessibility and inclusion](#103-accessibility-and-inclusion)
-- [11. Non-Functional Requirements](#11-non-functional-requirements)
-- [12. Monetisation and Commercial Model](#12-monetisation-and-commercial-model)
-  - [12.1 Pricing structure](#121-pricing-structure)
-  - [12.2 Collection channels](#122-collection-channels)
-  - [12.3 Unit economics to model in Phase 0](#123-unit-economics-to-model-in-phase-0)
-- [13. Delivery Roadmap](#13-delivery-roadmap)
-  - [13.1 Phases](#131-phases)
-  - [13.2 Critical path](#132-critical-path)
-- [14. Team, Roles and Resourcing](#14-team-roles-and-resourcing)
-- [15. Quality Assurance and Testing](#15-quality-assurance-and-testing)
-- [16. Launch and Growth Strategy](#16-launch-and-growth-strategy)
-  - [16.1 Channels, in order of expected efficiency](#161-channels-in-order-of-expected-efficiency)
-  - [16.2 The recurring hook](#162-the-recurring-hook)
-  - [16.3 Brand position](#163-brand-position)
-- [17. Risks and Mitigations](#17-risks-and-mitigations)
-- [18. Measurement Framework](#18-measurement-framework)
-  - [18.1 The metric that matters](#181-the-metric-that-matters)
-  - [18.2 Supporting metrics](#182-supporting-metrics)
-- [19. Post-Launch Operations](#19-post-launch-operations)
-- [20. Immediate Next Steps](#20-immediate-next-steps)
-
-## 1. Executive Summary
+# 1. Executive Summary
 
 This document sets out an end-to-end plan for building a robust digital preparation platform for candidates sitting the Unified Tertiary Matriculation Examination (UTME) administered by the Joint Admissions and Matriculation Board (JAMB). The product is conceived as an Android-first, offline-capable mobile application backed by a web platform, combining a rigorously curated question bank, a faithful simulation of the JAMB Computer-Based Test (CBT) environment, an adaptive practice engine, and diagnostic analytics that tell each candidate precisely what to study next.
 
 The central insight driving the design is that the UTME is not primarily a knowledge test — it is a speed-and-accuracy test under severe time pressure. A candidate must answer 180 multiple-choice questions across four subjects in 120 minutes, roughly 40 seconds per question. Most existing preparation apps in the market are question dumps: they show past questions but do not train pacing, do not diagnose weakness at topic level, and do not adapt. The differentiation of this product lies in three areas: exam-realistic simulation, adaptive item selection driven by measured item difficulty, and a readiness score that predicts a candidate's likely UTME score with a stated confidence interval.
 
-The plan proposes a phased delivery over approximately eight months to public launch, with a deliberate alignment to the JAMB annual cycle: build and pilot between May and October, launch publicly in November, and monetise through the December-to-April preparation peak. Total scope is broken into 6 phases, 21 workstreams and a defined MVP boundary, with a monetisation model built for the Nigerian payments environment.
+Two decisions shape the economics of the build. First, the entire question bank is generated by a large language model against the official syllabus, with the human budget spent on verification rather than authoring; this cuts cost per accepted item by roughly two-thirds but makes the review pipeline, not the generator, the critical content workstream. Second, the product launches on Android and extends to the web and iOS on a deliberate sequence, all three clients sharing a single platform-neutral core.
+
+The plan proposes a phased delivery over approximately eight months to Android launch, with a deliberate alignment to the JAMB annual cycle: build and pilot between May and October, launch publicly in November, and monetise through the December-to-April preparation peak. Total scope is broken into 7 phases and a defined MVP boundary, with a monetisation model built for the Nigerian payments environment and a platform expansion phase covering the web and iOS clients.
 
 | **The one-sentence product definition** An offline-first JAMB UTME preparation app that replicates the real CBT experience, measures each candidate's weakest topics against the official syllabus, and serves an adaptive daily practice plan that closes those gaps before exam day. |
 | --- |
 
-## 2. Product Vision, Objectives and Success Criteria
+# 2. Product Vision, Objectives and Success Criteria
 
-### 2.1 Vision statement
+## 2.1 Vision statement
 
 To become the default preparation companion for every Nigerian UTME candidate — trusted for the accuracy of its content, respected for the honesty of its diagnostics, and affordable enough that a candidate in any state can use it on an entry-level Android phone with intermittent data.
 
-### 2.2 Product objectives
+## 2.2 Product objectives
 
 - **Fidelity —** reproduce the JAMB CBT interface, question distribution, timing model and keyboard navigation so accurately that exam day feels like a repeat of practice.
 - **Diagnosis —** move candidates from 'I scored 210' to 'I lost 34 marks in Chemistry, 22 of them in Organic Chemistry, specifically on nomenclature and isomerism.'
@@ -97,7 +42,7 @@ To become the default preparation companion for every Nigerian UTME candidate �
 - **Affordability —** a genuinely useful free tier, with premium priced below the cost of a single physical past-questions compendium plus a term of tutorial-centre fees.
 - **Integrity —** no claims of 'expo', leaked papers or guaranteed scores. The brand position is legitimate preparation, explicitly contrasted with the fraudulent expo ecosystem.
 
-### 2.3 Success criteria (first 12 months post-launch)
+## 2.3 Success criteria (first 12 months post-launch)
 
 | **Dimension** | **Metric** | **Target** |
 | --- | --- | --- |
@@ -112,7 +57,7 @@ To become the default preparation companion for every Nigerian UTME candidate �
 | Technical | Crash-free session rate | ≥ 99.5% |
 | Technical | Median cold start on entry-level Android | < 3 seconds |
 
-## 3. The Examination Blueprint the Product Must Model
+# 3. The Examination Blueprint the Product Must Model
 
 Every scoring, timing and content decision in the application derives from the structure of the examination itself. The blueprint below is the specification the practice engine must satisfy. It must be stored as configuration data, not hard-coded, because JAMB adjusts the format from cycle to cycle and the product must absorb such changes without a code release.
 
@@ -133,9 +78,9 @@ Every scoring, timing and content decision in the application derives from the s
 
 *Note: the figures above should be re-verified against the current official JAMB brochure and any board circulars at the start of each cycle. The exam configuration table in the database is the single source of truth for the application and is versioned by examination year.*
 
-## 4. Users, Personas and Jobs to Be Done
+# 4. Users, Personas and Jobs to Be Done
 
-### 4.1 Primary personas
+## 4.1 Primary personas
 
 | **Persona** | **Context** | **Primary need** |
 | --- | --- | --- |
@@ -145,7 +90,7 @@ Every scoring, timing and content decision in the application derives from the s
 | The parent or sponsor | Pays for the subscription, wants evidence of progress | A simple progress report and proof that the money is producing improvement |
 | The tutorial-centre proprietor | Runs a coaching business with 40–400 students | Bulk licences, cohort dashboards, ability to assign and grade mocks |
 
-### 4.2 Core jobs to be done
+## 4.2 Core jobs to be done
 
 - "Tell me where I actually stand right now, honestly."
 - "Tell me exactly what to study today, so I stop wasting time re-reading what I already know."
@@ -153,7 +98,7 @@ Every scoring, timing and content decision in the application derives from the s
 - "Explain why my answer was wrong, in a way I can follow without a teacher present."
 - "Let me keep working when my data bundle finishes."
 
-## 5. Competitive Positioning
+# 5. Competitive Positioning
 
 The Nigerian UTME preparation market contains free past-question aggregators, offline CBT desktop software sold on discs and downloads, subscription video-lesson platforms, and a large informal ecosystem of WhatsApp groups and fraudulent 'expo' vendors. The gaps that a well-built product can occupy are consistent across the category:
 
@@ -165,11 +110,11 @@ The Nigerian UTME preparation market contains free past-question aggregators, of
 
 *A structured competitor teardown — pricing, content depth, app size, offline behaviour, store ratings and review themes for the eight leading apps — should be completed during Phase 0 and appended to this plan.*
 
-## 6. Feature Scope
+# 6. Feature Scope
 
 Scope is divided into three releases. The MVP boundary is drawn tightly and deliberately: everything in it exists to prove that realistic practice plus honest diagnosis changes outcomes. Anything that does not serve that proof is deferred.
 
-### 6.1 Release 1 — MVP (must have)
+## 6.1 Release 1 — MVP (must have)
 
 | **Module** | **Capability** |
 | --- | --- |
@@ -184,7 +129,7 @@ Scope is divided into three releases. The MVP boundary is drawn tightly and deli
 | Accounts | Progress persisted server-side, restore on reinstall or device change |
 | Payments | Free tier plus a single paid tier, card and bank-transfer collection, PIN/voucher redemption |
 
-### 6.2 Release 2 — Should have
+## 6.2 Release 2 — Should have
 
 - Adaptive practice engine with calibrated item difficulty and ability estimation.
 - Spaced-repetition review queue that resurfaces previously failed items on an optimal schedule.
@@ -195,26 +140,43 @@ Scope is divided into three releases. The MVP boundary is drawn tightly and deli
 - Parent or sponsor progress report delivered by email or WhatsApp.
 - Institution portal: bulk licences, cohort dashboards, assigned mocks, exportable results.
 
-### 6.3 Release 3 — Could have
+## 6.3 Release 3 — Could have
 
 - Short concept video and audio lessons for the weakest topics, produced in-house or licensed.
 - AI tutor that explains a missed item conversationally and generates similar practice items on demand.
 - Handwriting or photo capture of a working-out attempt for maths and physics, with step-level feedback.
 - Peer study groups and moderated subject discussion.
-- Extension to WAEC, NECO and post-UTME screening, reusing the same engine.
+- Extension to WAEC, NECO and post-UTME screening, reusing the same engine and the same generation pipeline.
+- Candidate progressive web application and iOS client, sharing the platform-neutral core (see section 8.5 and Phase 6).
 - USSD and SMS lite mode for feature-phone candidates.
 
-### 6.4 Explicitly out of scope
+## 6.4 Explicitly out of scope
 
 - Any claim, feature or content implying access to live or leaked examination papers.
 - Registration brokerage or profile creation on behalf of candidates.
 - Unmoderated user-generated question upload in Release 1.
 
-## 7. Content Strategy: The Question Bank
+# 7. Content Strategy: An AI-Generated, Human-Reviewed Question Bank
 
-Content is the product. Architecture can be rebuilt in weeks; a verified, well-tagged bank of tens of thousands of items takes a year and is the primary asset. This workstream must start on day one and run continuously in parallel with engineering.
+Content is the product, and it is also the largest cost line in any preparation platform. The strategy adopted here is to generate the entire question bank with a large language model against the official syllabus, and to spend the human budget on review rather than on authoring. This inverts the conventional model: instead of paying subject teachers to originate items at roughly twenty minutes each, the platform generates items at negligible marginal cost and pays reviewers to verify them at roughly five minutes each.
 
-### 7.1 Target volumes
+The saving is real but partial. Generation removes authoring, tagging and explanation-writing; it does not remove verification, and verification is not optional. The plan therefore treats the review pipeline, not the generator, as the critical content workstream, and budgets accordingly.
+
+## 7.1 The revised cost model
+
+| **Production step** | **Human authoring** | **AI generation + human review** |
+| --- | --- | --- |
+| Write stem and four options | 6-10 minutes | Negligible |
+| Write worked explanation | 5-8 minutes | Negligible |
+| Tag to syllabus objective | 2 minutes | Negligible |
+| Subject review | 3 minutes | 3 minutes |
+| Correction and rework | 2 minutes | 2-4 minutes (higher rework rate) |
+| Effective minutes per accepted item | 18-25 | 5-7 |
+| Indicative cost reduction | Baseline | 60-75% |
+
+*A second-order saving compounds the first: a reviewer needs subject accuracy but not authoring skill, which widens the hiring pool and lowers the rate. A serving teacher who cannot write a hundred good items a month can comfortably verify five hundred.*
+
+## 7.2 Target volumes
 
 | **Subject group** | **Items at MVP** | **Items at 12 months** |
 | --- | --- | --- |
@@ -222,49 +184,210 @@ Content is the product. Architecture can be rebuilt in weeks; a verified, well-t
 | Mathematics | 1,500 | 4,000 |
 | Physics, Chemistry, Biology (each) | 1,200 | 3,500 |
 | Economics, Government, Literature, CRS/IRS, Geography, Commerce, Accounting (each) | 800 | 2,500 |
-| Remaining syllabus subjects (each) | — | 1,200 |
+| Remaining syllabus subjects (each) | - | 1,200 |
 
-### 7.2 Sourcing
+*Because generation is fast, the binding constraint on these volumes is reviewer throughput, not authoring capacity. Accepted items per reviewer-hour is therefore tracked as a first-class project metric and drives the review hiring plan.*
 
-- **Original authoring.** Commission serving and retired subject teachers and university tutors to write items directly against the syllabus objectives. This is the primary channel and the only one that produces fully owned, defensible content.
-- **Past-question adaptation.** Historical papers inform the style, difficulty and topic weighting of authored items. Verbatim reproduction of copyrighted material is avoided; the model is to learn the pattern and author fresh items to it, with legal review of the approach before scale-up.
-- **Licensing.** Where an established publisher will license a bank on commercial terms, licensing accelerates coverage of long-tail subjects.
-- **Community contribution.** From Release 2, allow vetted teachers to submit items into the editorial pipeline, paid per accepted item.
+## 7.3 Risk tiering: what may be generated and what may not
 
-### 7.3 Editorial pipeline
+Not all items carry the same generation risk. The bank is tiered so that review effort concentrates where failure is most likely and most damaging.
 
-- Author drafts the item against a named syllabus objective, using a structured authoring template.
-- Subject reviewer checks factual correctness, key accuracy, distractor plausibility and syllabus alignment.
-- Language editor checks clarity, register, ambiguity and cultural appropriateness.
-- Explanation writer produces a worked solution that teaches the method, not merely the answer.
-- Technical check renders the item on a small screen, validating equations, diagrams and passage formatting.
-- Item enters the live bank in 'uncalibrated' state and is served to a pilot sample.
-- After a threshold of responses, the platform computes difficulty and discrimination and either calibrates the item or flags it for retirement.
+| **Tier** | **Content** | **Review policy** |
+| --- | --- | --- |
+| Low risk | Use of English lexis, structure, concord, prepositions, idiom and collocation; recall and definition items across all sciences; Biology physiology, ecology and classification; doctrine and principle items in Government, Economics, CRS/IRS and Commerce | Sample review of 30-50% of each batch, plus full automated gating |
+| High risk | Every item containing a calculation - Mathematics, quantitative Physics and Chemistry; items turning on a common misconception; Oral English stress and vowel-sound items; anything referencing current office holders, policy or statistics | Mandatory 100% human review, no exceptions, with calculations independently re-solved by the reviewer |
+| Not generated | Items depending on a diagram, circuit, ray path, graph or apparatus; all items on the JAMB recommended reading text, which changes each cycle; any item that would reproduce or closely paraphrase a real past paper | Human-authored with an illustrator where needed; the reading-text module is written by a teacher working from the actual set text |
 
-### 7.4 Item metadata schema
+Sampling 30-50% of a low-risk batch means the remaining 50-70% is never seen by a reviewer before it reaches candidates. That is only acceptable because those items still pass every automated gate, including the independent solve, and because the fact that no human reviewed them is recorded and queryable, not silently absorbed into an undifferentiated 'approved' status. Section 7.14 sets out exactly which items may take that automated-only route and how it is tracked.
 
-Every item carries the following fields. Rich metadata is what makes adaptivity and diagnostics possible, so it is captured at authoring time rather than retrofitted.
+| **The single most important control** A language model asked to produce a calculation item will occasionally produce an internally consistent question with a wrong answer key. The error is invisible on casual reading because the explanation confidently justifies the wrong answer. Every calculation item must be independently re-solved - once by machine, once by a human - before it can be served. |
+| --- |
+
+## 7.4 The generation pipeline
+
+1. The syllabus objectives table drives a generation queue; each objective is requested separately rather than in large undifferentiated batches, which improves tagging accuracy and reduces repetition.
+2. The generator issues a structured authoring prompt per objective, specifying subject, topic, objective text, target difficulty, cognitive level, UTME style conventions, and a requirement that every distractor correspond to a named plausible error.
+3. Independent solve: a second, separate model call receives only the stem and options, with no sight of the proposed key, and is asked to solve the item. Disagreement between the two flags the item immediately. This single check catches the majority of calculation errors.
+4. Automated gates run before any human sees the item: schema validation, duplicate detection by embedding similarity against the live bank, key-distribution rebalancing, rejection of 'all of the above' and 'none of the above', and rejection of length-outlier options.
+5. Surviving items carry status 'generated'. An item qualifies for the automated-only route, and is promoted straight to 'approved_uncalibrated' with approval_route 'auto_gated', only if its risk_tier is low, it was not selected by the sampling draw, and its independent_solve_verdict is 'agreed' — see 7.14. Every other item enters the human review queue as 'pending_review', prioritised so that calculation items are reviewed first and recall items last.
+6. The reviewer approves, edits or rejects through a keyboard-driven queue interface, recording approval_route as 'human_reviewed' or, for an escalation the subject moderator resolves, 'moderator_ruled'. Nothing reaches a candidate without either a recorded human decision or eligibility for the automated-only route in 7.14.
+7. Approved items — by either route — go live as 'approved_uncalibrated' and accumulate response data, from which empirical difficulty and discrimination are computed.
+8. Items whose discrimination falls below the quality floor are automatically quarantined and either reworked or retired, regardless of who or what wrote them or which approval_route they took.
+
+*The final stage matters more than any earlier one. Live response data is the real quality filter: an item that strong and weak candidates answer identically teaches nothing and measures nothing, and only usage reveals that. The operating rhythm is generate, gate, review, ship, measure, retire.*
+
+## 7.5 Known failure modes of generated content
+
+- **Key skew.** Generated batches skew heavily towards particular option letters rather than distributing evenly across A to D. Left uncorrected this is exploitable by test-wise candidates. The pipeline rebalances by permuting options and updating the corresponding references inside each explanation.
+- **Silent arithmetic error.** The most dangerous failure, because the accompanying explanation reads as authoritative. Mitigated by the independent solve and by mandatory human re-solving of calculation items.
+- **Style drift.** Generated items run slightly longer and more textbook-formal than genuine UTME items. The content lead should read fifty generated items against fifty real past questions and encode the differences as style corrections in the authoring prompt.
+- **Repetition within a topic.** The same underlying question recurs in superficially different wording. Embedding-based duplicate detection is a hard requirement, not an optimisation.
+- **Confident fabrication.** On the recommended reading text, on recent policy and on current statistics, the model will invent detail that reads plausibly. These categories are excluded from generation entirely.
+- **Unreliable difficulty self-estimates.** The difficulty value supplied at generation is a guess. It seeds the bank only; adaptive item selection must use empirically calibrated difficulty, never the authored estimate.
+
+## 7.6 Item metadata schema
+
+Every item carries the fields below. Rich metadata is what makes adaptivity and diagnostics possible, and it is captured at generation time rather than retrofitted.
 
 | **Field** | **Purpose** |
 | --- | --- |
 | subject_id, topic_id, subtopic_id, objective_id | Maps the item to the official syllabus hierarchy for diagnostics |
 | stem, options[4], correct_option | The item itself |
+| distractor_rationale | The specific named error each wrong option represents; required at generation and checked at review |
 | explanation, method_steps | Post-answer teaching content |
-| cognitive_level | Recall, comprehension, application or analysis — ensures mocks are not all recall |
-| author_difficulty | The author's prior estimate, used before calibration |
+| cognitive_level | Recall, comprehension, application or analysis - ensures mocks are not all recall |
+| author_difficulty | The generator's prior estimate; seeds the bank but never drives adaptive selection |
 | calibrated_difficulty, discrimination | Empirical parameters derived from live response data |
 | expected_time_seconds | Drives pacing coaching and time-pressure feedback |
-| passage_id | Links comprehension items to a shared reading passage |
-| asset_refs | Diagrams, equations, tables — stored as vector or compressed raster with alt text |
-| status, version, reviewer_ids, source | Editorial governance and audit trail |
+| provenance | Model and prompt version used, generation timestamp, raw response reference for audit |
+| independent_solve_verdict | Whether the blind second solve agreed with the proposed key |
+| status, version, reviewer_id, reviewed_at | Editorial governance and audit trail |
+| approval_route | 'auto_gated', 'human_reviewed' or 'moderator_ruled' — how the item reached its current approved status; see 7.14. Lets any query answer what share of the live bank no human has seen |
 | error_reports_count | Feeds the automatic quarantine rule below |
 
-| **Quality guarantee mechanism** Every item screen carries a one-tap 'Report a problem' control. Any item accumulating reports above a defined threshold, or whose empirical discrimination falls below the acceptable floor, is automatically quarantined from live serving pending editorial review. Reported errors are triaged within 72 hours. This mechanism, published openly, is a marketing asset as much as a quality control. |
+| **Quality guarantee mechanism** Every item screen carries a one-tap 'Report a problem' control. Any item accumulating reports above a defined threshold, or whose empirical discrimination falls below the acceptable floor, is automatically quarantined from live serving pending review. Reported errors are triaged within 72 hours. With a generated bank this mechanism is not a nicety but a structural necessity: it is the net that catches what the pipeline missed, and it should be published openly as a statement of confidence. |
 | --- |
 
-## 8. System Architecture
+## 7.7 Generation sequencing
 
-### 8.1 Architectural principles
+| **Wave** | **Scope** | **Volume** | **Review intensity** |
+| --- | --- | --- | --- |
+| 1 | Use of English and Biology, low-risk objectives | 2,000 | Sample 30% |
+| 2 | Mathematics, Physics, Chemistry - calculation-heavy | 3,000 | 100%, calculation-focused |
+| 3 | Government, Economics, CRS/IRS, Commerce, Geography | 3,000 | Sample 50% |
+| 4 | Literature and the recommended reading text | 800 | Human-authored, not generated |
+| 5 | Diagram-dependent items across the sciences | 1,200 | Human-authored with illustrator |
+
+*Waves 4 and 5 absorb the residual content budget and should be planned and funded explicitly. They are the part of the bank that generation cannot produce well, and omitting them leaves visible gaps in exactly the areas candidates find hardest.*
+
+## 7.8 The human review framework
+
+Generation makes items cheap; only review makes them safe. The framework below exists to make the human layer fast, accountable and pleasant enough that good reviewers stay. Its design assumption is specific: reviewers are practising Nigerian teachers and university tutors working in the evenings, on their own phones, on unreliable connectivity, in short bursts between other commitments. Every decision in this section follows from that assumption. A review tool that presumes a desktop, a quiet hour and a stable connection will simply not be used.
+
+### Panel structure
+
+| **Role** | **Who** | **Responsibility** |
+| --- | --- | --- |
+| Content lead | Full-time staff | Owns review standards, recruits and calibrates the panel, sets the style guide, reports quality and throughput |
+| Subject moderator | One senior reviewer per subject, retained monthly | Final arbiter on disputed items, writes subject-specific review guidance, audits a sample of each reviewer's approvals |
+| Reviewer | Practising teachers and tutors, paid per reviewed item | Verifies correctness, key, explanation, syllabus tagging and style; edits or rejects |
+| Contributor | Specialist authors and an illustrator, commissioned per brief | Produces the item categories that are not generated - reading text, diagram-dependent items |
+
+### Onboarding a reviewer
+
+1. Apply through a short web form: subject, teaching experience, school or institution, bank details for payment.
+2. Complete a calibration set of thirty pre-scored items, including deliberately seeded errors of each known failure type.
+3. Receive an automatic score against the reference decisions, with an explanation of each disagreement.
+4. Reviewers meeting the accuracy threshold are activated; those close to it are given a second set with targeted guidance.
+5. First fifty live reviews are shadow-audited by the subject moderator before the reviewer works unsupervised.
+
+*The calibration set doubles as the standing quality instrument: it is refreshed each cycle and re-issued periodically, so reviewer accuracy is measured continuously rather than assumed from an initial test.*
+
+## 7.9 The reviewer workspace
+
+A dedicated, mobile-first web application - not a spreadsheet, not a shared document, not a messaging group. Spreadsheet-based review is the default failure mode of content operations at this scale: it loses the audit trail, makes throughput unmeasurable, and produces merge conflicts that silently reintroduce corrected errors.
+
+| **Capability** | **Behaviour** |
+| --- | --- |
+| Single-item queue | One item at a time, assigned by the system. The reviewer never chooses what to work on, which prevents cherry-picking of easy items |
+| Queue prioritisation | (1) Items where the blind second solve disagreed with the proposed key, (2) high risk_tier items, (3) items in needs_second_review, (4) items flagged by other automated gates, (5) low-risk sampling. A disagreed verdict is evidence this specific item is probably wrong; high risk_tier only means the category is risky. A concrete suspected error outranks a merely risky category |
+| Full context on one screen | Stem, four options, proposed key, distractor rationale, worked explanation, syllabus objective, cognitive level, and the independent-solve verdict displayed prominently |
+| Four actions | Approve, Edit and approve, Reject with reason, Escalate to moderator. Nothing else - a short action set is what makes sustained review possible |
+| Keyboard and thumb driven | Single-key shortcuts on desktop; large, well-spaced touch targets on mobile. A reviewer should clear an item without leaving the home row or shifting grip |
+| Inline editing | Correct a typo, swap a distractor, rewrite an explanation, retag the objective - all without leaving the item |
+| Structured rejection reasons | Wrong key, ambiguous stem, implausible distractor, off-syllabus, duplicate, style breach, requires diagram, factually wrong. These feed directly back into prompt improvement |
+| Offline capable | The workspace caches a batch of items locally and syncs decisions when connectivity returns, exactly as the candidate app does |
+| Live counters | Items reviewed today, running accuracy against audits, earnings accrued this week - visible at all times |
+
+| **Why the rejection reasons are structured** Free-text rejection notes are unusable in aggregate. A fixed taxonomy turns the review queue into a diagnostic instrument for the generator: if forty per cent of Chemistry rejections in a week are 'implausible distractor', that is a prompt defect to be fixed once, not forty items to be corrected individually. The review panel is the feedback loop that improves generation. |
+| --- |
+
+## 7.10 Item states and review workflow
+
+Every item moves through an explicit state machine. States are recorded with actor and timestamp, giving a complete audit trail for any item a candidate ever queries.
+
+| **State** | **Meaning** | **Exit** |
+| --- | --- | --- |
+| generated | Produced by the pipeline, not yet gated | Automated gates run |
+| gate_failed | Failed schema, duplicate, key-balance or independent-solve check | Auto-regenerated, or routed to review if the failure needs judgement |
+| pending_review | In the queue, awaiting a reviewer | Reviewer claims it |
+| in_review | Claimed; released back to the queue if untouched after a set period | Reviewer decision |
+| needs_second_review | High-risk item, or first reviewer disagreed with the proposed key | Second independent reviewer decides |
+| escalated | Two reviewers disagree, or the reviewer is unsure | Subject moderator rules; the ruling is recorded as guidance |
+| approved_uncalibrated | Live to candidates; accumulating response data | Calibration threshold reached |
+| approved_calibrated | Empirical difficulty and discrimination established | Eligible for adaptive selection |
+| quarantined | Error reports above threshold, or discrimination below the floor | Reworked and re-reviewed, or retired |
+| rejected | Not usable; reason recorded and fed back to prompt improvement | Terminal |
+| retired | Withdrawn from serving; retained for audit | Terminal |
+
+An item that qualifies for the automated-only route (7.14) moves from generated straight to approved_uncalibrated without ever passing through pending_review or in_review. Every other item must pass through a human decision — pending_review at minimum, needs_second_review or escalated where the rules in 7.14 require it — before it can reach approved_uncalibrated. The approval_route field records which path any given item took.
+
+### Review rules
+
+- **Every calculation item is re-solved by the reviewer independently,** on paper or on screen, before the key is accepted. The tool requires the reviewer to enter their own answer before the proposed key is revealed. This is the single highest-value control in the entire framework.
+- **Any disagreement between the blind machine solve and the proposed key** routes to double review automatically, regardless of subject or risk tier.
+- **No reviewer approves their own contributed item.** Contributors and reviewers may be the same people, but never on the same item.
+- **Approval is per item, never per batch.** Bulk-approve is deliberately not offered, because it is the mechanism by which review quietly becomes rubber-stamping.
+- **A moderator ruling becomes written guidance.** Each escalation resolved produces a line in the subject review guide, so the same dispute is not litigated twice.
+
+## 7.11 Reviewer quality assurance and payment
+
+| **Mechanism** | **Design** |
+| --- | --- |
+| Seeded gold items | A small proportion of each reviewer's queue consists of items with known reference decisions, including planted wrong keys. Reviewer accuracy is measured continuously and invisibly |
+| Moderator audit | The subject moderator re-reviews a random sample of each reviewer's approvals each week |
+| Accuracy thresholds | Falling below the threshold triggers targeted re-calibration; sustained failure removes the reviewer from the panel and re-queues their recent approvals |
+| Inter-rater agreement | Tracked per subject. Persistently low agreement signals ambiguous items or unclear guidance rather than poor reviewers, and is investigated as a content problem first |
+| Payment model | Per reviewed item, with a materially higher rate for calculation and double-review items. Rejections are paid the same as approvals, so there is no incentive to wave items through |
+| Payment mechanics | Earnings accrue visibly in the workspace and are paid weekly by bank transfer, generated automatically from the review log. Late or opaque payment is the fastest way to lose a good panel |
+| Recognition | Optional credit in the app's content acknowledgements, and a reference letter for reviewers in good standing - both cost nothing and matter to teachers |
+
+*Pay for rejections at the same rate as approvals. It is a small cost and it removes the structural incentive that quietly destroys review quality everywhere it is not addressed.*
+
+## 7.12 The contribution framework for human-authored items
+
+Three categories are never generated: items depending on a diagram, graph, circuit or apparatus; all items on the JAMB recommended reading text, which changes each cycle; and anything turning on current policy, office holders or statistics. These are commissioned from human contributors through the same platform, so that generated and authored items flow into one bank with one standard of review.
+
+### Commissioning workflow
+
+1. The system identifies coverage gaps automatically by comparing approved item counts per syllabus objective against target volumes, and flags objectives that cannot be filled by generation.
+2. The content lead issues a brief from a template: objective, item count, difficulty spread, cognitive levels, style notes, fee and deadline. Briefs are visible to the contributor pool as an open board; contributors claim what suits them.
+3. The contributor authors directly in the platform's structured form - stem, four options, key, distractor rationale, worked explanation, objective tag - so that authored items carry the same metadata as generated ones. No email attachments, no Word documents, no format conversion.
+4. For a diagram item, the contributor describes the figure and uploads a hand sketch photographed on their phone. This creates an illustration ticket rather than blocking the item.
+5. The illustrator produces the asset to a defined specification: scalable vector, legible at small screen sizes, monochrome-safe, with alternative text supplied for accessibility.
+6. The completed item enters the ordinary review queue and is verified by a reviewer who is not its author.
+7. On approval, the contributor fee is released into the same weekly payment run as reviewer earnings.
+
+### The reading-text module
+
+The recommended text is announced per cycle and is the one area where a generated item would be confidently and visibly wrong. It is commissioned as a single package from a literature teacher working from the actual book: chapter summaries, character map, themes, and an item set covering plot, character, theme, setting and literary devices. The commission is triggered automatically when the exam configuration for a new cycle is created, because the risk is not that the module is written badly but that it is forgotten until candidates notice.
+
+## 7.13 What makes the framework seamless
+
+- **One platform, one item record.** Generation, gating, review, contribution, illustration, calibration and quarantine all act on the same row in the same table. Nothing is exported to a spreadsheet and re-imported, which is where content operations usually lose their audit trail.
+- **Work comes to the person.** Reviewers are assigned items; contributors see an open brief board. Nobody has to ask what to do next, and nobody negotiates scope by message.
+- **Built for a phone on bad connectivity.** The workspace caches offline and syncs on reconnection. A reviewer clears items on a commute or during a free period, in five-minute bursts.
+- **Short action sets.** Four actions in review, one structured form in authoring. Ambiguity about what to click is what makes volunteers and freelancers disengage.
+- **Visible earnings, automatic payment.** Accrual is shown live; payment runs weekly without anyone having to chase it.
+- **Every rejection improves the generator.** Structured reasons aggregate into prompt corrections, so the panel's effort compounds rather than being spent repeatedly on the same defect.
+- **Contributors and reviewers are one pool.** The same teacher may review Chemistry on Tuesday and author a commissioned diagram set in March, under one account, one payment record and one quality history.
+
+| **Build order** The reviewer workspace is on the critical path and must exist before bulk generation begins. Generating fifty thousand items with nowhere to review them produces a backlog, not a bank. Build the queue tool in Phase 1, run the first generation wave through it at small volume, fix what the reviewers complain about, and only then open the taps. |
+| --- |
+
+## 7.14 Approval routes
+
+The sampling policy in 7.3 means most low-risk items are never seen by a reviewer, yet every item that reaches a candidate still needs a defensible answer to "who, or what, approved this." That answer is the approval_route field, and the rule below is the single, exact statement of when the automated pipeline may answer that question on its own.
+
+Automated gates alone may promote an item to approved_uncalibrated without human review only when all three conditions hold: risk_tier is low, the item was not selected by the sampling draw, and independent_solve_verdict is 'agreed'. Every other item requires a human decision before it can serve to candidates: every high risk_tier item, any item whose independent_solve_verdict is 'disagreed', any item selected by sampling, and any human-authored contribution.
+
+Every item records approval_route as one of 'auto_gated', 'human_reviewed', or 'moderator_ruled', so the share of the live bank no human has ever seen can be queried directly, at any time, by anyone who asks.
+
+The quarantine rule in 7.6 — error reports above threshold, or discrimination below the quality floor — applies to auto_gated items exactly as it applies to every other item. Reaching the bank without a human review is not exemption from being pulled; if anything, an auto_gated item's live performance is the only check it has ever had, which makes that check non-negotiable.
+
+# 8. System Architecture
+
+## 8.1 Architectural principles
 
 - **Offline-first, not offline-tolerant.** The device holds a local database and the application logic runs against it. The network is a synchronisation channel, never a prerequisite for practising.
 - **Configuration over code.** Exam structure, subject combinations, timing and scoring rules live in versioned configuration so a JAMB format change is a data update.
@@ -272,7 +395,7 @@ Every item carries the following fields. Rich metadata is what makes adaptivity 
 - **Data frugality.** Assets compressed aggressively, delta sync only, subject packs downloadable on Wi-Fi with explicit size disclosure before download.
 - **Seasonal elasticity.** Traffic is extremely peaky around the exam window and national mock events. Infrastructure must scale horizontally and be measured against a defined peak-load profile.
 
-### 8.2 Recommended technology stack
+## 8.2 Recommended technology stack
 
 | **Layer** | **Choice** | **Rationale** |
 | --- | --- | --- |
@@ -292,7 +415,7 @@ Every item carries the following fields. Rich metadata is what makes adaptivity 
 
 *Where an existing team already has depth in a different stack, that depth outweighs the specific choices above. What is not negotiable is the offline-first storage model, the relational representation of the syllabus hierarchy, and an event pipeline capable of supporting item calibration.*
 
-### 8.3 Synchronisation design
+## 8.3 Synchronisation design
 
 Sync is the hardest technical problem in the product and deserves explicit design before coding begins.
 
@@ -302,7 +425,7 @@ Sync is the hardest technical problem in the product and deserves explicit desig
 - **Multi-device.** Ability estimates and mastery are computed server-side from the attempt stream, so a candidate switching devices retains their profile.
 - **Anti-piracy.** Downloaded content is encrypted at rest with a device-bound key tied to the entitlement; entitlements are revalidated on each sync with a configurable offline grace period.
 
-### 8.4 Core data model
+## 8.4 Core data model
 
 | **Entity** | **Key attributes and relationships** |
 | --- | --- |
@@ -319,19 +442,42 @@ Sync is the hardest technical problem in the product and deserves explicit desig
 | Institution, Cohort, Assignment | Tutorial-centre and school structures for the Release 2 portal |
 | Entitlement, Transaction, Voucher | Commercial state: plan, period, payment reference, redemption |
 
-## 9. The Adaptive Learning Engine
+## 8.5 Multi-platform strategy
+
+The product launches on Android and extends to iOS and the web on a deliberate sequence. Android first is not a technical preference but a market fact: it is the overwhelming majority of devices in the candidate population, and the entry-level Android device sets the performance budget for the whole product. iOS and web follow once the core engine is proven, and both reuse the same backend, the same exam configuration and the same item bank.
+
+| **Platform** | **Timing** | **Scope** | **Rationale** |
+| --- | --- | --- | --- |
+| Android | Launch | Full product: practice, mock CBT, offline packs, diagnostics, payments | Dominant device base among UTME candidates; sets the performance floor |
+| Web (institution portal) | Launch + 3 months | Tutorial-centre and school dashboards, cohort management, assigned mocks, exportable results, billing | Proprietors and teachers work on desktop; this is a sales channel before it is a study channel |
+| Web (candidate PWA) | Launch + 4 months | Full practice and mock experience in the browser, installable, with service-worker offline caching | Serves cybercafe and shared-computer users, and closely mirrors the desktop feel of the real CBT centre |
+| iOS | Launch + 6 months | Feature parity with Android | Smaller but higher-paying segment; diaspora candidates and sponsoring parents |
+
+### Engineering implications of the multi-platform path
+
+- **Shared core from day one.** Scoring, timing, item selection, spaced repetition and sync logic live in a platform-neutral TypeScript package consumed by every client. No business rule may be implemented inside a screen component.
+- **Cross-platform client framework.** React Native with Expo covers Android and iOS from one codebase, so the iOS release is largely a matter of platform testing, store compliance and payment handling rather than a rebuild.
+- **The web client is a genuine third target.** A Next.js progressive web application shares the core package and the API but has its own storage layer, using IndexedDB and a service worker in place of SQLite. Plan this as real work, not a wrapper.
+- **Storage abstraction.** Define a single persistence interface early, with a SQLite implementation for mobile and an IndexedDB implementation for web. Retrofitting this after launch is expensive; specifying it in the MVP costs almost nothing.
+- **Payments diverge.** Apple requires in-app purchase for digital content, which carries a platform commission and constrains pricing. Model iOS unit economics separately, and consider selling the season pass on the web with the app unlocking the entitlement on sign-in.
+- **The web PWA rehearses the real thing.** Because the actual UTME is sat on a desktop computer with a keyboard and mouse, the browser mock is arguably the most exam-realistic surface the product has, and should be marketed as such rather than treated as a lesser client.
+
+| **Sequencing discipline** Do not begin the iOS or web clients until the Android product has completed a full peak season. The engine, the sync layer and the item bank all improve materially under real load, and porting an unproven product simply multiplies the cost of every fix. |
+| --- |
+
+# 9. The Adaptive Learning Engine
 
 This is the intellectual core of the product and the hardest part to copy. It is delivered in Release 2 but its data requirements must be designed into Release 1, because calibration needs a response history that can only be accumulated over time.
 
-### 9.1 Item calibration
+## 9.1 Item calibration
 
 Each item's empirical difficulty and discrimination are estimated from live response data using a two-parameter logistic model, with a simpler Elo-style rating used as a bootstrap while response volumes are low. Items with low discrimination — those that strong and weak candidates answer equally well or equally badly — are flagged for editorial rework, since they teach nothing and measure nothing.
 
-### 9.2 Ability estimation and mastery
+## 9.2 Ability estimation and mastery
 
 The candidate's ability is estimated per syllabus objective, then rolled up to subtopic, topic and subject level with an explicit confidence interval. Confidence widens with time since last practice and narrows with each fresh attempt, which means the mastery heat map degrades honestly rather than showing a stale green square for a topic last practised in December.
 
-### 9.3 Item selection policy
+## 9.3 Item selection policy
 
 - Target an item difficulty slightly above current estimated ability — the zone where learning is fastest and motivation holds.
 - Weight selection towards objectives with high syllabus frequency and low candidate mastery — the largest available mark gains.
@@ -339,21 +485,21 @@ The candidate's ability is estimated per syllabus objective, then rolled up to s
 - Enforce topic diversity within a session to prevent tunnel practice.
 - Suppress items seen within a configurable recency window to prevent answer memorisation.
 
-### 9.4 Spaced repetition
+## 9.4 Spaced repetition
 
 Failed items enter a review queue scheduled by a modern spacing algorithm such as FSRS or a tuned SM-2 variant. Interval growth is a function of response correctness, response latency and current item difficulty, so a slow correct answer is treated differently from a fast confident one.
 
-### 9.5 The readiness score
+## 9.5 The readiness score
 
 The headline number the candidate sees is a predicted UTME score out of 400 with a confidence band, derived from per-subject ability estimates translated through the exam blueprint. It is deliberately conservative, is shown alongside the specific actions that would raise it most, and is never inflated for engagement. Predicted-versus-actual accuracy is validated against real reported UTME results each cycle and published; the credibility of this number is the credibility of the product.
 
-### 9.6 Pacing analytics
+## 9.6 Pacing analytics
 
 Because the examination is time-constrained above all else, the engine tracks seconds per item against the expected time, identifies the specific topics where the candidate is accurate but slow, and coaches a first-pass strategy: answer what is known immediately, flag the rest, return with the remaining time.
 
-## 10. User Experience and Interface Design
+# 10. User Experience and Interface Design
 
-### 10.1 Design principles
+## 10.1 Design principles
 
 - **Exam-realistic where it matters.** Mock mode mirrors the real CBT layout, palette and keyboard behaviour. Everywhere else, the interface is modern and pleasant — realism is a training tool, not an aesthetic.
 - **One decision per screen.** Candidates use this while tired, on small screens, often at night.
@@ -361,7 +507,7 @@ Because the examination is time-constrained above all else, the engine tracks se
 - **Honest feedback.** No inflated praise. Progress shown as it is, with the next action always visible.
 - **Legible under strain.** Minimum 16sp body text, high contrast, generous tap targets, a dark mode for night study, and reduced-brightness palettes.
 
-### 10.2 Key screens
+## 10.2 Key screens
 
 | **Screen** | **Purpose and critical elements** |
 | --- | --- |
@@ -377,14 +523,14 @@ Because the examination is time-constrained above all else, the engine tracks se
 | Downloads | Subject packs with explicit sizes, download and delete controls, storage used |
 | Account and plan | Entitlement state, payment history, voucher redemption, referral code |
 
-### 10.3 Accessibility and inclusion
+## 10.3 Accessibility and inclusion
 
 - Screen-reader labelling on all interactive elements and alternative text on every diagram.
 - Adjustable text scaling that does not break the question layout.
 - Colour choices that remain distinguishable under the common forms of colour vision deficiency.
 - Low-bandwidth mode that suppresses non-essential imagery.
 
-## 11. Non-Functional Requirements
+# 11. Non-Functional Requirements
 
 | **Category** | **Requirement** |
 | --- | --- |
@@ -403,9 +549,9 @@ Because the examination is time-constrained above all else, the engine tracks se
 | **Regulatory note** A large proportion of users will be minors. Age assurance, guardian consent for under-18 data processing, restraint in behavioural advertising, and a clearly written privacy notice in plain English are legal obligations under Nigerian data protection law and are also prerequisites for the school and tutorial-centre channel. Obtain qualified local legal review before launch. |
 | --- |
 
-## 12. Monetisation and Commercial Model
+# 12. Monetisation and Commercial Model
 
-### 12.1 Pricing structure
+## 12.1 Pricing structure
 
 | **Tier** | **Includes** | **Indicative positioning** |
 | --- | --- | --- |
@@ -414,7 +560,7 @@ Because the examination is time-constrained above all else, the engine tracks se
 | Monthly | Same as season pass, billed monthly | For late deciders; priced so the season pass is the obvious value |
 | Institution licence | Per-seat bulk licence, cohort dashboards, assigned mocks, exportable reports | Volume-discounted; invoiced termly |
 
-### 12.2 Collection channels
+## 12.2 Collection channels
 
 - Card and bank transfer through a Nigerian payment gateway, with transfer being the dominant expected method.
 - USSD-initiated payment for candidates without cards.
@@ -422,57 +568,71 @@ Because the examination is time-constrained above all else, the engine tracks se
 - Agent and reseller network with commission, mirroring the distribution logic that already works for exam-related products in Nigeria.
 - Airtime-based payment where commercially viable, accepting the higher processing cost as an acquisition expense.
 
-### 12.3 Unit economics to model in Phase 0
+## 12.3 Unit economics to model in Phase 0
 
-- Cost to author, review and explain one item; total content cost to reach MVP and 12-month volumes.
+- Cost per approved item, separating model inference cost from reviewer fees; total content cost to reach MVP and 12-month volumes; ring-fenced budget for the human-authored reading-text and diagram items.
 - Blended customer acquisition cost by channel, with school partnerships expected to be the cheapest.
 - Payment processing and messaging cost per paying user.
 - Infrastructure cost per active user at peak, which is the season's dominant variable cost.
 - Seasonality model: revenue concentrated between November and April, with cash flow planned around a lean May-to-October period.
 
-## 13. Delivery Roadmap
+# 13. Delivery Roadmap
 
-The roadmap is anchored to the JAMB annual cycle. Registration typically opens early in the calendar year and the examination is held around April, so preparation demand peaks from November through April. The plan therefore targets a public launch in November, giving a full peak season to monetise and to collect the response data the adaptive engine needs.
+The roadmap is anchored to the JAMB annual cycle. Registration typically opens early in the calendar year and the examination is held around April, so preparation demand peaks from November through April. The plan targets an Android launch in November, giving a full peak season to monetise and to accumulate the response data the adaptive engine and item calibration both require. iOS and the web clients follow after that first season, once the engine has been proven under real load.
 
-### 13.1 Phases
+## 13.1 Phases
 
 | **Phase** | **Duration** | **Objectives** | **Exit criteria** |
 | --- | --- | --- | --- |
-| Phase 0 — Discovery and design | Weeks 1–3 | Competitor teardown, candidate and tutor interviews, syllabus digitisation plan, exam blueprint verification, unit economics model, legal and data protection review | Signed-off product requirements, wireframes, technical design document and content budget |
-| Phase 1 — Foundations | Weeks 4–9 | Repository and environment setup, CI/CD, data model, auth, syllabus hierarchy loaded, authoring and editorial tooling built, first 1,500 items authored | Editors can author, review and publish items end to end; app shell renders a real item from the live bank |
-| Phase 2 — MVP build | Weeks 10–20 | Practice mode, mock CBT engine, scoring, review, diagnostics, offline packs and sync, payments, MVP content volumes reached | Feature-complete MVP passing the full test suite; content bank at target volume for the core subjects |
-| Phase 3 — Closed beta | Weeks 21–26 | 300–500 candidates recruited through two or three partner schools and tutorial centres; instrumented usage; item calibration begins; performance tuning on low-end devices | Crash-free rate above 99%, no critical content errors outstanding, measurable score improvement in the beta cohort |
-| Phase 4 — Public launch | Weeks 27–32 | Play Store release, marketing activation, voucher distribution live, support operations staffed, monitoring and on-call in place | Launch executed; acquisition, activation and conversion tracking reporting reliably |
-| Phase 5 — Peak season operations | Months 9–12 | Continuous content expansion, weekly national mocks, adaptive engine released, institution portal released, iOS client | Season targets met; readiness-score accuracy validated against reported UTME results |
+| Phase 0 - Discovery and design | Weeks 1-3 | Competitor teardown, candidate and tutor interviews, syllabus digitisation plan, exam blueprint verification, unit economics model including generation and review costs, legal review of generated content and minors' data | Signed-off product requirements, wireframes, technical design document and content budget |
+| Phase 1 - Foundations and content pipeline | Weeks 4-9 | Repository, environments and CI/CD; data model; auth; syllabus hierarchy loaded; generation pipeline and automated gates built; reviewer workspace and contributor brief board built; review panel recruited and calibrated; first generation wave produced and under review | Pipeline generates, gates and routes items end to end; reviewers are working through a live queue; app shell renders an approved item from the live bank |
+| Phase 2 - MVP build | Weeks 10-20 | Practice mode, mock CBT engine, scoring, review, diagnostics, offline packs and sync, payments; generation waves 1 to 3 completed and reviewed; waves 4 and 5 commissioned to human authors | Feature-complete Android MVP passing the full test suite; approved item bank at target MVP volume across the core subjects |
+| Phase 3 - Closed beta | Weeks 21-26 | 300-500 candidates recruited through partner schools and tutorial centres; instrumented usage; item calibration begins; content error rate measured and reduced; performance tuning on low-end devices | Crash-free rate above 99%, error reports below the quality threshold, measurable score improvement in the beta cohort |
+| Phase 4 - Android public launch | Weeks 27-32 | Play Store release, marketing activation, voucher distribution live, support operations staffed, monitoring and on-call in place | Launch executed; acquisition, activation and conversion tracking reporting reliably |
+| Phase 5 - Peak season operations | Months 9-12 | Continuous generation and review, weekly national mocks, adaptive engine released, institution web portal released | Season targets met; readiness-score accuracy validated against reported UTME results |
+| Phase 6 - Platform expansion | Months 13-18 | Candidate web PWA released; iOS client released with parity and store-compliant payments; extension of the engine to WAEC, NECO and post-UTME using the same generation pipeline | Three clients live on a shared core; revenue curve measurably flattened across the off-season |
 
-### 13.2 Critical path
+## 13.2 Critical path
 
 Three dependencies govern the schedule and must be started first:
 
-- Syllabus digitisation. Nothing can be tagged, and therefore nothing can be diagnosed, until the full official syllabus hierarchy exists as structured data. This is a Phase 0 and early Phase 1 task.
-- Editorial tooling. Content production cannot scale until authors and reviewers have a working pipeline. Building this before the candidate-facing app is counter-intuitive but correct, because content lead time is the longest in the plan.
-- The mock CBT engine. Timer accuracy, offline persistence and auto-submit are subtle and must be hardened early, since a failure here destroys trust irreparably.
+1. Syllabus digitisation. Nothing can be generated, tagged or diagnosed until the full official syllabus hierarchy exists as structured data, because the objectives table is what drives the generation queue. This is a Phase 0 and early Phase 1 task.
+2. The generation and review pipeline. Item throughput is now limited by reviewer capacity rather than authoring capacity, so the reviewer queue tool is on the critical path and must exist before bulk generation begins. Generating thousands of items with nowhere to review them simply creates a backlog.
+3. The mock CBT engine. Timer accuracy, offline persistence and auto-submit are subtle and must be hardened early, since a failure here destroys trust irreparably.
 
-## 14. Team, Roles and Resourcing
+# 14. Team, Roles and Resourcing
+
+The shift to generated content changes the shape of the team materially. The large freelance authoring pool that a conventional plan would require is replaced by a smaller review panel and a single engineer owning the generation pipeline. Engineering headcount rises slightly; content headcount falls substantially.
 
 | **Role** | **Count** | **Engagement** | **Responsibility** |
 | --- | --- | --- | --- |
 | Product owner | 1 | Full time | Scope, priorities, stakeholder and partner relationships |
-| Technical lead / architect | 1 | Full time | Architecture, sync design, code quality, technical decisions |
-| Mobile engineer | 2 | Full time | Client application, offline layer, CBT engine |
+| Technical lead / architect | 1 | Full time | Architecture, shared core, sync design, code quality |
+| Mobile engineer | 2 | Full time | Android client, offline layer, CBT engine; iOS from Phase 6 |
 | Backend engineer | 2 | Full time | APIs, sync services, payments, entitlements, admin tooling |
-| Data / ML engineer | 1 | From Phase 2 | Event pipeline, calibration, ability estimation, readiness model |
+| Content pipeline engineer | 1 | Full time from Phase 1 | Generation pipeline, prompt engineering, automated gates, reviewer tooling, cost and quality reporting |
+| Data / ML engineer | 1 | From Phase 2 | Event pipeline, item calibration, ability estimation, readiness model |
+| Web engineer | 1 | From Phase 5 | Institution portal, then the candidate progressive web application |
 | Product designer | 1 | Full time to Phase 3, then part time | Interaction design, design system, usability testing |
 | QA engineer | 1 | From Phase 2 | Test strategy, automation, device matrix, release verification |
-| Content lead | 1 | Full time | Editorial standards, author recruitment, pipeline throughput |
-| Subject authors | 10–20 | Freelance, paid per accepted item | Item authoring across subjects |
-| Subject reviewers | 6–10 | Freelance | Accuracy and syllabus-alignment review |
+| Content lead | 1 | Full time | Review standards, reviewer recruitment and throughput, style calibration against real past papers, quality reporting |
+| Subject moderators | 1 per core subject | Retained monthly | Arbitration of escalated items, weekly audit of reviewer approvals, subject review guidance |
+| Subject reviewers | 6-10 | Freelance, paid per reviewed item | Verification of generated items; mandatory re-solving of all calculation items |
+| Specialist contributors | 2-4 | Freelance, commissioned per brief | Reading-text module and diagram-dependent items, which are not generated |
+| Illustrator | 1 | Freelance, per asset | Diagrams, circuits, ray paths and graphs to the accessibility specification |
 | Growth / partnerships | 1 | From Phase 3 | School and tutorial-centre channel, agents, campaigns |
-| Support | 1–2 | From Phase 4, scaling in season | User support across in-app, WhatsApp and store reviews |
+| Support | 1-2 | From Phase 4, scaling in season | User support across in-app, WhatsApp and store reviews |
 
-*Budget should be modelled in three envelopes — engineering and design payroll, content production paid per accepted item, and operating costs covering infrastructure, payment processing, messaging and marketing. Content is routinely under-budgeted and is the line item most likely to determine whether the product is competitive; it should be treated as capital investment in the core asset rather than as a variable cost to be minimised.*
+## 14.1 Budget envelopes
 
-## 15. Quality Assurance and Testing
+- **Engineering and design payroll.** The largest fixed cost, and now marginally larger than in a human-authoring plan because of the pipeline engineer and the earlier web hire.
+- **Content operations.** Two components: model inference cost per generated item, which is small and predictable, and reviewer fees per accepted item, which dominate. Track cost per approved item as a single reported figure so the two are never confused.
+- **Specialist authoring.** A ring-fenced budget for the reading-text module and diagram items. This is the line most likely to be quietly cut and most likely to be noticed by candidates when it is.
+- **Operating costs.** Infrastructure, payment processing, messaging and marketing, with infrastructure sharply seasonal around the exam window.
+
+*The saving from generation should be understood as a reallocation rather than a windfall. Roughly two-thirds of the content budget is released; a meaningful share of it should be reinvested in review depth, in the specialist authoring the model cannot do, and in the calibration work that turns a large bank into an accurate one.*
+
+# 15. Quality Assurance and Testing
 
 | **Test layer** | **Scope** |
 | --- | --- |
@@ -490,9 +650,9 @@ Three dependencies govern the schedule and must be started first:
 | **The non-negotiable test** A candidate must be able to start a full 180-question mock offline, lose battery or force-close the app at minute 70, relaunch, and resume with the correct remaining time and every prior answer intact. If this scenario is not bulletproof, the product is not ready for launch. |
 | --- |
 
-## 16. Launch and Growth Strategy
+# 16. Launch and Growth Strategy
 
-### 16.1 Channels, in order of expected efficiency
+## 16.1 Channels, in order of expected efficiency
 
 - **Schools and tutorial centres.** Direct partnerships with secondary schools and JAMB coaching centres. Free institutional dashboards in exchange for cohort adoption; the proprietor becomes the distribution channel.
 - **Referral.** Candidate-to-candidate referral with reward in free premium days. Cohorts are dense social networks, which makes referral unusually effective here.
@@ -501,38 +661,44 @@ Three dependencies govern the schedule and must be started first:
 - **Search.** Content marketing against high-intent queries around the syllabus, subject combinations and past questions, funnelling into app download.
 - **Agents and resellers.** Commission-earning voucher sellers in cybercafés and business centres, reaching the cash-paying segment.
 
-### 16.2 The recurring hook
+## 16.2 The recurring hook
 
 A free weekly national mock, held at a fixed time with a public leaderboard, gives the product a heartbeat. It drives habitual return, generates a steady stream of calibration data across the whole item bank, produces shareable results that market the product organically, and creates a natural upgrade prompt at the moment the candidate sees their weak areas.
 
-### 16.3 Brand position
+## 16.3 Brand position
 
 The market is polluted by fraudulent 'expo' vendors selling supposed leaked papers. The brand should confront this directly: state plainly that leaked papers do not exist, that anyone selling them is defrauding candidates, and that the only reliable route to a high score is measured, adaptive practice. This position is credible with parents, essential for school partnerships, and creates clear separation from the informal competition.
 
-## 17. Risks and Mitigations
+# 17. Risks and Mitigations
 
 | **Risk** | **Impact** | **Mitigation** |
 | --- | --- | --- |
-| JAMB changes the exam format or syllabus mid-cycle | High | Blueprint held as versioned configuration; syllabus mapping designed for re-tagging; monitoring of board announcements assigned to a named owner |
-| Content errors damage credibility | High | Multi-stage editorial review, in-app error reporting, automatic quarantine on threshold, 72-hour triage, published accuracy commitment |
-| Copyright exposure from past-question reuse | High | Original authoring as primary channel; legal review of adaptation practice; licensing where a rights holder exists; documented provenance per item |
-| Content production falls behind schedule | High | Start authoring in Phase 1, overprovision the freelance author pool, track weekly accepted-item throughput as a first-class project metric |
+| A generated item carries a wrong answer key and reaches candidates | High | Blind independent second solve before human review; mandatory 100% review of all calculation items; in-app error reporting with automatic quarantine on threshold; 72-hour triage |
+| Generated content is factually confident but wrong on the reading text, current policy or statistics | High | These categories are excluded from generation entirely and human-authored; a standing rule that no generated item may reference anything time-sensitive |
+| Reviewer capacity becomes the throughput bottleneck | High | Reviewer queue tool built in Phase 1; accepted items per reviewer-hour tracked weekly; review panel overprovisioned before bulk generation begins |
+| Generated items drift stylistically from genuine UTME phrasing | Medium | Content lead calibrates fifty generated items against fifty real past questions and encodes corrections into the authoring prompt; recalibrated each cycle |
+| Systematic bias in generated banks, such as answer-key skew or repeated questions | Medium | Automated key rebalancing and embedding-based duplicate detection as hard gates; batch-level distribution reports |
+| Model or API change alters output quality mid-production | Medium | Model and prompt version recorded per item; a golden-set regression suite re-run on every model or prompt change; raw responses retained for audit |
+| JAMB changes the exam format or syllabus mid-cycle | High | Blueprint held as versioned configuration; syllabus mapping designed for re-tagging; regeneration against changed objectives is cheap, which is a genuine advantage of this model |
+| Copyright or originality challenge to the bank | Medium | Original generation only, with an explicit prompt constraint against reproducing past papers; provenance recorded per item; duplicate detection against known past-paper text |
 | Offline sync defects lose candidate work | High | Append-only attempts, local write-ahead persistence, idempotent upload, dedicated resilience test suite, staged rollout |
-| Low willingness to pay | Medium | Voucher and agent channels for the cash economy, institutional bulk sales, season pass framing against tutorial-centre cost, a free tier good enough to build trust |
-| Seasonal revenue concentration strains cash flow | Medium | Plan the lean May–October period explicitly; extend the engine to WAEC, NECO and post-UTME to flatten the curve |
+| Low willingness to pay | Medium | Voucher and agent channels for the cash economy, institutional bulk sales, season pass framed against tutorial-centre cost, a free tier good enough to build trust |
+| Seasonal revenue concentration strains cash flow | Medium | Plan the lean May-October period explicitly; extend to WAEC, NECO and post-UTME using the same pipeline to flatten the curve |
+| Apple in-app purchase commission erodes iOS margin | Low | Model iOS economics separately; sell the season pass on the web with the app unlocking the entitlement on sign-in, within store rules |
 | Peak-load failure during a national mock | Medium | Load testing against the peak profile, autoscaling, graceful degradation, offline mock as the fallback path |
 | Piracy of downloaded content | Medium | Device-bound encryption, signed bundles, entitlement revalidation with a bounded offline grace period |
-| Fast-follower competition | Medium | Compound the defensible assets: calibrated item bank, longitudinal response data, school relationships |
 | Regulatory action over minors' data | Medium | Guardian consent flow, data minimisation, documented retention, qualified local legal review before launch |
-| Key-person dependency on the content lead | Low | Documented editorial standards, cross-trained reviewers, tooling that encodes the process |
 
-## 18. Measurement Framework
+| **The reputational asymmetry** A single screenshot of a wrong answer key, circulated in a candidate WhatsApp group, costs more than the entire review budget it would have taken to prevent. Generation lowers the cost of being right; it raises the cost of being careless. Review depth is not the place to economise. |
+| --- |
 
-### 18.1 The metric that matters
+# 18. Measurement Framework
+
+## 18.1 The metric that matters
 
 The north-star metric is the mark improvement between a candidate's first diagnostic mock and their final mock before the examination, validated wherever possible against self-reported actual UTME results. Engagement metrics are instrumental; if candidates are engaged but not improving, the product has failed regardless of how good the retention curve looks.
 
-### 18.2 Supporting metrics
+## 18.2 Supporting metrics
 
 | **Category** | **Metrics** |
 | --- | --- |
@@ -545,7 +711,7 @@ The north-star metric is the mark improvement between a candidate's first diagno
 | Content | Items live by subject, error reports per 10,000 views, share of bank calibrated, item discrimination distribution |
 | Technical | Crash-free rate, API latency percentiles, sync failure rate, mock completion rate without technical interruption |
 
-## 19. Post-Launch Operations
+# 19. Post-Launch Operations
 
 - **Annual cycle review.** Within four weeks of each UTME sitting, refresh the blueprint, syllabus mapping, reading-text module and item topic weightings for the next cycle.
 - **Continuous content operations.** A standing target for newly authored items per month, plus retirement of items whose empirical statistics fall below the quality floor.
@@ -554,17 +720,17 @@ The north-star metric is the mark improvement between a candidate's first diagno
 - **Incident readiness.** Documented severity levels, on-call rotation during the peak, and a public status page.
 - **Roadmap governance.** Quarterly review against the measurement framework; features that do not move the north-star metric are removed, not merely deprioritised.
 
-## 20. Immediate Next Steps
+# 20. Immediate Next Steps
 
-- Verify the current exam blueprint against the official JAMB brochure and any board circulars for the coming cycle, and record it as version 1 of the exam configuration.
-- Obtain and digitise the official syllabus for the priority subjects into the topic and objective hierarchy.
-- Complete the competitor teardown across the leading eight preparation apps, capturing pricing, content depth, offline behaviour and review themes.
-- Interview twenty candidates, five tutorial-centre proprietors and five secondary-school teachers; validate the personas and the jobs to be done.
-- Build the unit economics model, with particular attention to the fully loaded cost of an authored, reviewed and explained item.
-- Commission legal review covering content provenance and minors' data protection obligations.
-- Recruit the content lead and the first cohort of subject authors — this has the longest lead time of any hiring task.
-- Confirm the technology stack against the actual skills of the founding engineering team and produce the technical design document.
-- Agree the MVP scope boundary formally and freeze it for the duration of Phase 2.
+1. Verify the current exam blueprint against the official JAMB brochure and any board circulars for the coming cycle, and record it as version 1 of the exam configuration.
+2. Obtain and digitise the official syllabus for the priority subjects into the topic and objective hierarchy.
+3. Complete the competitor teardown across the leading eight preparation apps, capturing pricing, content depth, offline behaviour and review themes.
+4. Interview twenty candidates, five tutorial-centre proprietors and five secondary-school teachers; validate the personas and the jobs to be done.
+5. Build the unit economics model, with particular attention to the fully loaded cost of an authored, reviewed and explained item.
+6. Commission legal review covering content provenance and minors' data protection obligations.
+7. Recruit the content lead and the first cohort of subject authors — this has the longest lead time of any hiring task.
+8. Confirm the technology stack against the actual skills of the founding engineering team and produce the technical design document.
+9. Agree the MVP scope boundary formally and freeze it for the duration of Phase 2.
 
 | **Closing note** The scarce resource in this venture is not engineering capacity — it is verified, well-tagged, well-explained content and the longitudinal response data that makes it adaptive. Every scheduling decision in this plan should be tested against a single question: does it get more calibrated items and more candidate attempts into the system sooner? |
 | --- |
