@@ -1,7 +1,14 @@
 #!/usr/bin/env python3
 """
-docx-to-md.py -- convert a .docx to Markdown using only the standard library
-(no pandoc, no python-docx, no mammoth). Reads word/document.xml directly.
+docx-to-md.py -- one-off import tool. It converted the original
+docs/implementation-plan.docx to Markdown a single time; that Markdown
+file is now the source of truth and is edited directly. This script is
+not part of any regular workflow and there is no docx left in the repo
+to run it against. Kept for provenance and in case a future document
+needs the same one-time treatment.
+
+Uses only the standard library (no pandoc, no python-docx, no mammoth)
+by reading word/document.xml directly.
 
 Usage:
     python tools/docx-to-md.py <input.docx> <output.md>
@@ -9,7 +16,7 @@ Usage:
 Handles: heading styles (Heading1-6, Title), bold/italic/code runs,
 bulleted and numbered lists, multi-row/column tables (rendered as
 Markdown tables), and single-cell tables (rendered as blockquotes,
-since in this plan's source docx a 1x1 table is always a callout box).
+since in the source docx a 1x1 table was always a callout box).
 """
 import sys
 import zipfile

@@ -8,10 +8,9 @@ An offline-first JAMB UTME preparation app: mobile client (React Native/Expo,
 Android first), Node + TypeScript backend, PostgreSQL, plus an internal content
 pipeline that generates and reviews exam items.
 
-The full specification lives at `docs/implementation-plan.docx` (and
-`docs/implementation-plan.md` if converted). **That document is the source of
-truth.** If anything here conflicts with it, the plan wins — raise the conflict
-rather than guessing.
+The full specification lives at `docs/implementation-plan.md`. **That
+document is the source of truth.** If anything here conflicts with it, the
+plan wins — raise the conflict rather than guessing.
 
 `docs/implementation-plan.md` is the single source of truth for enums, state
 names, orderings and thresholds. Other documents reference it by section

@@ -1,3 +1,7 @@
+> **This file is the source of truth.** The original Word document was
+> imported once via `tools/docx-to-md.py` and is no longer maintained —
+> edit this file directly.
+
 **IMPLEMENTATION PLAN**
 
 **JAMB UTME Preparation Application**

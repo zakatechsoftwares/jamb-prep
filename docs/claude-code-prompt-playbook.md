@@ -10,7 +10,7 @@ How to drive the build session by session. Copy the prompts; adapt the details.
 mkdir jamb-app && cd jamb-app && git init
 mkdir -p docs
 # put the plan in the repo, not in the chat
-cp ~/Downloads/JAMB-UTME-App-Implementation-Plan.docx docs/implementation-plan.docx
+cp ~/Downloads/implementation-plan.md docs/implementation-plan.md
 cp ~/Downloads/jamb-seed-items.json docs/seed-items.json
 cp ~/Downloads/item-generation-spec.md docs/item-generation-spec.md
 # CLAUDE.md goes in the repo root
@@ -20,10 +20,9 @@ claude
 Then, first prompt of the first session:
 
 ```
-Read docs/implementation-plan.docx and convert it to
-docs/implementation-plan.md so it's greppable in future sessions.
-Then summarise back to me, in 10 bullets, what you understand we are
-building — I want to check you've got it before we write any code.
+Read docs/implementation-plan.md and summarise back to me, in 10
+bullets, what you understand we are building — I want to check you've
+got it before we write any code.
 ```
 
 **Do not skip that check.** If the summary is wrong, fix the understanding now,
