@@ -28,7 +28,7 @@
         "Scan the options for a word carrying hostility rather than harmony.",
         "Eliminate amicable, tactful and cordial as synonyms; belligerent remains."
       ],
-      "status": "draft_ai",
+      "status": "generated",
       "needs_review": true
     },
     {
@@ -54,7 +54,7 @@
         "Recall that exacerbate carries the sense of aggravating or intensifying.",
         "Select 'worsened'."
       ],
-      "status": "draft_ai",
+      "status": "generated",
       "needs_review": true
     },
     {
@@ -80,7 +80,7 @@
         "Recall the image: a chip taken from a block is made of the same material.",
         "Match to the option about resemblance to a parent."
       ],
-      "status": "draft_ai",
+      "status": "generated",
       "needs_review": true
     },
     {
@@ -106,7 +106,7 @@
         "Group bear, dare and hair as rhyming on /eə/.",
         "Isolate fear as /ɪə/."
       ],
-      "status": "draft_ai",
+      "status": "generated",
       "needs_review": true
     },
     {
@@ -132,7 +132,7 @@
         "Pronounce it naturally and locate the loudest, longest syllable.",
         "Confirm: second syllable."
       ],
-      "status": "draft_ai",
+      "status": "generated",
       "needs_review": true
     },
     {
@@ -158,7 +158,7 @@
         "Apply the proximity rule: agree with the nearer subject.",
         "The nearer subject 'teachers' is plural, so choose 'were'."
       ],
-      "status": "draft_ai",
+      "status": "generated",
       "needs_review": true
     },
     {
@@ -184,7 +184,7 @@
         "Distinguish from 'charge someone WITH something'.",
         "Select 'of'."
       ],
-      "status": "draft_ai",
+      "status": "generated",
       "needs_review": true
     },
     {
@@ -210,7 +210,7 @@
         "Test each option in the phrase and reject the unidiomatic ones.",
         "Select 'increase'."
       ],
-      "status": "draft_ai",
+      "status": "generated",
       "needs_review": true
     },
 
@@ -233,7 +233,7 @@
         "Solve 15 − 5y = 10 to obtain y = 1.",
         "Back-substitute: x = 5 − 1 = 4."
       ],
-      "status": "draft_ai",
+      "status": "generated",
       "needs_review": true
     },
     {
@@ -254,7 +254,7 @@
         "Apply I = PRT/100 = 3,000.",
         "Amount = P + I = 23,000."
       ],
-      "status": "draft_ai",
+      "status": "generated",
       "needs_review": true
     },
     {
@@ -275,7 +275,7 @@
         "Apply log a − log b = log(a/b): log(1000/10) = log 100.",
         "Evaluate log₁₀ 100 = 2."
       ],
-      "status": "draft_ai",
+      "status": "generated",
       "needs_review": true
     },
     {
@@ -296,7 +296,7 @@
         "Sum the known values: 26.",
         "x = 35 − 26 = 9."
       ],
-      "status": "draft_ai",
+      "status": "generated",
       "needs_review": true
     },
     {
@@ -317,7 +317,7 @@
         "Favourable outcomes (not blue) = 4 + 3 = 7.",
         "Probability = 7/12."
       ],
-      "status": "draft_ai",
+      "status": "generated",
       "needs_review": true
     },
     {
@@ -338,7 +338,7 @@
         "Add the coefficients: 3 + 2 + 4 + 6 = 15.",
         "Solve 15x = 360 to get x = 24."
       ],
-      "status": "draft_ai",
+      "status": "generated",
       "needs_review": true
     },
     {
@@ -359,7 +359,7 @@
         "Apply aᵐ ÷ aⁿ = a^(m−n): 2^(3n+1−3n).",
         "Simplify the index to 1, giving 2."
       ],
-      "status": "draft_ai",
+      "status": "generated",
       "needs_review": true
     },
     {
@@ -380,7 +380,7 @@
         "Obtain dy/dx = 9x² − 10x + 4.",
         "Substitute x = 1 to get 3."
       ],
-      "status": "draft_ai",
+      "status": "generated",
       "needs_review": true
     },
 
@@ -402,7 +402,7 @@
         "Apply F = ma.",
         "F = 5 kg × 5 m/s² = 25 N."
       ],
-      "status": "draft_ai",
+      "status": "generated",
       "needs_review": true
     },
     {
@@ -423,7 +423,7 @@
         "Speed is the scalar counterpart of velocity; work and energy are scalars.",
         "Momentum = mass × velocity, so it inherits direction."
       ],
-      "status": "draft_ai",
+      "status": "generated",
       "needs_review": true
     },
     {
@@ -444,7 +444,7 @@
         "Substitute m = 2, c = 4200, Δθ = 10.",
         "Q = 84,000 J, which is 84 kJ."
       ],
-      "status": "draft_ai",
+      "status": "generated",
       "needs_review": true
     },
     {
@@ -465,7 +465,7 @@
         "Invert: R = 12/4 = 3 Ω.",
         "Sanity check: 3 Ω is less than 4 Ω, as required for parallel."
       ],
-      "status": "draft_ai",
+      "status": "generated",
       "needs_review": true
     },
     {
@@ -486,7 +486,7 @@
         "Substitute f = 50 Hz, λ = 4 m.",
         "v = 200 m/s."
       ],
-      "status": "draft_ai",
+      "status": "generated",
       "needs_review": true
     },
     {
@@ -512,7 +512,7 @@
         "Rearrange to v = c/n.",
         "v = 3.0 × 10⁸ ÷ 1.5 = 2.0 × 10⁸ m/s."
       ],
-      "status": "draft_ai",
+      "status": "generated",
       "needs_review": true
     },
     {
@@ -533,7 +533,7 @@
         "Fraction remaining = (1/2)ⁿ.",
         "(1/2)⁴ = 1/16."
       ],
-      "status": "draft_ai",
+      "status": "generated",
       "needs_review": true
     },
     {
@@ -554,7 +554,7 @@
         "Rearrange: MA = (efficiency/100) × VR.",
         "MA = 0.8 × 5 = 4."
       ],
-      "status": "draft_ai",
+      "status": "generated",
       "needs_review": true
     },
 
@@ -576,7 +576,7 @@
         "Apply n = m/M.",
         "n = 11/44 = 0.25 mol."
       ],
-      "status": "draft_ai",
+      "status": "generated",
       "needs_review": true
     },
     {
@@ -597,7 +597,7 @@
         "Zn loses electrons, so Zn is oxidised.",
         "The oxidised species is the reducing agent: Zn."
       ],
-      "status": "draft_ai",
+      "status": "generated",
       "needs_review": true
     },
     {
@@ -618,7 +618,7 @@
         "Count valence electrons: 2.",
         "For s-block elements, group number equals the number of valence electrons: Group 2."
       ],
-      "status": "draft_ai",
+      "status": "generated",
       "needs_review": true
     },
     {
@@ -645,7 +645,7 @@
         "Number from both ends and choose the lower locant: position 2.",
         "Name: 2-methylbutane."
       ],
-      "status": "draft_ai",
+      "status": "generated",
       "needs_review": true
     },
     {
@@ -666,7 +666,7 @@
         "[H⁺] = 1 × 10⁻³ mol dm⁻³.",
         "pH = −log(10⁻³) = 3."
       ],
-      "status": "draft_ai",
+      "status": "generated",
       "needs_review": true
     },
     {
@@ -687,7 +687,7 @@
         "Apply V₁/T₁ = V₂/T₂.",
         "V₂ = 500 × (400/300) ≈ 667 cm³."
       ],
-      "status": "draft_ai",
+      "status": "generated",
       "needs_review": true
     },
     {
@@ -708,7 +708,7 @@
         "Apply the electrochemical series: the ion lower in the series is discharged.",
         "Hydrogen is discharged at the cathode."
       ],
-      "status": "draft_ai",
+      "status": "generated",
       "needs_review": true
     },
     {
@@ -734,7 +734,7 @@
         "Alkanes are CₙH₂ₙ₊₂; alkenes with one double bond are CₙH₂ₙ.",
         "Alkynes, with a triple bond, are CₙH₂ₙ₋₂."
       ],
-      "status": "draft_ai",
+      "status": "generated",
       "needs_review": true
     },
 
@@ -755,7 +755,7 @@
         "Associate each option with its organ system.",
         "Only the nephron belongs to the kidney."
       ],
-      "status": "draft_ai",
+      "status": "generated",
       "needs_review": true
     },
     {
@@ -775,7 +775,7 @@
         "Recall the function of each listed organelle.",
         "Match aerobic ATP production to the mitochondrion."
       ],
-      "status": "draft_ai",
+      "status": "generated",
       "needs_review": true
     },
     {
@@ -796,7 +796,7 @@
         "Obtain genotypes 1 TT : 2 Tt : 1 tt.",
         "Group by phenotype: 3 tall : 1 dwarf."
       ],
-      "status": "draft_ai",
+      "status": "generated",
       "needs_review": true
     },
     {
@@ -816,7 +816,7 @@
         "Recall the trophic categories: producers, consumers, decomposers.",
         "Match the description of breaking down dead matter to decomposers."
       ],
-      "status": "draft_ai",
+      "status": "generated",
       "needs_review": true
     },
     {
@@ -842,7 +842,7 @@
         "Confirm A, B and D as established liver functions.",
         "Recall that insulin originates in the pancreas."
       ],
-      "status": "draft_ai",
+      "status": "generated",
       "needs_review": true
     },
     {
@@ -862,7 +862,7 @@
         "Recall the principal role of each hormone.",
         "Link differential cell elongation towards light to auxin distribution."
       ],
-      "status": "draft_ai",
+      "status": "generated",
       "needs_review": true
     },
     {
@@ -882,7 +882,7 @@
         "Separate the two conducting tissues by their cargo.",
         "Water and minerals travel in xylem; sugars travel in phloem."
       ],
-      "status": "draft_ai",
+      "status": "generated",
       "needs_review": true
     },
     {
@@ -907,7 +907,7 @@
         "Associate each scientist with his principal contribution.",
         "Natural selection belongs to Darwin."
       ],
-      "status": "draft_ai",
+      "status": "generated",
       "needs_review": true
     }
   ]

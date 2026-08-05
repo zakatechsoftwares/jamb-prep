@@ -25,7 +25,7 @@ Second-order saving: a reviewer working on drafts is a cheaper hire than an auth
 
 ## 2. Where AI authoring is safe and where it is not
 
-**Low risk — generate freely, spot-check a sample:**
+**Low risk — generate freely, sample 30-50% per plan §7.3:**
 - Use of English: lexis, structure, concord, prepositions, idioms, collocation
 - Definitions and recall items across all sciences
 - Biology: physiology, ecology, classification, genetics ratios
@@ -104,7 +104,7 @@ Return ONLY valid JSON, an array of objects with these keys:
 id, subject, topic, subtopic, objective, cognitive_level,
 author_difficulty (0-1), expected_time_seconds, stem, options {A,B,C,D},
 correct_option, distractor_rationale {A,B,C,D}, explanation,
-method_steps (array), status ("draft_ai"), needs_review (true)
+method_steps (array), status ("generated")
 ```
 
 ---
@@ -122,16 +122,24 @@ syllabus objectives table
         │
         ├── fail ──► regenerate or route straight to human
         ▼
-  human review queue, prioritised: calculations first, recall last
+  status "generated" — passed every gate
         │
-        ▼
-  approved → live bank, status "uncalibrated"
+        ├── low risk_tier, not sampled, independent_solve_verdict "agreed"
+        │   ──► approved_uncalibrated, approval_route "auto_gated"  (see §8)
+        │
+        └── everything else ──► human review queue, prioritised:
+              calculations first, recall last
+                    │
+                    ▼
+              reviewer decides → approved_uncalibrated,
+              approval_route "human_reviewed" or "moderator_ruled"
         │
         ▼
   served to candidates → response data → difficulty & discrimination
         │
         ▼
-  calibrated  |  or auto-quarantined if discrimination is poor
+  calibrated  |  or auto-quarantined if discrimination is poor — applies
+  identically regardless of approval_route
 ```
 
 The final stage matters more than any of the earlier ones. **Live response data is the real quality filter.** An item that strong and weak candidates answer identically is worthless regardless of who wrote it, and only usage reveals that. Ship, measure, retire.
@@ -158,3 +166,17 @@ Waves 4 and 5 are where the real content budget goes. Plan for them; they are th
 - **Style drift.** Generated items skew slightly more verbose and more "textbook" than real UTME items. Have your content lead read 50 items against 50 real past questions and write a style correction into the prompt.
 - **Difficulty estimates are guesses** until calibrated. Do not trust `author_difficulty` for adaptive selection; use it only to seed the bank.
 - **A bank nobody has reviewed is a liability, not an asset.** One viral screenshot of a wrong answer key costs more than the review budget you saved.
+
+---
+
+## 8. Approval routes
+
+The spot-check sampling in section 2 means most low-risk items are never seen by a reviewer, yet every item that reaches a candidate still needs a defensible answer to "who, or what, approved this." That answer is the `approval_route` field, and the rule below is the single, exact statement of when the automated pipeline may answer that question on its own.
+
+Automated gates alone may promote an item to `approved_uncalibrated` without human review only when all three conditions hold: `risk_tier` is `low`, the item was not selected by the sampling draw, and `independent_solve_verdict` is `'agreed'`. Every other item requires a human decision before it can serve to candidates: every `high` risk_tier item, any item whose `independent_solve_verdict` is `'disagreed'`, any item selected by sampling, and any human-authored contribution.
+
+Every item records `approval_route` as one of `'auto_gated'`, `'human_reviewed'`, or `'moderator_ruled'`, so the share of the live bank no human has ever seen can be queried directly, at any time, by anyone who asks.
+
+The quarantine rule above — error reports above threshold, or discrimination below the quality floor — applies to `auto_gated` items exactly as it applies to every other item. Reaching the bank without a human review is not exemption from being pulled; if anything, an auto_gated item's live performance is the only check it has ever had, which makes that check non-negotiable.
+
+See `docs/implementation-plan.md` section 7.14 for the full rationale.

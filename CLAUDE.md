@@ -8,10 +8,14 @@ An offline-first JAMB UTME preparation app: mobile client (React Native/Expo,
 Android first), Node + TypeScript backend, PostgreSQL, plus an internal content
 pipeline that generates and reviews exam items.
 
-The full specification lives at `docs/implementation-plan.docx` (and
-`docs/implementation-plan.md` if converted). **That document is the source of
-truth.** If anything here conflicts with it, the plan wins — raise the conflict
-rather than guessing.
+The full specification lives at `docs/implementation-plan.md`. **That
+document is the source of truth.** If anything here conflicts with it, the
+plan wins — raise the conflict rather than guessing.
+
+`docs/implementation-plan.md` is the single source of truth for enums, state
+names, orderings and thresholds. Other documents reference it by section
+number and must not restate the values. If a value must be repeated, quote
+it and cite the section.
 
 ## Exam blueprint (drives all scoring and timing logic)
 
@@ -68,14 +72,35 @@ answer intact. Write tests for this scenario early and keep them green.
 
 ## Content pipeline rules
 
-- Generated items enter with `status: 'draft_ai'` and `needs_review: true`
-- Nothing serves to candidates until `status: 'approved'`
+- Generated items enter with `status: 'generated'`
 - Every calculation item requires human review — no exceptions
 - Literature, reading-text and diagram items are human-authored, not generated
 - Run the independent-solve check (a second model call solving the item blind,
   without sight of the proposed key) before any item reaches a human reviewer
 - Rebalance the A/B/C/D key distribution across each batch — generated banks
   skew heavily and this is a real defect, not cosmetic
+
+### Approval routes
+
+Automated gates alone may promote an item to `approved_uncalibrated` without
+human review only when all three conditions hold: `risk_tier` is `low`, the
+item was not selected by the sampling draw, and `independent_solve_verdict`
+is `'agreed'`. Every other item requires a human decision before it can
+serve to candidates: every `high` risk_tier item, any item whose
+`independent_solve_verdict` is `'disagreed'`, any item selected by sampling,
+and any human-authored contribution.
+
+Every item records `approval_route` as one of `'auto_gated'`,
+`'human_reviewed'`, or `'moderator_ruled'`, so the share of the live bank no
+human has ever seen can be queried directly, at any time, by anyone who asks.
+
+The quarantine rule — error reports above threshold, or discrimination below
+the quality floor — applies to `auto_gated` items exactly as it applies to
+every other item. Reaching the bank without a human review is not exemption
+from being pulled; if anything, an auto_gated item's live performance is the
+only check it has ever had, which makes that check non-negotiable.
+
+See `docs/implementation-plan.md` section 7.14 for the full rationale.
 
 ## How I want you to work
 
