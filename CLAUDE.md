@@ -85,3 +85,4 @@ answer intact. Write tests for this scenario early and keep them green.
   invent a convention
 - Update this file when we agree a new convention
 - Run the test suite before saying a task is done
+- Never push to main. Never push without showing me the diff first.
