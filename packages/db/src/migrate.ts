@@ -1,4 +1,5 @@
 import { readFileSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
 import { pool } from './client';
 import { loadMigrations } from './migrations';
 
@@ -16,8 +17,12 @@ async function appliedMigrationNames(): Promise<Set<string>> {
   return new Set(result.rows.map((row) => row.name));
 }
 
-async function runSqlFile(filePath: string): Promise<void> {
-  const sql = readFileSync(filePath, 'utf8');
+// Every migration file runs as a single statement batch inside one
+// transaction: if any statement in it fails, the whole file rolls back —
+// nothing from an earlier statement in the same file is left committed.
+// Exported so this exact behaviour can be exercised directly by a test,
+// not just asserted in prose (see migrate.integration.test.ts).
+export async function runMigrationSql(sql: string): Promise<void> {
   const client = await pool.connect();
   try {
     await client.query('BEGIN');
@@ -29,6 +34,10 @@ async function runSqlFile(filePath: string): Promise<void> {
   } finally {
     client.release();
   }
+}
+
+function runSqlFile(filePath: string): Promise<void> {
+  return runMigrationSql(readFileSync(filePath, 'utf8'));
 }
 
 async function up(): Promise<void> {
@@ -75,7 +84,14 @@ async function main(): Promise<void> {
   await pool.end();
 }
 
-main().catch((error: unknown) => {
-  console.error(error);
-  process.exitCode = 1;
-});
+// Only run as a CLI when this file is the entrypoint — not when it's
+// imported (e.g. by the integration test, for `runMigrationSql`).
+const isCliEntrypoint =
+  process.argv[1] !== undefined && fileURLToPath(import.meta.url) === process.argv[1];
+
+if (isCliEntrypoint) {
+  main().catch((error: unknown) => {
+    console.error(error);
+    process.exitCode = 1;
+  });
+}
