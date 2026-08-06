@@ -1,0 +1,5 @@
+DROP TABLE IF EXISTS objectives;
+DROP TABLE IF EXISTS subtopics;
+DROP TABLE IF EXISTS topics;
+DROP TABLE IF EXISTS subjects;
+DROP FUNCTION IF EXISTS set_updated_at();

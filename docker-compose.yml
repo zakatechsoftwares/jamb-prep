@@ -1,0 +1,15 @@
+services:
+  db:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: jamb_prep
+      POSTGRES_USER: jamb
+      POSTGRES_PASSWORD: jamb
+    ports:
+      - '5432:5432'
+    volumes:
+      - jamb_prep_db:/var/lib/postgresql/data
+
+volumes:
+  jamb_prep_db:
