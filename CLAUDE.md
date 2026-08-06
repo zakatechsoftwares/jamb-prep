@@ -45,6 +45,10 @@ between cycles and we absorb that as a data update, not a release.
 6. **Syllabus hierarchy is the backbone.** Subject → Topic → Subtopic →
    Objective. Every item maps to exactly one Objective. All diagnostics roll up
    this tree. Never store a topic as a free-text string.
+7. **No business logic in `apps/mobile`.** Scoring, timing, item selection,
+   spaced repetition and sync logic live in `packages/shared`. Mobile tests
+   run against a react-native stub, so anything testable must sit in shared,
+   not in the mobile package.
 
 ## The test that gates release
 

@@ -1,0 +1,13 @@
+{
+  "expo": {
+    "name": "JAMB UTME Prep",
+    "slug": "jamb-utme-prep",
+    "version": "0.1.0",
+    "orientation": "portrait",
+    "userInterfaceStyle": "automatic",
+    "platforms": ["android"],
+    "android": {
+      "package": "com.jambprep.mobile"
+    }
+  }
+}
