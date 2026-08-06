@@ -8,6 +8,22 @@ on:
 jobs:
   build:
     runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_DB: jamb_prep
+          POSTGRES_USER: jamb
+          POSTGRES_PASSWORD: jamb
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U jamb -d jamb_prep"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
     steps:
       - uses: actions/checkout@v4
 
@@ -24,4 +40,11 @@ jobs:
 
       - run: pnpm typecheck
 
+      - name: Run database migrations
+        run: pnpm --filter @jamb/db migrate:up
+        env:
+          DATABASE_URL: postgres://jamb:jamb@localhost:5432/jamb_prep
+
       - run: pnpm test
+        env:
+          DATABASE_URL: postgres://jamb:jamb@localhost:5432/jamb_prep

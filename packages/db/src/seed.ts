@@ -1,7 +1,7 @@
 import { readFileSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import type { QueryResult, QueryResultRow } from 'pg';
+import { firstRow } from './first-row';
 import { pool } from './client';
 import { deriveRiskTier } from './risk-tier';
 
@@ -29,14 +29,6 @@ interface SeedItem {
 
 interface SeedFile {
   items: SeedItem[];
-}
-
-function firstRow<T extends QueryResultRow>(result: QueryResult<T>): T {
-  const row = result.rows[0];
-  if (!row) {
-    throw new Error('expected at least one row back from the database');
-  }
-  return row;
 }
 
 async function upsertSubject(name: string): Promise<number> {
