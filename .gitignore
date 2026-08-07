@@ -2,6 +2,7 @@ node_modules/
 dist/
 build/
 .next/
+.expo/
 .env
 .env.local
 *.log
@@ -9,3 +10,4 @@ build/
 coverage/
 .turbo/
 generated-items-raw/
+*.tsbuildinfo
