@@ -73,6 +73,13 @@ answer intact. Write tests for this scenario early and keep them green.
 - Every migration is reversible and checked in
 - Tests colocated with source as `*.test.ts`
 - Conventional commits
+- Pure logic modules in `packages/shared` (scoring, timing, item selection,
+  spaced repetition) validate their inputs and throw on inconsistency —
+  an attempt referencing something outside the config, or a config that
+  doesn't add up internally — rather than silently tolerating it and
+  producing a quietly wrong result. See `packages/shared/src/scoring.ts`
+  for the pattern and `packages/shared/README.md` for the specific
+  decisions (rounding rule, append-only attempt resolution) it documents.
 
 ## Content pipeline rules
 
@@ -115,3 +122,5 @@ See `docs/implementation-plan.md` section 7.14 for the full rationale.
 - Update this file when we agree a new convention
 - Run the test suite before saying a task is done
 - Never push to main. Never push without showing me the diff first.
+- For a new pure logic module in `packages/shared`, write the tests first
+  and show them before implementing.
