@@ -4,3 +4,5 @@ build
 .next
 .expo
 pnpm-lock.yaml
+.env
+.env.*
