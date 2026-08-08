@@ -10,6 +10,7 @@ DROP TABLE IF EXISTS review_claims;
 DROP TABLE IF EXISTS review_decisions;
 DROP FUNCTION IF EXISTS forbid_review_decisions_mutation();
 
+DROP TABLE IF EXISTS reviewer_subjects;
 DROP TABLE IF EXISTS reviewers;
 
 DROP INDEX IF EXISTS items_approval_route_idx;

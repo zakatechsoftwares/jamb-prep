@@ -54,10 +54,6 @@ CREATE TABLE reviewers (
   user_id BIGINT NOT NULL UNIQUE REFERENCES users (id) ON DELETE RESTRICT,
   role TEXT NOT NULL DEFAULT 'reviewer'
     CHECK (role IN ('content_lead', 'moderator', 'reviewer', 'contributor')),
-  -- Subjects this reviewer is calibrated for. Denormalised deliberately, as
-  -- specified: array elements carry no FK integrity, so a subject may not be
-  -- deleted on the strength of this table alone.
-  subject_ids BIGINT[] NOT NULL DEFAULT '{}',
   status TEXT NOT NULL DEFAULT 'applied'
     CHECK (status IN ('applied', 'calibrating', 'active', 'suspended', 'removed')),
   -- Rolling accuracy against gold items and moderator audits (7.11).
@@ -74,6 +70,26 @@ CREATE INDEX reviewers_status_idx ON reviewers (status);
 
 CREATE TRIGGER reviewers_set_updated_at
 BEFORE UPDATE ON reviewers
+FOR EACH ROW EXECUTE FUNCTION set_updated_at();
+
+-- The subjects a reviewer is calibrated for (7.8). A join table rather than
+-- an array column, so a subject cannot be deleted out from under a live
+-- panel assignment: the array form carries no referential integrity on its
+-- elements, and inter-rater agreement is tracked per subject (7.11), which
+-- makes this a relationship the database should be able to enforce and join
+-- on rather than one it merely stores.
+CREATE TABLE reviewer_subjects (
+  reviewer_id BIGINT NOT NULL REFERENCES reviewers (id) ON DELETE CASCADE,
+  subject_id BIGINT NOT NULL REFERENCES subjects (id) ON DELETE RESTRICT,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  PRIMARY KEY (reviewer_id, subject_id)
+);
+
+CREATE INDEX reviewer_subjects_subject_id_idx ON reviewer_subjects (subject_id);
+
+CREATE TRIGGER reviewer_subjects_set_updated_at
+BEFORE UPDATE ON reviewer_subjects
 FOR EACH ROW EXECUTE FUNCTION set_updated_at();
 
 -- 3. Review decisions -------------------------------------------------------
