@@ -87,6 +87,33 @@ answer intact. Write tests for this scenario early and keep them green.
   values in CHECK constraints, and
   `packages/db/src/lifecycle-vocabulary.test.ts` fails the build if the
   two ever drift apart.
+- **When a rule must exist in both TypeScript and SQL, write a drift
+  test.** Some rules genuinely cannot live in one place — concurrency
+  safety needs SQL, and CHECK constraints cannot import TypeScript. Where
+  that happens, the pure version in `packages/shared` is the statement of
+  the rule, the SQL mirrors it, and a test drives every combination of
+  inputs through both and asserts they agree. See
+  `lifecycle-vocabulary.test.ts` and
+  `review-queue-ranking.integration.test.ts`. A duplicated rule with no
+  drift test is a defect waiting to happen silently.
+- **Rates are fractions in `[0, 1]`, never percentages.** The plan writes
+  them as percentages ("30-50%"); code stores 0.3-0.5, names them
+  `...Rate`, and throws on anything outside the range. Record the mapping
+  next to the field so nobody "corrects" the units back.
+- **Inject randomness and the clock; never reach for `Math.random()` or
+  `new Date()` inside a decision.** A rule that samples or draws takes a
+  `random: () => number`; a transition takes its `occurredAt`. Otherwise
+  the behaviour cannot be pinned in a test.
+- **A silent failure needs a counter.** If something can stop working
+  while every request still succeeds — a stock-out, a queue draining, a
+  measurement that quietly stops — record it durably at the point it
+  happens. Nothing else will ever surface it. See
+  `review_queue_gold_stockouts`.
+- Integration tests that need committed data (anything testing real
+  concurrency) clean up with `TRUNCATE ... CASCADE`, which is also the
+  only way to clear the append-only tables, whose `DELETE` triggers
+  reject a `DELETE`. Packages whose tests do this set
+  `fileParallelism: false` in their vitest config.
 
 ## Content pipeline rules
 
