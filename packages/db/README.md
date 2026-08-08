@@ -54,6 +54,60 @@ Migrations live in `migrations/` as paired `NNNN_name.up.sql` /
   the earlier constraint has no such value. That is deliberate — the
   alternative is silently relabelling human-authored items as generated
   ones. Retier or retire those items first.
+- `int8` is parsed to a JavaScript number in `client.ts`. Postgres returns
+  bigint as a *string* by default, because it can exceed what a number holds
+  exactly — which quietly made every `id: number` in this package a lie.
+  Every id here is a surrogate `BIGSERIAL` well inside 2^53, so parsing is
+  safe and makes the declared types true. Revisit if a table ever carries
+  genuinely large int8 values.
+
+## The reviewer queue (`review-queue-repository.ts`)
+
+`getNextItem` / `getNextItemBatch` assign work to a reviewer; the pure
+ranking and filtering policy lives in `@jamb/shared`, and
+`review-queue-ranking.integration.test.ts` drives all 396 combinations of
+item facts through both to prove the SQL and the policy agree.
+
+**How two simultaneous callers stay disjoint.** `SELECT ... FOR UPDATE OF i
+SKIP LOCKED` inside the same transaction that writes the claim. The claim
+row alone is not enough: under READ COMMITTED a concurrent caller's snapshot
+can predate the other's commit, so its `NOT EXISTS (review_claims ...)`
+would not see the claim. The row lock closes that window; the claim row
+provides exclusion that outlives the transaction. Both are needed, and the
+isolation level must stay READ COMMITTED — under REPEATABLE READ a
+`FOR UPDATE` against a concurrently updated row raises a serialization
+failure instead of skipping it.
+
+**Why `EXISTS` subqueries and not joins.** Postgres refuses `FOR UPDATE`
+alongside aggregates, `DISTINCT`, `GROUP BY` or `UNION`, and locking the
+nullable side of an outer join means nothing. `EXISTS` keeps `items` the
+only lockable relation.
+
+**Why the claim insert upserts.** `review_claims` is keyed on `item_id`, and
+an expired claim row survives until the sweeper removes it, so a plain
+`INSERT` would collide with it. The `WHERE review_claims.expires_at <=
+now()` on the conflict path is what stops the upsert stealing a live claim.
+
+**`releaseExpiredClaims` is not what makes an abandoned item available
+again** — the queue query already ignores expired claims. It is what
+*records* that the item was released, via the `claim_expired` transition,
+and the state machine decides whether it lands back in `pending_review` or
+`needs_second_review`.
+
+**`items.gate_flagged` is written only by `flagForJudgement`,** in the same
+transaction as the `routed_for_judgement` transition. It denormalises what
+the transition log already implies, so the moment the two can be written
+apart is the moment they can disagree — and the queue would then prioritise
+on a fact the audit trail contradicts. An integration test asserts the two
+describe exactly the same set of items.
+
+**The queue tests commit and then TRUNCATE.** The concurrency test needs
+twenty connections to see the same items, which rules out the roll-back-a-
+transaction pattern the other integration tests use. TRUNCATE is also the
+only way to clear the append-only tables: their DELETE triggers reject a
+DELETE, but TRUNCATE fires TRUNCATE triggers, not row triggers. Because
+these tests wipe shared tables, `vitest.config.ts` sets
+`fileParallelism: false` for this package.
 - The syllabus hierarchy (`subjects` → `topics` → `subtopics` → `objectives`)
   is four real tables, never free text.
 - `exam_configs` holds the exam blueprint as versioned data, not
