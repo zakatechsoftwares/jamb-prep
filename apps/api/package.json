@@ -10,6 +10,7 @@
     "test": "vitest run"
   },
   "dependencies": {
+    "@jamb/db": "workspace:*",
     "@jamb/shared": "workspace:*",
     "express": "^5.2.1"
   },
