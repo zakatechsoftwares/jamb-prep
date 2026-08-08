@@ -114,6 +114,17 @@ answer intact. Write tests for this scenario early and keep them green.
   only way to clear the append-only tables, whose `DELETE` triggers
   reject a `DELETE`. Packages whose tests do this set
   `fileParallelism: false` in their vitest config.
+- **A column existing is not a column being written.** Two separate bugs
+  across three sessions were exactly this shape: `pg` silently returning
+  `int8` as a string (session 05), and `item_state_transitions.approval_route`
+  going unpopulated from 0012 through 0013 (session 06) because every
+  caller up to that point happened to produce the benign value (`null`),
+  so nothing looked wrong. Neither was caught by a migration test, a type
+  check, or a passing suite — only by a later caller that finally exercised
+  the case the gap was hiding. When a migration adds a column that
+  application code is meant to write, add a test asserting the column is
+  actually populated with the expected value on the relevant code path —
+  not merely that the migration applies or that the column exists.
 
 ## Content pipeline rules
 
