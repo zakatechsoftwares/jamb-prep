@@ -1,4 +1,10 @@
-import { getNextItem, getNextItemBatch } from '@jamb/db';
+import {
+  decideOnItem,
+  getNextItem,
+  getNextItemBatch,
+  revealItem,
+  submitBlindAnswer,
+} from '@jamb/db';
 import { createApp } from './app';
 
 const port = process.env.PORT ?? 3000;
@@ -9,6 +15,12 @@ const app = createApp({
   reviewQueue: {
     getNextItem: (reviewerId) => getNextItem(reviewerId),
     getNextItemBatch: (reviewerId, count) => getNextItemBatch(reviewerId, count),
+  },
+  reviewDecision: {
+    submitBlindAnswer: (reviewerId, itemId, answer) =>
+      submitBlindAnswer(reviewerId, itemId, answer),
+    revealItem: (reviewerId, itemId) => revealItem(reviewerId, itemId),
+    decideOnItem: (reviewerId, itemId, input) => decideOnItem(reviewerId, itemId, input),
   },
 });
 

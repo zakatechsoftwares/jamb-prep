@@ -1,5 +1,6 @@
 import express, { type Express } from 'express';
-import type { HealthStatus, ReviewQueueService } from '@jamb/shared';
+import type { HealthStatus, ReviewDecisionService, ReviewQueueService } from '@jamb/shared';
+import { createReviewDecisionRouter } from './routes/review-decision';
 import { createReviewQueueRouter } from './routes/review-queue';
 
 export interface AppDependencies {
@@ -9,10 +10,12 @@ export interface AppDependencies {
    * database.
    */
   reviewQueue?: ReviewQueueService;
+  reviewDecision?: ReviewDecisionService;
 }
 
 export function createApp(dependencies: AppDependencies = {}): Express {
   const app = express();
+  app.use(express.json());
 
   app.get('/health', (_req, res) => {
     const status: HealthStatus = 'ok';
@@ -21,6 +24,9 @@ export function createApp(dependencies: AppDependencies = {}): Express {
 
   if (dependencies.reviewQueue) {
     app.use('/review', createReviewQueueRouter(dependencies.reviewQueue));
+  }
+  if (dependencies.reviewDecision) {
+    app.use('/review', createReviewDecisionRouter(dependencies.reviewDecision));
   }
 
   return app;
