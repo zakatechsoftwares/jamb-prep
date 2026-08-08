@@ -80,6 +80,13 @@ answer intact. Write tests for this scenario early and keep them green.
   producing a quietly wrong result. See `packages/shared/src/scoring.ts`
   for the pattern and `packages/shared/README.md` for the specific
   decisions (rounding rule, append-only attempt resolution) it documents.
+- Enums shared between the database and the application — item states,
+  approval routes, risk tiers, review actions, rejection reasons — are
+  declared once in `packages/shared/src/item-lifecycle.ts` and nowhere
+  else. No package retypes them locally. The migrations hold the same
+  values in CHECK constraints, and
+  `packages/db/src/lifecycle-vocabulary.test.ts` fails the build if the
+  two ever drift apart.
 
 ## Content pipeline rules
 
@@ -121,6 +128,7 @@ See `docs/implementation-plan.md` section 7.14 for the full rationale.
   invent a convention
 - Update this file when we agree a new convention
 - Run the test suite before saying a task is done
-- Never push to main. Never push without showing me the diff first.
+- Never push to main. Never open a PR without showing me the diff first.
+  Pushing a feature branch is fine.
 - For a new pure logic module in `packages/shared`, write the tests first
   and show them before implementing.

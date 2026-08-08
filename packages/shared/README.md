@@ -4,6 +4,71 @@ Types and pure logic shared between the client and server. No `apps/*`
 package may reimplement anything that belongs here — see CLAUDE.md's "no
 business logic in apps/mobile" rule.
 
+## The item lifecycle vocabulary (`src/item-lifecycle.ts`)
+
+The single home for the enumerated values that plan sections 7.3–7.14
+define: the eleven item states, approval routes, risk tiers, independent
+solve verdicts, review actions, the structured rejection taxonomy, panel
+roles and reviewer statuses. Declared here and nowhere else — `@jamb/db`
+imports them rather than retyping them, and
+`packages/db/src/lifecycle-vocabulary.test.ts` parses the migrations'
+CHECK constraints and fails if the database and this file diverge.
+
+## Item state machine (`src/item-state-machine.ts`)
+
+`transition(currentState, event, context)` advances one item through the
+lifecycle in plan section 7.10. Pure and dependency-free: no DB access, no
+I/O, and no clock — the caller supplies `occurredAt`, because a pure
+function that reads the wall clock is not reproducible in a test.
+
+**It throws rather than returning a falsy result.** An illegal transition
+is a bug in the caller, and an item reaching candidates by an illegitimate
+path is the failure this module exists to make impossible. Silently
+returning `null` would let that failure propagate to the row that gets
+written.
+
+**One table of legal source states.** `LEGAL_SOURCE_STATES` names, per
+event, the states it may be applied from. `rejected` and `retired` appear
+in no list, which is what makes them terminal — the absence of any way out,
+not a special case in the code.
+
+**`gates_passed` never promotes.** Passing the automated gates only ever
+queues an item as `pending_review`, whatever its facts. The automated-only
+route in 7.14 is reached solely through `auto_gate_promote`, which asserts
+all three conditions (low risk tier, not sampled, independent solve agreed)
+and throws if any fails. Two doors, deliberately: skipping human review is
+a decision a caller has to take on purpose, not an outcome it can fall into
+by passing the wrong context. This is why the route is not simply derived
+from the item's fields.
+
+**What the returned object carries, and why it isn't just a state.**
+`TransitionResult` returns the new status _plus_ the `approvalRoute` the
+transition establishes and the actor and timestamp it must be recorded
+against. The route is determined by the transition and nothing else —
+deriving it at the call site would re-implement the 7.14 rule in a second
+place. A `null` route means "this transition establishes no route; leave
+the item's existing one alone", not "clear it".
+
+**Guards, encoded as guards rather than comments.** A high `risk_tier`
+item never reaches `approved_uncalibrated` on one decision; a `disagreed`
+independent solve forces a second review regardless of tier; nobody decides
+on an item they authored (on rejection as much as on approval, and
+moderators included, since they are drawn from the same pool); conflicting
+decisions route to `escalated` and never to approved; only a moderator
+resolves an escalation; and a reviewer may not decide twice on one item,
+because 7.10's second opinion is a second _independent_ reviewer.
+
+**An expired claim returns to the queue it came from.** `claim_expired`
+routes to `needs_second_review` when a prior decision exists, not to
+`pending_review` — otherwise a lapsed second review could be approved by a
+single reviewer, silently discarding the requirement that put it there.
+
+**Where the audit trail is written.** The machine is pure and writes
+nothing. Its result maps directly onto an `item_state_transitions` row
+(migration `0012`), which is append-only. `review_decisions` records
+reviewer decisions specifically; the transition log records every
+transition including the automated ones.
+
 ## Scoring (`src/scoring.ts`)
 
 Computes per-subject and aggregate exam scores from an `ExamConfig` and a
