@@ -50,7 +50,31 @@ INSERT INTO review_queue_configs (
 -- gate-flag-agreement.integration.test.ts proves they agree.
 ALTER TABLE items ADD COLUMN gate_flagged BOOLEAN NOT NULL DEFAULT false;
 
--- 3. Queue scan support -----------------------------------------------------
+-- 3. Gold stock-out counter -------------------------------------------------
+
+-- Recorded whenever the gold-injection draw fires but no eligible gold item
+-- exists for that reviewer (7.11).
+--
+-- Running out of gold stock is silent by construction: the reviewer is
+-- served an ordinary item and notices nothing, the API returns success, and
+-- accuracy measurement simply stops happening. Nothing else in the system
+-- would ever surface it. One row per occurrence rather than a bare integer,
+-- so the content lead's dashboard can tell a global stock-out from one
+-- reviewer who has already seen every gold item in their subjects — which
+-- are different problems with different fixes.
+CREATE TABLE review_queue_gold_stockouts (
+  id BIGSERIAL PRIMARY KEY,
+  reviewer_id BIGINT NOT NULL REFERENCES reviewers (id) ON DELETE CASCADE,
+  occurred_at TIMESTAMPTZ NOT NULL,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+CREATE INDEX review_queue_gold_stockouts_occurred_at_idx
+  ON review_queue_gold_stockouts (occurred_at);
+CREATE INDEX review_queue_gold_stockouts_reviewer_idx
+  ON review_queue_gold_stockouts (reviewer_id, occurred_at);
+
+-- 4. Queue scan support -----------------------------------------------------
 
 -- The queue only ever scans the two waiting states, so a partial index keeps
 -- it off the whole bank. Ordered to match the ORDER BY in the claim query

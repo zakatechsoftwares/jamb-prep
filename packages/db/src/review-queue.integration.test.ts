@@ -455,6 +455,66 @@ describe.runIf(hasDatabase)('review queue', () => {
     });
   });
 
+  it('counts a gold stock-out when the draw fires and no gold item is available', async () => {
+    await withWorld(async ({ client, world, fixtures, repository }) => {
+      // Running dry is invisible from the outside: the reviewer is served an
+      // ordinary item and the request succeeds, while accuracy measurement
+      // quietly stops. The counter is the only thing that surfaces it.
+      const ordinary = await fixtures.insertQueueItem(client, world);
+      const before = new Date(Date.now() - 60_000);
+
+      const served = await repository.getNextItem(world.reviewerId, { random: alwaysGold });
+      expect(served?.itemId).toBe(ordinary);
+
+      const stockouts = await repository.goldStockoutsSince(before);
+      expect(stockouts).toEqual([{ reviewerId: world.reviewerId, occurrences: 1 }]);
+    });
+  });
+
+  it('counts a stock-out when the reviewer has exhausted the gold items in their subjects', async () => {
+    await withWorld(async ({ client, world, fixtures, repository }) => {
+      // Stock exists, but not for this reviewer — a different problem from a
+      // global stock-out, which is why the count is per reviewer.
+      const gold = await fixtures.insertQueueItem(client, world, { gold: true });
+      await fixtures.insertDecision(client, gold, world.reviewerId);
+      await fixtures.insertQueueItem(client, world);
+      const before = new Date(Date.now() - 60_000);
+
+      await repository.getNextItem(world.reviewerId, { random: alwaysGold });
+
+      const stockouts = await repository.goldStockoutsSince(before);
+      expect(stockouts).toEqual([{ reviewerId: world.reviewerId, occurrences: 1 }]);
+    });
+  });
+
+  it('counts nothing when a gold item was available, or when the draw never fired', async () => {
+    await withWorld(async ({ client, world, fixtures, repository }) => {
+      await fixtures.insertQueueItem(client, world, { gold: true });
+      await fixtures.insertQueueItem(client, world);
+      const before = new Date(Date.now() - 60_000);
+
+      await repository.getNextItem(world.reviewerId, { random: alwaysGold });
+      await repository.getNextItem(world.secondReviewerId, { random: neverGold });
+
+      expect(await repository.goldStockoutsSince(before)).toEqual([]);
+    });
+  });
+
+  it('counts a stock-out per affected serve across a batch', async () => {
+    await withWorld(async ({ client, world, fixtures, repository }) => {
+      for (let index = 0; index < 3; index += 1) {
+        await fixtures.insertQueueItem(client, world);
+      }
+      const before = new Date(Date.now() - 60_000);
+
+      await repository.getNextItemBatch(world.reviewerId, 3, { random: alwaysGold });
+
+      expect(await repository.goldStockoutsSince(before)).toEqual([
+        { reviewerId: world.reviewerId, occurrences: 3 },
+      ]);
+    });
+  });
+
   // -------------------------------------------------------------------------
   // Batch
   // -------------------------------------------------------------------------

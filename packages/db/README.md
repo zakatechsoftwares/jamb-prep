@@ -54,12 +54,38 @@ Migrations live in `migrations/` as paired `NNNN_name.up.sql` /
   the earlier constraint has no such value. That is deliberate — the
   alternative is silently relabelling human-authored items as generated
   ones. Retier or retire those items first.
-- `int8` is parsed to a JavaScript number in `client.ts`. Postgres returns
-  bigint as a *string* by default, because it can exceed what a number holds
-  exactly — which quietly made every `id: number` in this package a lie.
-  Every id here is a surrogate `BIGSERIAL` well inside 2^53, so parsing is
-  safe and makes the declared types true. Revisit if a table ever carries
-  genuinely large int8 values.
+- The syllabus hierarchy (`subjects` → `topics` → `subtopics` → `objectives`)
+  is four real tables, never free text.
+- `exam_configs` holds the exam blueprint as versioned data, not
+  hard-coded application logic.
+- The seed script is idempotent (`ON CONFLICT` on natural keys) — rerunning
+  it does not duplicate rows.
+
+## Bigint ids are parsed to JavaScript numbers
+
+This is a **package-wide decision**, not a detail of any one query, and it
+affects every consumer of `@jamb/db`.
+
+`client.ts` registers `types.setTypeParser(types.builtins.INT8, Number)`.
+Without it, `pg` returns every `int8` — which is every `BIGSERIAL` id in
+this schema, plus `count(*)` — as a **string**, because a Postgres bigint
+can exceed what a JavaScript number represents exactly. That default had
+quietly made every `id: number` in this package a lie: nothing noticed,
+because both sides of every comparison happened to be strings. It surfaced
+only when a test asserted `typeof id === 'number'` rather than equality.
+
+**The bound is 2^53** (9,007,199,254,740,992). Above it, ids silently lose
+precision — two different rows can parse to the same number, which is worse
+than the string default because it fails as wrong answers rather than as
+type errors. Every id here is a surrogate key on a table that will not
+approach that scale, so parsing is safe and makes the declared types
+honest.
+
+**Revisit this if** a table ever stores a genuinely large `int8` — an
+externally-issued identifier, a monetary amount in minor units, an
+accumulating event counter. Such a column needs its own parser returning a
+string or `BigInt`, and a type to match; do not rely on the package-wide
+default covering it.
 
 ## The reviewer queue (`review-queue-repository.ts`)
 
@@ -90,7 +116,7 @@ now()` on the conflict path is what stops the upsert stealing a live claim.
 
 **`releaseExpiredClaims` is not what makes an abandoned item available
 again** — the queue query already ignores expired claims. It is what
-*records* that the item was released, via the `claim_expired` transition,
+_records_ that the item was released, via the `claim_expired` transition,
 and the state machine decides whether it lands back in `pending_review` or
 `needs_second_review`.
 
@@ -101,6 +127,14 @@ apart is the moment they can disagree — and the queue would then prioritise
 on a fact the audit trail contradicts. An integration test asserts the two
 describe exactly the same set of items.
 
+**A gold stock-out is counted, not swallowed.** When the injection draw
+fires and no eligible gold item exists, `review_queue_gold_stockouts` gets a
+row before the fallback to an ordinary item. Running dry is otherwise
+completely silent — the reviewer sees a normal item, the request succeeds,
+and accuracy measurement simply stops. The count is per reviewer so the
+dashboard can distinguish "the seeded stock is exhausted" from "this
+reviewer has already seen every gold item in their subjects".
+
 **The queue tests commit and then TRUNCATE.** The concurrency test needs
 twenty connections to see the same items, which rules out the roll-back-a-
 transaction pattern the other integration tests use. TRUNCATE is also the
@@ -108,12 +142,6 @@ only way to clear the append-only tables: their DELETE triggers reject a
 DELETE, but TRUNCATE fires TRUNCATE triggers, not row triggers. Because
 these tests wipe shared tables, `vitest.config.ts` sets
 `fileParallelism: false` for this package.
-- The syllabus hierarchy (`subjects` → `topics` → `subtopics` → `objectives`)
-  is four real tables, never free text.
-- `exam_configs` holds the exam blueprint as versioned data, not
-  hard-coded application logic.
-- The seed script is idempotent (`ON CONFLICT` on natural keys) — rerunning
-  it does not duplicate rows.
 
 ## Why a bespoke migration runner, not node-pg-migrate
 

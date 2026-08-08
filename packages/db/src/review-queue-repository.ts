@@ -333,6 +333,49 @@ async function loadItemPayloads(
   );
 }
 
+/**
+ * Records that the gold-injection draw fired with no eligible gold item for
+ * this reviewer (7.11). Written inside the serving transaction, so it
+ * cannot be lost while the ordinary item it fell back to is still handed
+ * out.
+ */
+async function recordGoldStockout(client: PoolClient, reviewerId: number): Promise<void> {
+  await client.query(
+    `INSERT INTO review_queue_gold_stockouts (reviewer_id, occurred_at) VALUES ($1, now())`,
+    [reviewerId],
+  );
+}
+
+export interface GoldStockoutCount {
+  reviewerId: number;
+  occurrences: number;
+}
+
+/**
+ * Gold stock-outs since a given moment, by reviewer, for the content lead's
+ * dashboard.
+ *
+ * A count against one reviewer means they have exhausted the gold items in
+ * their subjects; a count spread across all of them means the seeded stock
+ * itself has run dry. Both stop accuracy measurement, and they need
+ * different fixes.
+ */
+export async function goldStockoutsSince(since: Date): Promise<GoldStockoutCount[]> {
+  const result = await pool.query<{ reviewer_id: number; occurrences: number }>(
+    `SELECT reviewer_id, count(*)::int AS occurrences
+       FROM review_queue_gold_stockouts
+      WHERE occurred_at >= $1
+      GROUP BY reviewer_id
+      ORDER BY occurrences DESC, reviewer_id`,
+    [since],
+  );
+
+  return result.rows.map((row) => ({
+    reviewerId: row.reviewer_id,
+    occurrences: row.occurrences,
+  }));
+}
+
 export interface GetNextItemOptions {
   /** Injected so the gold-injection rate is reproducible in a test. */
   random?: () => number;
@@ -395,8 +438,13 @@ export async function getNextItemBatch(
         (candidate) => !alreadyTaken.has(candidate.id),
       );
 
-      // No gold item available is not a reason to serve nothing.
+      // No gold item available is not a reason to serve nothing — but it
+      // must not pass unrecorded either. The reviewer notices nothing, the
+      // request succeeds, and accuracy measurement quietly stops happening,
+      // so this counter is the only thing that can ever surface it.
       if (!next && wantsGold) {
+        await recordGoldStockout(client, reviewer.reviewer_id);
+
         next = (await lockCandidates(client, reviewer, 1 + alreadyTaken.size, false)).find(
           (candidate) => !alreadyTaken.has(candidate.id),
         );

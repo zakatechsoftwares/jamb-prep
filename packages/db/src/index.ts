@@ -9,7 +9,9 @@ export {
   flagForJudgement,
   getNextItem,
   getNextItemBatch,
+  goldStockoutsSince,
   loadActiveQueueConfig,
   releaseExpiredClaims,
   type GetNextItemOptions,
+  type GoldStockoutCount,
 } from './review-queue-repository';
