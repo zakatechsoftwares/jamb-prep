@@ -3,8 +3,8 @@
   "private": true,
   "version": "0.1.0",
   "type": "module",
-  "main": "src/client.ts",
-  "types": "src/client.ts",
+  "main": "src/index.ts",
+  "types": "src/index.ts",
   "scripts": {
     "migrate:up": "tsx src/migrate.ts up",
     "migrate:down": "tsx src/migrate.ts down",

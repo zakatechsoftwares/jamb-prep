@@ -57,6 +57,9 @@ importers:
 
   apps/api:
     dependencies:
+      '@jamb/db':
+        specifier: workspace:*
+        version: link:../../packages/db
       '@jamb/shared':
         specifier: workspace:*
         version: link:../../packages/shared

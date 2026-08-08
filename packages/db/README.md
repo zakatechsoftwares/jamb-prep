@@ -61,6 +61,88 @@ Migrations live in `migrations/` as paired `NNNN_name.up.sql` /
 - The seed script is idempotent (`ON CONFLICT` on natural keys) — rerunning
   it does not duplicate rows.
 
+## Bigint ids are parsed to JavaScript numbers
+
+This is a **package-wide decision**, not a detail of any one query, and it
+affects every consumer of `@jamb/db`.
+
+`client.ts` registers `types.setTypeParser(types.builtins.INT8, Number)`.
+Without it, `pg` returns every `int8` — which is every `BIGSERIAL` id in
+this schema, plus `count(*)` — as a **string**, because a Postgres bigint
+can exceed what a JavaScript number represents exactly. That default had
+quietly made every `id: number` in this package a lie: nothing noticed,
+because both sides of every comparison happened to be strings. It surfaced
+only when a test asserted `typeof id === 'number'` rather than equality.
+
+**The bound is 2^53** (9,007,199,254,740,992). Above it, ids silently lose
+precision — two different rows can parse to the same number, which is worse
+than the string default because it fails as wrong answers rather than as
+type errors. Every id here is a surrogate key on a table that will not
+approach that scale, so parsing is safe and makes the declared types
+honest.
+
+**Revisit this if** a table ever stores a genuinely large `int8` — an
+externally-issued identifier, a monetary amount in minor units, an
+accumulating event counter. Such a column needs its own parser returning a
+string or `BigInt`, and a type to match; do not rely on the package-wide
+default covering it.
+
+## The reviewer queue (`review-queue-repository.ts`)
+
+`getNextItem` / `getNextItemBatch` assign work to a reviewer; the pure
+ranking and filtering policy lives in `@jamb/shared`, and
+`review-queue-ranking.integration.test.ts` drives all 396 combinations of
+item facts through both to prove the SQL and the policy agree.
+
+**How two simultaneous callers stay disjoint.** `SELECT ... FOR UPDATE OF i
+SKIP LOCKED` inside the same transaction that writes the claim. The claim
+row alone is not enough: under READ COMMITTED a concurrent caller's snapshot
+can predate the other's commit, so its `NOT EXISTS (review_claims ...)`
+would not see the claim. The row lock closes that window; the claim row
+provides exclusion that outlives the transaction. Both are needed, and the
+isolation level must stay READ COMMITTED — under REPEATABLE READ a
+`FOR UPDATE` against a concurrently updated row raises a serialization
+failure instead of skipping it.
+
+**Why `EXISTS` subqueries and not joins.** Postgres refuses `FOR UPDATE`
+alongside aggregates, `DISTINCT`, `GROUP BY` or `UNION`, and locking the
+nullable side of an outer join means nothing. `EXISTS` keeps `items` the
+only lockable relation.
+
+**Why the claim insert upserts.** `review_claims` is keyed on `item_id`, and
+an expired claim row survives until the sweeper removes it, so a plain
+`INSERT` would collide with it. The `WHERE review_claims.expires_at <=
+now()` on the conflict path is what stops the upsert stealing a live claim.
+
+**`releaseExpiredClaims` is not what makes an abandoned item available
+again** — the queue query already ignores expired claims. It is what
+_records_ that the item was released, via the `claim_expired` transition,
+and the state machine decides whether it lands back in `pending_review` or
+`needs_second_review`.
+
+**`items.gate_flagged` is written only by `flagForJudgement`,** in the same
+transaction as the `routed_for_judgement` transition. It denormalises what
+the transition log already implies, so the moment the two can be written
+apart is the moment they can disagree — and the queue would then prioritise
+on a fact the audit trail contradicts. An integration test asserts the two
+describe exactly the same set of items.
+
+**A gold stock-out is counted, not swallowed.** When the injection draw
+fires and no eligible gold item exists, `review_queue_gold_stockouts` gets a
+row before the fallback to an ordinary item. Running dry is otherwise
+completely silent — the reviewer sees a normal item, the request succeeds,
+and accuracy measurement simply stops. The count is per reviewer so the
+dashboard can distinguish "the seeded stock is exhausted" from "this
+reviewer has already seen every gold item in their subjects".
+
+**The queue tests commit and then TRUNCATE.** The concurrency test needs
+twenty connections to see the same items, which rules out the roll-back-a-
+transaction pattern the other integration tests use. TRUNCATE is also the
+only way to clear the append-only tables: their DELETE triggers reject a
+DELETE, but TRUNCATE fires TRUNCATE triggers, not row triggers. Because
+these tests wipe shared tables, `vitest.config.ts` sets
+`fileParallelism: false` for this package.
+
 ## Why a bespoke migration runner, not node-pg-migrate
 
 `src/migrate.ts` is a ~90-line runner (`up` / `down [--all]`) instead of an
