@@ -52,6 +52,14 @@ DONE WHEN:   the checkable condition
 
 ## Session sequence
 
+> **This numbering is internal to this document.** This repo interleaves
+> this track with `docs/reviewer-workspace-prompts.md`'s own lettered
+> sessions, and the two only run in the order shown in
+> `docs/build-log.md`'s "Session order" table — not in the order either
+> source document lists on its own. In particular, this file's own
+> Session 4 and Session 5 below are **not** this repo's sessions 04 and
+> 05; see the notes on those two headings.
+
 ### Session 1 — Scaffold
 
 ```
@@ -112,6 +120,13 @@ Write the tests first, show them to me, then implement.
 
 ### Session 4 — Mock CBT engine
 
+> **Not this repo's session 04.** This repo's session 04 is
+> `docs/reviewer-workspace-prompts.md`'s Session A (item state machine) —
+> the reviewer-workspace track is a "Phase 1 blocker" that took priority
+> over continuing this one after Session 3. This prompt is this repo's
+> canonical session **12**; see `docs/build-log.md`'s "Session order"
+> table.
+
 This is the highest-risk component. Prompt it deliberately:
 
 ```
@@ -138,6 +153,13 @@ Propose your approach to timer persistence before you write code.
 
 ### Session 5 — Offline sync
 
+> **Not this repo's session 05.** This repo's session 05 is
+> `docs/reviewer-workspace-prompts.md`'s Session B (queue assignment
+> service). This prompt is this repo's canonical session **13** — after
+> the reviewer workflow (sessions 04–09), the item generation pipeline
+> (10) and the contributor brief board (11), and after Session 4 above
+> (canonical 12). See `docs/build-log.md`'s "Session order" table.
+
 ```
 GOAL: Sync layer, per section 8.3 of the plan.
 
@@ -158,6 +180,10 @@ offline.
 
 Same shape, one workstream each: diagnostics rollup → adaptive engine →
 payments and entitlements → admin review tooling → institution portal.
+
+> This is canonical session **14+** — after Session 5 above (13). No
+> individual prompts are written for these yet; see `docs/build-log.md`'s
+> "Session order" table.
 
 ---
 
@@ -201,6 +227,14 @@ items in the database and a gate report showing what was flagged and why.
 
 Then the review tool:
 
+> **Superseded, not queued.** `docs/reviewer-workspace-prompts.md`'s
+> Session A through F specify this same feature in far more depth —
+> concurrency-safe assignment, the anti-anchoring answer-before-key flow,
+> offline support, gold-item accuracy scoring, payment accrual — and are
+> already done through this repo's session 06. The short prompt below
+> predates that document and is kept only for this file's own narrative
+> continuity; do not build it.
+
 ```
 GOAL: Build the reviewer UI in apps/admin.
 
@@ -221,6 +255,7 @@ metric the content budget depends on.
 ## Prompting habits that matter
 
 **Do:**
+
 - Give one workstream per session; `/clear` between them
 - Ask for the plan before the code on anything non-trivial
 - Reference plan sections by number — it can grep the file
@@ -230,6 +265,7 @@ metric the content budget depends on.
   patching on top of a bad foundation
 
 **Don't:**
+
 - Paste the whole plan into the chat — put it in the repo
 - Say "implement the plan" or "build the app"
 - Let one session sprawl across mobile, API and database at once

@@ -3,6 +3,70 @@
 Chronological record of what's been built, what's open, and what's next.
 Newest entry at the bottom.
 
+## Session order
+
+Two source documents supply session prompts, and this repo interleaves
+them rather than finishing one before starting the other:
+
+- **the playbook** — `docs/claude-code-prompt-playbook.md`. The
+  candidate-facing app track. Numbers its own sessions `Session 1`
+  through `Session 5`, then an unordered "Later sessions" list.
+- **the reviewer workspace prompts** — `docs/reviewer-workspace-prompts.md`.
+  The review-pipeline track. States plainly that it is a "Phase 1
+  blocker" to be built "before bulk generation" — which is why this repo
+  left the playbook after its Session 3 and has not returned to it since.
+  Letters its own sessions `Session A` through `Session F`.
+
+Neither document's own numbering is the canonical sequence for this
+repo — **the table below is**. A session prompt's heading in its source
+document (`Session 3`, `Session B`, …) is not the same number as this
+project's session (`03`, `05`, …); read the table, not the heading, when
+you need "what comes next."
+
+| Canonical | Source document            | Heading in that document                                                                                                                                        | Status           |
+| --------- | -------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------- |
+| 01        | playbook                   | Session 1 — Scaffold                                                                                                                                            | done, PR #2      |
+| 02        | playbook                   | Session 2 — Data model                                                                                                                                          | done, PR #3      |
+| 03        | playbook                   | Session 3 — Scoring engine (pure logic, no I/O)                                                                                                                 | done, PR #4      |
+| 04        | reviewer workspace prompts | Session A — Item state machine and review domain model                                                                                                          | done, PR #5      |
+| 05        | reviewer workspace prompts | Session B — Queue assignment service                                                                                                                            | done, PR #6      |
+| 06        | reviewer workspace prompts | Session C — Review submission and the answer-before-key flow                                                                                                    | in review, PR #7 |
+| 07        | reviewer workspace prompts | Session D — The reviewer workspace UI                                                                                                                           | not started      |
+| 08        | reviewer workspace prompts | Session E — Offline layer for the workspace                                                                                                                     | not started      |
+| 09        | reviewer workspace prompts | Session F — Gold items, audit, and payment accrual                                                                                                              | not started      |
+| 10        | playbook                   | "Using Claude to generate the question bank" (the item generation pipeline, `tools/item-gen/`)                                                                  | not started      |
+| 11        | reviewer workspace prompts | "Then: the contributor brief board"                                                                                                                             | not started      |
+| 12        | playbook                   | Session 4 — Mock CBT engine                                                                                                                                     | not started      |
+| 13        | playbook                   | Session 5 — Offline sync                                                                                                                                        | not started      |
+| 14+       | playbook                   | "Later sessions" (diagnostics rollup, adaptive engine, payments and entitlements, admin review tooling, institution portal) — no individual prompts written yet | not started      |
+
+This resolves two forward references already sitting in the session 05
+entry below, written before this table existed: "session 09" (the content
+lead dashboard reading `goldStockoutsSince`) is workspace-prompts
+Session F, and "session 10" (the generation pipeline calling
+`shouldSampleForReview`) is the playbook's item generation pipeline —
+both guessed correctly, and both now fixed by this table rather than by
+memory.
+
+**Why the playbook's own Session 4 and Session 5 are not this repo's
+sessions 04 and 05.** The playbook numbers its own track independently
+of the reviewer-workspace track; the two schemes only happen to overlap
+in digits. This repo's actual session 04 is workspace-prompts Session A
+(item state machine), and session 05 is workspace-prompts Session B
+(queue assignment) — neither is the playbook's Mock CBT engine or
+Offline sync, which land at canonical 12 and 13 instead, well after the
+reviewer workflow finishes. The playbook's own headings for its Session 4
+and Session 5 now carry a note pointing back here, so reading that file
+in isolation doesn't suggest otherwise.
+
+The playbook's own closing "review tool" prompt (the short, unlabeled one
+right after the item-generation prompt) is **superseded**, not queued —
+workspace-prompts' Session A through F is the same feature, specified in
+far more depth, and is already done through session 06. It is not this
+project's canonical session 10 or anywhere else in the table; it's dead
+prompt text kept for the playbook's own narrative continuity, annotated
+in place.
+
 ## BLOCKING
 
 Items here gate other work. They are not "open notes" to be carried
