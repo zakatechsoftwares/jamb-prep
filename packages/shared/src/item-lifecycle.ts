@@ -54,6 +54,13 @@ export const RISK_TIERS = ['low', 'high', 'not_generated'] as const;
 export type RiskTier = (typeof RISK_TIERS)[number];
 
 /**
+ * The tiers an item can be *generated* at. `not_generated` is assigned by
+ * the commissioning workflow (7.12), never derived at generation, so the
+ * deriving function cannot return it.
+ */
+export type GeneratedRiskTier = Exclude<RiskTier, 'not_generated'>;
+
+/**
  * Plan 7.4 step 3. `not_run` is an explicit recorded fact rather than a
  * NULL, because 7.14 turns on the verdict being exactly 'agreed': "the
  * check never ran" and "the check disagreed" must both be visibly

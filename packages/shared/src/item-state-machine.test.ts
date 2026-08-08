@@ -61,68 +61,37 @@ describe('generated', () => {
     expect(result.approvalRoute).toBeNull();
   });
 
-  it('promotes straight to approved_uncalibrated when all three 7.14 conditions hold', () => {
-    // The auto-gated route: low risk_tier, not selected by the sampling
-    // draw, independent solve agreed. This is the one path that skips the
-    // review states entirely, so it is the one most easily lost.
+  it('queues even a fully auto-eligible item for review, rather than promoting it', () => {
+    // Passing the gates never promotes anything. Skipping human review is
+    // a decision the pipeline has to take deliberately, through
+    // auto_gate_promote, where all three 7.14 conditions are asserted and
+    // a failure throws. There is no path to the live bank that a caller
+    // can reach by accident.
     const result = transition('generated', { type: 'gates_passed' }, ctx({ item: AUTO_ELIGIBLE }));
 
-    expect(result.status).toBe('approved_uncalibrated');
-    expect(result.approvalRoute).toBe('auto_gated');
-  });
-
-  it('queues for human review when the item was selected by the sampling draw', () => {
-    const result = transition(
-      'generated',
-      { type: 'gates_passed' },
-      ctx({ item: { sampledForReview: true } }),
-    );
-
     expect(result.status).toBe('pending_review');
+    expect(result.status).not.toBe('approved_uncalibrated');
     expect(result.approvalRoute).toBeNull();
   });
 
-  it('queues for human review when risk_tier is high, however clean the gates were', () => {
-    const result = transition(
-      'generated',
-      { type: 'gates_passed' },
-      ctx({ item: { riskTier: 'high' } }),
-    );
+  // Passing the gates queues the item, whatever the item turns out to be.
+  // There is no combination of facts that makes gates_passed promote.
+  const gatesPassedCases: ReadonlyArray<[string, Partial<ItemFacts>]> = [
+    ['selected by the sampling draw', { sampledForReview: true }],
+    ['high risk_tier', { riskTier: 'high' }],
+    ['human-authored (not_generated)', { riskTier: 'not_generated' }],
+    ['a disagreed independent solve', { independentSolveVerdict: 'disagreed' }],
+    ['an independent solve that never ran', { independentSolveVerdict: 'not_run' }],
+  ];
 
-    expect(result.status).toBe('pending_review');
-  });
+  for (const [description, item] of gatesPassedCases) {
+    it(`queues an item with ${description} for human review`, () => {
+      const result = transition('generated', { type: 'gates_passed' }, ctx({ item }));
 
-  it('queues for human review when the independent solve disagreed', () => {
-    const result = transition(
-      'generated',
-      { type: 'gates_passed' },
-      ctx({ item: { independentSolveVerdict: 'disagreed' } }),
-    );
-
-    expect(result.status).toBe('pending_review');
-  });
-
-  it('queues for human review when the independent solve never ran', () => {
-    // 'not_run' is not 'agreed'. 7.14 requires agreement, not merely the
-    // absence of disagreement.
-    const result = transition(
-      'generated',
-      { type: 'gates_passed' },
-      ctx({ item: { independentSolveVerdict: 'not_run' } }),
-    );
-
-    expect(result.status).toBe('pending_review');
-  });
-
-  it('queues a not_generated (human-authored) item for human review', () => {
-    const result = transition(
-      'generated',
-      { type: 'gates_passed' },
-      ctx({ item: { riskTier: 'not_generated' } }),
-    );
-
-    expect(result.status).toBe('pending_review');
-  });
+      expect(result.status).toBe('pending_review');
+      expect(result.approvalRoute).toBeNull();
+    });
+  }
 
   it('accepts an explicit auto_gate_promote when the item qualifies', () => {
     const result = transition('generated', { type: 'auto_gate_promote' }, ctx());
