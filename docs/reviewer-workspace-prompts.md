@@ -8,6 +8,13 @@ Prerequisites: sessions 1–2 of the main playbook done (monorepo scaffolded,
 database schema and migrations in place, `docs/implementation-plan.md`
 converted and in the repo).
 
+> This document's `Session A`–`Session F` letters are its own numbering,
+> independent of the main playbook's `Session 1`–`Session 5` and of this
+> project's actual canonical sessions (`01`, `02`, …). See
+> `docs/build-log.md`'s "Session order" table for how the two documents
+> actually interleave in this repo — Session A here is canonical 04, not
+> session A or 1.
+
 ---
 
 ## Session A — Item state machine and review domain model
@@ -319,12 +326,12 @@ session should pick up. Then run the full test suite and show me the result.
 
 Four things it will be tempted to "helpfully" add. Refuse each:
 
-| It will suggest | Why to refuse |
-|---|---|
-| A bulk-approve button | This is how review becomes rubber-stamping |
-| An item list or queue browser | Enables cherry-picking of easy items |
-| Showing the key alongside the item for high-tier | Anchoring is the whole failure mode |
-| Free-text rejection notes | Unusable in aggregate; kills the feedback loop into the generator |
+| It will suggest                                  | Why to refuse                                                     |
+| ------------------------------------------------ | ----------------------------------------------------------------- |
+| A bulk-approve button                            | This is how review becomes rubber-stamping                        |
+| An item list or queue browser                    | Enables cherry-picking of easy items                              |
+| Showing the key alongside the item for high-tier | Anchoring is the whole failure mode                               |
+| Free-text rejection notes                        | Unusable in aggregate; kills the feedback loop into the generator |
 
 If it adds any of these, `git reset` and re-prompt rather than removing them
 after the fact — they tend to leave assumptions behind in adjacent code.
