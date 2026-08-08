@@ -3,6 +3,7 @@ import {
   shouldServeGoldItem,
   transition,
   validateReviewQueueConfig,
+  type ApprovalRoute,
   type IndependentSolveVerdict,
   type ItemStatus,
   type PanelRole,
@@ -43,14 +44,14 @@ export const REQUIRES_HUMAN_REVIEW_SQL = `i.status IN ('pending_review', 'needs_
     )
   )`;
 
-interface QueueReviewerRow {
+export interface QueueReviewerRow {
   reviewer_id: number;
   user_id: number;
   role: PanelRole;
   status: string;
 }
 
-async function withTransaction<T>(run: (client: PoolClient) => Promise<T>): Promise<T> {
+export async function withTransaction<T>(run: (client: PoolClient) => Promise<T>): Promise<T> {
   const client = await pool.connect();
 
   try {
@@ -96,7 +97,10 @@ export async function loadActiveQueueConfig(client?: PoolClient): Promise<Review
   return config;
 }
 
-async function loadReviewer(client: PoolClient, reviewerId: number): Promise<QueueReviewerRow> {
+export async function loadReviewer(
+  client: PoolClient,
+  reviewerId: number,
+): Promise<QueueReviewerRow> {
   const result = await client.query<QueueReviewerRow>(
     `SELECT r.id AS reviewer_id, r.user_id, r.role, r.status
        FROM reviewers r
@@ -174,7 +178,7 @@ async function lockCandidates(
 }
 
 /** Prior decisions per item, keyed by item id, as the state machine wants them. */
-async function loadPriorDecisions(
+export async function loadPriorDecisions(
   client: PoolClient,
   itemIds: number[],
 ): Promise<Map<number, PriorDecision[]>> {
@@ -201,7 +205,15 @@ async function loadPriorDecisions(
   return byItem;
 }
 
-async function recordTransition(
+/**
+ * Writes one row to the audit trail. Every caller passes the same
+ * `approvalRoute` its `transition()` call returned — no call site before
+ * `decideOnItem` (packages/db/src/review-decision-repository.ts) ever
+ * produced a non-null route, which is why this parameter went unpopulated
+ * from 0012 through 0013 without anything noticing. `reviewer_decided` is
+ * the first event that can establish `human_reviewed`.
+ */
+export async function recordTransition(
   client: PoolClient,
   itemId: number,
   fromStatus: ItemStatus,
@@ -210,12 +222,13 @@ async function recordTransition(
   actorUserId: number | null,
   actorRole: string,
   occurredAt: Date,
+  approvalRoute: ApprovalRoute | null,
 ): Promise<void> {
   await client.query(
     `INSERT INTO item_state_transitions (
-       item_id, from_status, to_status, event, actor_user_id, actor_role, occurred_at
-     ) VALUES ($1, $2, $3, $4, $5, $6, $7)`,
-    [itemId, fromStatus, toStatus, event, actorUserId, actorRole, occurredAt],
+       item_id, from_status, to_status, event, actor_user_id, actor_role, occurred_at, approval_route
+     ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
+    [itemId, fromStatus, toStatus, event, actorUserId, actorRole, occurredAt, approvalRoute],
   );
 }
 
@@ -261,13 +274,29 @@ async function claimItems(
     // review_claims is keyed on item_id, so a plain INSERT would collide
     // with it. The WHERE on the conflict path is what stops this from
     // stealing a claim that is still live.
+    //
+    // reviewer_answer is explicitly reset to NULL on the conflict path, as
+    // defense in depth: this branch is not reachable today, because
+    // lockCandidates gates candidacy on items.status, and the only path
+    // that returns status to a candidate value after an expiry
+    // (releaseExpiredClaims) also deletes this row in the same step — so a
+    // real reclaim is always a fresh INSERT, which starts blank regardless.
+    // The reset stays anyway, so a future change to either of those two
+    // facts cannot quietly resurrect a previous reviewer's answer for
+    // whoever claims the item next. See
+    // review-decision.integration.test.ts for the test that exercises this
+    // branch directly, since the application itself cannot reach it. The
+    // claimed_at column update is what the immutability trigger in
+    // migration 0014 reads to tell "a fresh claim episode" apart from "an
+    // attempt to rewrite an answer within the same one".
     await client.query(
       `INSERT INTO review_claims (item_id, reviewer_id, claimed_at, expires_at)
        VALUES ($1, $2, $3::timestamptz, $3::timestamptz + make_interval(mins => $4))
        ON CONFLICT (item_id) DO UPDATE
           SET reviewer_id = EXCLUDED.reviewer_id,
               claimed_at = EXCLUDED.claimed_at,
-              expires_at = EXCLUDED.expires_at
+              expires_at = EXCLUDED.expires_at,
+              reviewer_answer = NULL
         WHERE review_claims.expires_at <= now()`,
       [candidate.id, reviewer.reviewer_id, occurredAt, config.claimDurationMinutes],
     );
@@ -283,6 +312,7 @@ async function claimItems(
       result.actorUserId,
       reviewer.role,
       result.occurredAt,
+      result.approvalRoute,
     );
 
     claimed.push(candidate.id);
@@ -563,6 +593,7 @@ export async function releaseExpiredClaims(): Promise<number> {
         null,
         'system',
         occurredAt,
+        result.approvalRoute,
       );
 
       released += 1;
@@ -632,6 +663,7 @@ export async function flagForJudgement(
       actor.userId,
       actor.role,
       occurredAt,
+      result.approvalRoute,
     );
 
     return result.status;
