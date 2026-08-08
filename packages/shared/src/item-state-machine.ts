@@ -167,6 +167,18 @@ function hasRejection(decisions: PriorDecision[]): boolean {
  * else throws rather than quietly falling back to the review queue, because
  * a caller reaching for this door is asserting the item qualifies.
  */
+/**
+ * Section 7.14's three conditions, as a predicate. The queue in
+ * `review-queue-policy.ts` needs to ask the same question this module
+ * asserts — an item bound for the automated route must not be shown to a
+ * reviewer — so the triple is stated here once and consumed by both.
+ */
+export function qualifiesForAutomatedRoute(item: ItemFacts): boolean {
+  return (
+    item.riskTier === 'low' && !item.sampledForReview && item.independentSolveVerdict === 'agreed'
+  );
+}
+
 function assertAutomatedRouteEligible(item: ItemFacts): void {
   if (item.riskTier !== 'low') {
     throw new Error(

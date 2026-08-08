@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { ITEM_STATUSES, type ItemStatus } from './item-lifecycle';
 import {
+  qualifiesForAutomatedRoute,
   transition,
   type ItemFacts,
   type LifecycleActor,
@@ -98,6 +99,48 @@ describe('generated', () => {
 
     expect(result.status).toBe('approved_uncalibrated');
     expect(result.approvalRoute).toBe('auto_gated');
+  });
+});
+
+// ---------------------------------------------------------------------------
+// The 7.14 triple as a predicate, shared with the review queue
+// ---------------------------------------------------------------------------
+
+describe('qualifiesForAutomatedRoute', () => {
+  it('qualifies only when all three conditions hold', () => {
+    expect(qualifiesForAutomatedRoute(AUTO_ELIGIBLE)).toBe(true);
+  });
+
+  it.each([
+    ['high risk_tier', { riskTier: 'high' as const }],
+    ['human-authored', { riskTier: 'not_generated' as const }],
+    ['selected by the sampling draw', { sampledForReview: true }],
+    ['a disagreed independent solve', { independentSolveVerdict: 'disagreed' as const }],
+    ['an independent solve that never ran', { independentSolveVerdict: 'not_run' as const }],
+  ])('does not qualify with %s', (_description, override) => {
+    expect(qualifiesForAutomatedRoute({ ...AUTO_ELIGIBLE, ...override })).toBe(false);
+  });
+
+  it('agrees with what auto_gate_promote permits, since both read the same rule', () => {
+    const facts = [
+      AUTO_ELIGIBLE,
+      { ...AUTO_ELIGIBLE, riskTier: 'high' as const },
+      { ...AUTO_ELIGIBLE, sampledForReview: true },
+      { ...AUTO_ELIGIBLE, independentSolveVerdict: 'not_run' as const },
+    ];
+
+    for (const item of facts) {
+      const promotes = (() => {
+        try {
+          transition('generated', { type: 'auto_gate_promote' }, ctx({ item }));
+          return true;
+        } catch {
+          return false;
+        }
+      })();
+
+      expect(promotes).toBe(qualifiesForAutomatedRoute(item));
+    }
   });
 });
 
