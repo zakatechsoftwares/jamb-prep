@@ -7,3 +7,4 @@ export type HealthStatus = 'ok' | 'degraded' | 'down';
 // against them) and must exist in exactly one place.
 export * from './item-lifecycle';
 export * from './item-state-machine';
+export * from './review-queue-policy';

@@ -69,6 +69,50 @@ nothing. Its result maps directly onto an `item_state_transitions` row
 reviewer decisions specifically; the transition log records every
 transition including the automated ones.
 
+## Review queue policy (`src/review-queue-policy.ts`)
+
+The pure half of the reviewer queue (plan 7.9, 7.11): which items belong in
+it, which band they fall into, what order they come out in, and the two
+configured rates. The locking query that actually serves them lives in
+`@jamb/db` — concurrency-safety cannot be expressed in a pure module — and
+`packages/db/src/review-queue-ranking.test.ts` asserts the SQL ordering and
+`priorityOf` never disagree.
+
+**Rates are rates, never percentages.** Plan 7.3 says "sample review of
+30-50% of each batch". That is `lowRiskSampleRate` **0.3 to 0.5** here, not
+30 to 50. Every rate in `ReviewQueueConfig` is a fraction in `[0, 1]`, and
+passing 30 throws rather than sampling the entire bank and quietly
+exhausting the review budget. If you are tempted to "correct" these values
+back to percentages, this paragraph is why they look like that.
+
+**`requiresHumanReview` is the negated 7.14 triple, not a sampling filter.**
+An item the blind solve disagreed with, or one a gate flagged, needs a human
+whether or not the sampling draw picked it. Filtering the queue on
+`sampled_for_review` alone drops exactly the items that most need review —
+the priority-1 band. The triple itself lives in `item-state-machine.ts` as
+`qualifiesForAutomatedRoute`, read by both the machine and the queue.
+
+**Ordering: band, then age, then id.** The age tiebreak stops the ordinary
+band starving while a generation wave floods bands 1 and 2. The id tiebreak
+makes the order total — two items from one batch can share a `created_at` to
+the millisecond, and without it the queue order is whatever the query plan
+happens to produce, which is untestable.
+
+**`priorityOf` throws where `isEligibleForReviewer` returns false.**
+Deliberate: "not for you" is an ordinary answer for a filter, but being
+asked to rank an item that should never have been queued means one leaked
+past the filter, which is a caller bug worth surfacing.
+
+**Gold items take the same exclusions as ordinary ones,** including "already
+decided by this reviewer" — otherwise one judgement is counted twice in the
+accuracy score (7.11). Their band comes from their own facts, so they cannot
+be identified by their position in the queue.
+
+**`shouldSampleForReview` has no caller yet.** The generation pipeline calls
+it when it writes `items.sampled_for_review`; the queue reads the recorded
+flag rather than re-drawing. It lives here so the rule is tested rather than
+notional.
+
 ## Scoring (`src/scoring.ts`)
 
 Computes per-subject and aggregate exam scores from an `ExamConfig` and a
