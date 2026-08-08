@@ -29,9 +29,31 @@ Migrations live in `migrations/` as paired `NNNN_name.up.sql` /
 
 ## Notes
 
-- `attempts` is append-only: a trigger rejects any `UPDATE` or `DELETE`
-  against it (migration `0008_attempts`), proven by
-  `attempts-guard.integration.test.ts`.
+- Three tables are append-only, each guarded by triggers rejecting any
+  `UPDATE` or `DELETE`: `attempts` (migration `0008_attempts`), and
+  `review_decisions` and `item_state_transitions` (migration
+  `0012_item_review_workflow`). Proven by
+  `attempts-guard.integration.test.ts` and
+  `review-decisions-guard.integration.test.ts`. A reviewer who changes
+  their mind records a new decision; they never edit the old one.
+- The enumerated values in the migrations' CHECK constraints — item
+  states, approval routes, risk tiers, review actions, rejection reasons —
+  are owned by `packages/shared/src/item-lifecycle.ts`, not by this
+  package. `lifecycle-vocabulary.test.ts` parses the migration files and
+  fails if the two drift apart, so adding a state in one place without the
+  other is a red build rather than a runtime surprise later.
+- The `review_*` tables in `0012` are the **editorial** review of items by
+  the human panel. They are unrelated to `review_queue_entries`
+  (`0009_mastery_and_review_queue`), which is the candidate-facing
+  spaced-repetition queue. The name collision is worth remembering.
+- `item_state_transitions` is the complete audit trail plan 7.10 requires.
+  `review_decisions` covers only reviewer decisions, so it cannot carry
+  that trail alone: gate failures, auto-gated promotion, calibration and
+  automatic quarantine all move an item without a reviewer touching it.
+- Reverting `0012` fails if any item has been tiered `not_generated`, since
+  the earlier constraint has no such value. That is deliberate — the
+  alternative is silently relabelling human-authored items as generated
+  ones. Retier or retire those items first.
 - The syllabus hierarchy (`subjects` → `topics` → `subtopics` → `objectives`)
   is four real tables, never free text.
 - `exam_configs` holds the exam blueprint as versioned data, not

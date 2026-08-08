@@ -1,15 +1,13 @@
 import { readFileSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { OPTION_LABELS, type OptionLabel } from '@jamb/shared';
 import { firstRow } from './first-row';
 import { pool } from './client';
 import { deriveRiskTier } from './risk-tier';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const seedItemsPath = path.resolve(__dirname, '../../../docs/jamb-seed-items.json');
-
-type OptionLabel = 'A' | 'B' | 'C' | 'D';
-const OPTION_LABELS: OptionLabel[] = ['A', 'B', 'C', 'D'];
 
 interface SeedItem {
   id: string;
@@ -20,6 +18,9 @@ interface SeedItem {
   cognitive_level: string;
   author_difficulty: number;
   expected_time_seconds: number;
+  // Optional in the seed file: absent means "no calculation", which is
+  // correct for the current seed set. Generated batches set it explicitly.
+  contains_calculation?: boolean;
   stem: string;
   options: Record<OptionLabel, string>;
   correct_option: OptionLabel;
@@ -122,7 +123,7 @@ async function upsertItem(item: SeedItem, ids: SyllabusIds): Promise<number> {
       item.author_difficulty,
       item.expected_time_seconds,
       JSON.stringify(provenance),
-      deriveRiskTier(item.subject),
+      deriveRiskTier(item.subject, item.contains_calculation ?? false),
       item.id,
     ],
   );

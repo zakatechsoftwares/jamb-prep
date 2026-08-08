@@ -95,6 +95,9 @@ importers:
 
   packages/db:
     dependencies:
+      '@jamb/shared':
+        specifier: workspace:*
+        version: link:../shared
       pg:
         specifier: ^8.16.3
         version: 8.22.0
