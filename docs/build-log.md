@@ -3,6 +3,34 @@
 Chronological record of what's been built, what's open, and what's next.
 Newest entry at the bottom.
 
+## BLOCKING
+
+Items here gate other work. They are not "open notes" to be carried
+forward — nothing that depends on them may ship until they are resolved.
+
+### B1 — No authentication on the reviewer endpoints (opened session 05)
+
+`GET /review/next` and `GET /review/next-batch` take `reviewerId` as a
+**query parameter**. Any caller can therefore request any reviewer's queue
+and claim items as them, which also means they can write
+`review_decisions` and `item_state_transitions` rows attributed to somebody
+else — into append-only tables, where a false attribution cannot be
+corrected, only annotated.
+
+**The rule: `reviewerId` comes from an authenticated session, never from
+the request. No reviewer-facing endpoint ships without it.**
+
+**Blocks Session D.** A client built against the current signature would
+encode "the caller names the reviewer" in its request layer, its offline
+cache keys and its sync payloads. That is expensive to unpick afterwards,
+and it is exactly the kind of shape that survives a rewrite. Resolve this
+before Session D builds anything against these routes.
+
+Resolving it means: the reviewer identity is derived server-side from the
+session, `reviewerId` disappears from the query string, and a test asserts
+that a request naming a different reviewer than the authenticated one is
+rejected rather than honoured.
+
 ## Session 01 — scaffold (2026-08-06, `session/01-scaffold`, PR #2, merged)
 
 **Built:**
@@ -203,8 +231,10 @@ documented in `packages/db/README.md`.
   a running background job.
 - `goldStockoutsSince` has no reader; the content lead dashboard consumes
   it in session 09.
-- No authentication anywhere: `reviewerId` is a query parameter, so any
-  caller can request any reviewer's queue.
+- **No authentication anywhere — see BLOCKING item B1 at the top of this
+  file.** `reviewerId` is a query parameter, so any caller can request any
+  reviewer's queue and claim items as them. This is not an open note to
+  carry forward; it blocks Session D.
 
 **Next:** the decision-recording endpoint (approve / edit and approve /
 reject with reason / escalate), which is what makes the queue a workflow
