@@ -8,3 +8,4 @@ export type HealthStatus = 'ok' | 'degraded' | 'down';
 export * from './item-lifecycle';
 export * from './item-state-machine';
 export * from './review-queue-policy';
+export * from './review-decision-policy';
