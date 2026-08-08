@@ -1,5 +1,6 @@
 import { Router } from 'express';
 import type { ReviewQueueItem, ReviewQueueService } from '@jamb/shared';
+import { parsePositiveInteger, resolveReviewerId } from '../reviewer-identity';
 
 /**
  * The reviewer workspace's queue endpoints (plan 7.9).
@@ -16,7 +17,7 @@ export function createReviewQueueRouter(service: ReviewQueueService): Router {
   const router = Router();
 
   router.get('/next', (req, res, next) => {
-    const reviewerId = parseReviewerId(req.query.reviewerId);
+    const reviewerId = resolveReviewerId(req);
 
     if (reviewerId === null) {
       res.status(400).json({ error: 'reviewerId must be a positive integer' });
@@ -39,8 +40,8 @@ export function createReviewQueueRouter(service: ReviewQueueService): Router {
   });
 
   router.get('/next-batch', (req, res, next) => {
-    const reviewerId = parseReviewerId(req.query.reviewerId);
-    const count = parseCount(req.query.count);
+    const reviewerId = resolveReviewerId(req);
+    const count = parsePositiveInteger(req.query.count);
 
     if (reviewerId === null) {
       res.status(400).json({ error: 'reviewerId must be a positive integer' });
@@ -61,23 +62,6 @@ export function createReviewQueueRouter(service: ReviewQueueService): Router {
   });
 
   return router;
-}
-
-function parseReviewerId(raw: unknown): number | null {
-  if (typeof raw !== 'string') {
-    return null;
-  }
-
-  const value = Number(raw);
-  return Number.isInteger(value) && value > 0 ? value : null;
-}
-
-function parseCount(raw: unknown): number | null {
-  if (raw === undefined) {
-    return null;
-  }
-
-  return parseReviewerId(raw);
 }
 
 /**

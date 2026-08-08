@@ -113,6 +113,33 @@ it when it writes `items.sampled_for_review`; the queue reads the recorded
 flag rather than re-drawing. It lives here so the rule is tested rather than
 notional.
 
+## Review decision policy (`src/review-decision-policy.ts`)
+
+The anti-anchoring control and the `decide` boundary validation (plan 7.10):
+`canReveal`, `agreesWithKey`, `parseOptionLabel`, `parseDecisionInput`,
+`buildItemEditDiff`. Also declares the decision service contract
+(`ReviewDecisionService` and its outcome types) that `@jamb/db` implements
+and `apps/api` is wired against — the same split `ReviewQueueItem` /
+`ReviewQueueService` already established.
+
+**`canReveal` is scoped to `high` risk_tier, not "every item".** `high` is
+exactly "every item containing a calculation" (7.3), the category where a
+confidently wrong generated item is both most likely and hardest to catch by
+reading. `low` and `not_generated` items reveal immediately.
+
+**Parsing is split into two stages that see different data.**
+`parseDecisionInput` validates shape against the raw request body alone — is
+this a well-formed request — and never sees the database. `buildItemEditDiff`
+validates substance against a `ItemSnapshot` read from the row — did this
+patch actually change anything — and never sees the raw request. An
+all-no-op edit patch is well-formed by the first stage's rules and rejected
+by the second, because that is what `approve` is for, not
+`edit_and_approve`.
+
+**`rejectionReason` rejects a near-miss exactly like free text.**
+`'WRONG_KEY'` (case-mismatched) throws precisely as `'I think this is
+wrong'` does — a fixed enum that quietly accepts a near-miss is not fixed.
+
 ## Scoring (`src/scoring.ts`)
 
 Computes per-subject and aggregate exam scores from an `ExamConfig` and a

@@ -143,6 +143,57 @@ DELETE, but TRUNCATE fires TRUNCATE triggers, not row triggers. Because
 these tests wipe shared tables, `vitest.config.ts` sets
 `fileParallelism: false` for this package.
 
+## Review decisions (`review-decision-repository.ts`)
+
+`submitBlindAnswer`, `revealItem`, `decideOnItem` — the three calls behind
+the anti-anchoring control (7.10). All three require the caller to
+currently hold a live claim on the item; none of them make sense otherwise.
+
+**Expected outcomes are discriminated results, not exceptions.** "Not your
+claim", "already answered", "not yet solved" and an invalid state
+transition are all ordinary business outcomes — the same reasoning
+`getNextItem` already applied by returning `null` for "nothing available"
+rather than throwing. The router maps each `reason` to a status code (403,
+409); only a genuine invariant violation reaches Express's default handler.
+
+**`submitBlindAnswer` is one guarded `UPDATE`, not read-then-write.**
+`... WHERE reviewer_answer IS NULL RETURNING item_id` either records the
+answer or touches nothing; a zero-row result triggers one follow-up `SELECT`
+to report _why_ (never claimed vs. already answered), but the answer itself
+is never at risk of a lost update between two near-simultaneous submissions.
+
+**The immutability trigger's reachable branch, and the one that isn't.**
+Migration 0014's `forbid_reviewer_answer_rewrite` blocks a same-episode
+rewrite (`claimed_at` unchanged) — this is the one a reviewer can actually
+trigger, by calling `/solve` twice. `submitBlindAnswer`'s own `WHERE
+reviewer_answer IS NULL` guard means the application's second call never
+even reaches the trigger; the trigger is verified directly against raw SQL
+in the integration test, the same way an append-only guard is.
+
+The reclaim path's `reviewer_answer = NULL` reset, by contrast, guards a
+branch (`claimItems`' `ON CONFLICT DO UPDATE`) that is **not reachable
+through the application today** — `lockCandidates` gates candidacy on
+`items.status`, and the only path that restores a candidate status after an
+expiry (`releaseExpiredClaims`) also deletes the conflicting row in the same
+step, so a real reclaim is always a fresh `INSERT`. The reset stays as
+defense in depth against a future change to either of those two facts, and
+is tested directly against a hand-constructed row conflict, since the
+application has no way to construct one itself. See
+`review-decision.integration.test.ts` for both.
+
+**`decideOnItem` computes `seconds_taken` server-side**, from the claim's
+`claimed_at` to the moment of decision, rather than trusting a client-
+supplied duration — the same instinct as "server is scoring authority"
+(CLAUDE.md rule 5) applied to review timing.
+
+**`recordTransition` now writes `approval_route`.** It always accepted the
+column existed but never populated it, because before this module no
+transition it recorded ever produced a non-null route — `claimed` and
+`claim_expired` are always null, and `flagForJudgement`'s
+`routed_for_judgement` is too. `reviewer_decided` is the first event that
+can establish `human_reviewed`, which is what surfaced the gap. Fixed at
+the shared function, not by adding a special case for one call site.
+
 ## Why a bespoke migration runner, not node-pg-migrate
 
 `src/migrate.ts` is a ~90-line runner (`up` / `down [--all]`) instead of an

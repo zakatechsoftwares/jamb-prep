@@ -15,3 +15,8 @@ export {
   type GetNextItemOptions,
   type GoldStockoutCount,
 } from './review-queue-repository';
+// Only the functions are exported here — DecideInput, DecideOutcome and the
+// rest of the decision service's shapes live in @jamb/shared (they are the
+// contract apps/api is wired against), the same split ReviewQueueItem and
+// ReviewQueueService already established for the queue.
+export { decideOnItem, revealItem, submitBlindAnswer } from './review-decision-repository';
