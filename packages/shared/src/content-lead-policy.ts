@@ -55,6 +55,39 @@ export interface AuditSampleItem {
   decidedAt: Date;
 }
 
+export interface AggregatedRejectionReason {
+  subjectId: number;
+  rejectionReason: RejectionReason;
+  count: number;
+}
+
+/**
+ * Sums `RejectionReasonCount` rows across every week in the window, per
+ * subject and reason. The repository query groups by subject/week/reason
+ * because "sorted so the dominant defect per subject-week is first" is
+ * useful for a trend view; the dashboard's own "which prompt defect to fix
+ * next, at a glance" (plan 7.11's DONE WHEN) needs the window-wide total
+ * instead, so this is a second, separate aggregation rather than something
+ * the SQL should also try to produce.
+ */
+export function aggregateRejectionReasons(
+  rows: RejectionReasonCount[],
+): AggregatedRejectionReason[] {
+  const totals = new Map<string, AggregatedRejectionReason>();
+
+  for (const row of rows) {
+    const key = `${row.subjectId}:${row.rejectionReason}`;
+    const existing = totals.get(key);
+    if (existing) {
+      existing.count += row.count;
+    } else {
+      totals.set(key, { subjectId: row.subjectId, rejectionReason: row.rejectionReason, count: row.count });
+    }
+  }
+
+  return [...totals.values()].sort((a, b) => b.count - a.count);
+}
+
 export interface ContentLeadService {
   getDashboard(since: Date): Promise<ContentDashboard>;
   runWeeklyPayment(runAt: Date): Promise<PaymentRunResult>;

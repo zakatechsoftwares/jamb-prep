@@ -11,7 +11,7 @@ export default function LoginPage() {
 
   useEffect(() => {
     if (session) {
-      router.replace('/');
+      router.replace(session.role === 'content_lead' ? '/content-lead' : '/');
     }
   }, [session, router]);
 

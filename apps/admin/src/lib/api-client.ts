@@ -1,11 +1,13 @@
 import type {
   ApprovalRoute,
+  ContentDashboard,
   DecisionContext,
   ItemEditPatch,
   ItemStatus,
   OptionLabel,
   PanelRole,
   RejectionReason,
+  RejectionReasonCount,
   RevealResult,
   ReviewQueueItem,
 } from '@jamb/shared';
@@ -30,6 +32,18 @@ type WireQueueItem = Omit<ReviewQueueItem, 'claimExpiresAt'> & { claimExpiresAt:
 
 function toQueueItem(wire: WireQueueItem): ReviewQueueItem {
   return { ...wire, claimExpiresAt: new Date(wire.claimExpiresAt) };
+}
+
+type WireRejectionReasonCount = Omit<RejectionReasonCount, 'week'> & { week: string };
+type WireContentDashboard = Omit<ContentDashboard, 'rejectionReasons'> & {
+  rejectionReasons: WireRejectionReasonCount[];
+};
+
+function toContentDashboard(wire: WireContentDashboard): ContentDashboard {
+  return {
+    ...wire,
+    rejectionReasons: wire.rejectionReasons.map((row) => ({ ...row, week: new Date(row.week) })),
+  };
 }
 
 interface RawResponse {
@@ -130,6 +144,12 @@ export type DecideOutcome =
   | { ok: false; reason: 'invalid_transition'; message: string }
   | { ok: false; reason: 'request_failed'; message: string };
 
+export type GetContentDashboardOutcome =
+  | { ok: true; dashboard: ContentDashboard }
+  | { ok: false; reason: 'unauthorized' }
+  | { ok: false; reason: 'forbidden' }
+  | { ok: false; reason: 'request_failed'; message: string };
+
 export interface ApiClient {
   login(emailOrPhone: string, password: string): Promise<LoginOutcome>;
   getNextItem(token: string): Promise<GetNextItemOutcome>;
@@ -148,6 +168,8 @@ export interface ApiClient {
     input: DecideRequestInput,
     idempotencyKey?: string,
   ): Promise<DecideOutcome>;
+  /** The content-lead dashboard (plan 7.11) — a `content_lead` session only. */
+  getContentDashboard(token: string, since: Date): Promise<GetContentDashboardOutcome>;
 }
 
 /** `baseUrl` defaults to the same-origin proxy path — see next.config.mjs's rewrite. */
@@ -272,6 +294,26 @@ export function createApiClient(fetchImpl: FetchImpl, baseUrl = '/api/review'): 
         };
       }
       return { ok: false, reason: 'not_claimed_by_you' };
+    },
+
+    async getContentDashboard(token, since) {
+      const response = await call(
+        fetchImpl,
+        'GET',
+        `/api/content-lead/dashboard?since=${encodeURIComponent(since.toISOString())}`,
+        token,
+      );
+
+      if (response.status === 0) {
+        return { ok: false, reason: 'request_failed', message: 'could not reach the server' };
+      }
+      if (response.status === 401) {
+        return { ok: false, reason: 'unauthorized' };
+      }
+      if (response.status === 403) {
+        return { ok: false, reason: 'forbidden' };
+      }
+      return { ok: true, dashboard: toContentDashboard(response.body as unknown as WireContentDashboard) };
     },
   };
 }
