@@ -30,7 +30,12 @@ const REVEAL: RevealResult = {
 };
 
 const SOLVING: ReviewFlowState = { status: 'solving', pending: false, item: ITEM, selected: null };
-const DECIDING: ReviewFlowState = { status: 'deciding', pending: false, item: ITEM, reveal: REVEAL };
+const DECIDING: ReviewFlowState = {
+  status: 'deciding',
+  pending: false,
+  item: ITEM,
+  reveal: REVEAL,
+};
 
 describe('INITIAL_REVIEW_FLOW_STATE', () => {
   it('starts loading and not pending', () => {
@@ -81,14 +86,24 @@ describe('reduceReviewFlow', () => {
         item: ITEM,
         reveal: REVEAL,
       });
-      expect(fromLoading).toEqual({ status: 'deciding', pending: false, item: ITEM, reveal: REVEAL });
+      expect(fromLoading).toEqual({
+        status: 'deciding',
+        pending: false,
+        item: ITEM,
+        reveal: REVEAL,
+      });
 
       const fromSolving = reduceReviewFlow(SOLVING, {
         type: 'itemRevealed',
         item: ITEM,
         reveal: REVEAL,
       });
-      expect(fromSolving).toEqual({ status: 'deciding', pending: false, item: ITEM, reveal: REVEAL });
+      expect(fromSolving).toEqual({
+        status: 'deciding',
+        pending: false,
+        item: ITEM,
+        reveal: REVEAL,
+      });
     });
   });
 
@@ -123,7 +138,9 @@ describe('reduceReviewFlow', () => {
     });
 
     it('throws when not solving', () => {
-      expect(() => reduceReviewFlow(DECIDING, { type: 'solveSubmitted' })).toThrow(/solveSubmitted/);
+      expect(() => reduceReviewFlow(DECIDING, { type: 'solveSubmitted' })).toThrow(
+        /solveSubmitted/,
+      );
     });
   });
 
@@ -242,11 +259,13 @@ describe('reduceReviewFlow', () => {
   describe('requestFailed', () => {
     it('moves to an error state carrying the message, from any state', () => {
       for (const state of [INITIAL_REVIEW_FLOW_STATE, SOLVING, DECIDING]) {
-        expect(reduceReviewFlow(state, { type: 'requestFailed', message: 'network down' })).toEqual({
-          status: 'error',
-          pending: false,
-          message: 'network down',
-        });
+        expect(reduceReviewFlow(state, { type: 'requestFailed', message: 'network down' })).toEqual(
+          {
+            status: 'error',
+            pending: false,
+            message: 'network down',
+          },
+        );
       }
     });
   });

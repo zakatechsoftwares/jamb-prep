@@ -41,7 +41,9 @@ export default function ReviewPage() {
       <ReviewHeader reviewedThisSession={flow.reviewedThisSession} />
 
       {state.status === 'loading' && (
-        <div className="flex flex-1 items-center justify-center text-sm text-gray-500">Loading…</div>
+        <div className="flex flex-1 items-center justify-center text-sm text-gray-500">
+          Loading…
+        </div>
       )}
 
       {state.status === 'empty' && <EmptyQueueState onRetry={() => void flow.retry()} />}

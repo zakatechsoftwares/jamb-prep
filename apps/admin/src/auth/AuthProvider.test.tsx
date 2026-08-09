@@ -22,7 +22,9 @@ function Consumer() {
 describe('AuthProvider / useAuth', () => {
   it('starts with no session', () => {
     render(
-      <AuthProvider apiClient={fakeApiClient(async () => ({ ok: false, reason: 'invalid_credentials' }))}>
+      <AuthProvider
+        apiClient={fakeApiClient(async () => ({ ok: false, reason: 'invalid_credentials' }))}
+      >
         <Consumer />
       </AuthProvider>,
     );
@@ -55,7 +57,9 @@ describe('AuthProvider / useAuth', () => {
   it('leaves the session empty when login fails', async () => {
     const user = userEvent.setup();
     render(
-      <AuthProvider apiClient={fakeApiClient(async () => ({ ok: false, reason: 'invalid_credentials' }))}>
+      <AuthProvider
+        apiClient={fakeApiClient(async () => ({ ok: false, reason: 'invalid_credentials' }))}
+      >
         <Consumer />
       </AuthProvider>,
     );

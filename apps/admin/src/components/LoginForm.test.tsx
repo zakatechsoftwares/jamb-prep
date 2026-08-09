@@ -41,7 +41,9 @@ describe('LoginForm', () => {
     const user = userEvent.setup();
     replace.mockClear();
     render(
-      <AuthProvider apiClient={fakeApiClient(async () => ({ ok: false, reason: 'invalid_credentials' }))}>
+      <AuthProvider
+        apiClient={fakeApiClient(async () => ({ ok: false, reason: 'invalid_credentials' }))}
+      >
         <LoginForm />
       </AuthProvider>,
     );
@@ -59,7 +61,9 @@ describe('LoginForm', () => {
     // the distinction by, say, mentioning "no such reviewer".
     const user = userEvent.setup();
     render(
-      <AuthProvider apiClient={fakeApiClient(async () => ({ ok: false, reason: 'invalid_credentials' }))}>
+      <AuthProvider
+        apiClient={fakeApiClient(async () => ({ ok: false, reason: 'invalid_credentials' }))}
+      >
         <LoginForm />
       </AuthProvider>,
     );

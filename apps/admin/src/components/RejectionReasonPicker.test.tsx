@@ -9,7 +9,9 @@ describe('RejectionReasonPicker', () => {
     render(<RejectionReasonPicker pending={false} onChoose={() => {}} onCancel={() => {}} />);
 
     for (const reason of REJECTION_REASONS) {
-      expect(screen.getByRole('button', { name: new RegExp(reason.replace(/_/g, ' '), 'i') })).toBeTruthy();
+      expect(
+        screen.getByRole('button', { name: new RegExp(reason.replace(/_/g, ' '), 'i') }),
+      ).toBeTruthy();
     }
     expect(screen.queryByRole('textbox')).toBeNull();
   });
@@ -18,7 +20,11 @@ describe('RejectionReasonPicker', () => {
     const user = userEvent.setup();
     let chosen: string | null = null;
     render(
-      <RejectionReasonPicker pending={false} onChoose={(reason) => (chosen = reason)} onCancel={() => {}} />,
+      <RejectionReasonPicker
+        pending={false}
+        onChoose={(reason) => (chosen = reason)}
+        onCancel={() => {}}
+      />,
     );
 
     await user.click(screen.getByText(/wrong key/i));
@@ -29,7 +35,11 @@ describe('RejectionReasonPicker', () => {
     const user = userEvent.setup();
     let cancelled = false;
     render(
-      <RejectionReasonPicker pending={false} onChoose={() => {}} onCancel={() => (cancelled = true)} />,
+      <RejectionReasonPicker
+        pending={false}
+        onChoose={() => {}}
+        onCancel={() => (cancelled = true)}
+      />,
     );
 
     await user.click(screen.getByRole('button', { name: /cancel/i }));
@@ -40,7 +50,9 @@ describe('RejectionReasonPicker', () => {
     render(<RejectionReasonPicker pending={true} onChoose={() => {}} onCancel={() => {}} />);
 
     for (const reason of REJECTION_REASONS) {
-      const button = screen.getByRole('button', { name: new RegExp(reason.replace(/_/g, ' '), 'i') });
+      const button = screen.getByRole('button', {
+        name: new RegExp(reason.replace(/_/g, ' '), 'i'),
+      });
       expect(button.hasAttribute('disabled')).toBe(true);
     }
   });

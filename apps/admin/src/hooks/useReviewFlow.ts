@@ -100,7 +100,10 @@ export function useReviewFlow() {
         logout();
         return;
       }
-      dispatch({ type: 'requestFailed', message: `could not record your answer (${solved.reason})` });
+      dispatch({
+        type: 'requestFailed',
+        message: `could not record your answer (${solved.reason})`,
+      });
       return;
     }
 

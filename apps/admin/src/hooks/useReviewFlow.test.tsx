@@ -79,7 +79,8 @@ describe('useReviewFlow', () => {
     const { result } = renderHook(() => useReviewFlow(), {
       wrapper: wrapperWith({
         getNextItem: async () => ({ ok: true, item: ITEM }),
-        reveal: async () => (solved ? { ok: true, result: REVEAL } : { ok: false, reason: 'not_yet_solved' }),
+        reveal: async () =>
+          solved ? { ok: true, result: REVEAL } : { ok: false, reason: 'not_yet_solved' },
         submitSolve: async (_token, itemId, answer) => {
           solved = true;
           return { ok: true, itemId, answer };
@@ -122,7 +123,12 @@ describe('useReviewFlow', () => {
         reveal: async () => ({ ok: true, result: REVEAL }),
         decide: async (_token, itemId, input) => {
           decideCalls.push({ itemId, input });
-          return { ok: true, itemId, status: 'approved_uncalibrated', approvalRoute: 'human_reviewed' };
+          return {
+            ok: true,
+            itemId,
+            status: 'approved_uncalibrated',
+            approvalRoute: 'human_reviewed',
+          };
         },
       }),
     });
@@ -192,7 +198,12 @@ describe('useReviewFlow', () => {
         reveal: async () => ({ ok: true, result: REVEAL }),
         decide: async (_token, itemId, input) => {
           decideCalls.push({ itemId, input });
-          return { ok: true, itemId, status: 'approved_uncalibrated', approvalRoute: 'human_reviewed' };
+          return {
+            ok: true,
+            itemId,
+            status: 'approved_uncalibrated',
+            approvalRoute: 'human_reviewed',
+          };
         },
       }),
     });

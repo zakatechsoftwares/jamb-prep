@@ -51,7 +51,9 @@ export function DecideStep({
             <div
               key={option.label}
               className={`rounded-lg border-2 px-4 py-2 text-base ${
-                isCorrect ? 'border-approve bg-approve-bg font-semibold' : 'border-gray-200 bg-white'
+                isCorrect
+                  ? 'border-approve bg-approve-bg font-semibold'
+                  : 'border-gray-200 bg-white'
               }`}
             >
               <span className="mr-2 font-semibold">{option.label}.</span>

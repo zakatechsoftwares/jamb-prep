@@ -13,7 +13,15 @@ const DRAFT: ItemEditDraft = {
 
 describe('InlineEditForm', () => {
   it('shows the current draft values in editable fields', () => {
-    render(<InlineEditForm draft={DRAFT} pending={false} onChange={() => {}} onConfirm={() => {}} onCancel={() => {}} />);
+    render(
+      <InlineEditForm
+        draft={DRAFT}
+        pending={false}
+        onChange={() => {}}
+        onConfirm={() => {}}
+        onCancel={() => {}}
+      />,
+    );
 
     expect(screen.getByDisplayValue(DRAFT.stem)).toBeTruthy();
     expect(screen.getByDisplayValue('newton')).toBeTruthy();

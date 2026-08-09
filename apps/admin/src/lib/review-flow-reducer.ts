@@ -110,7 +110,9 @@ export function reduceReviewFlow(state: ReviewFlowState, event: ReviewFlowEvent)
         );
       }
       if (state.selected === null) {
-        throw new Error('reduceReviewFlow: solveSubmitted requires an option to already be selected');
+        throw new Error(
+          'reduceReviewFlow: solveSubmitted requires an option to already be selected',
+        );
       }
       return { ...state, pending: true };
 

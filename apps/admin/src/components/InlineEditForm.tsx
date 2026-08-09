@@ -16,7 +16,13 @@ export interface InlineEditFormProps {
  * browsable data source yet (no endpoint lists/searches objectives), so
  * that part of 7.9 is a known gap for this session, not a silent omission.
  */
-export function InlineEditForm({ draft, pending, onChange, onConfirm, onCancel }: InlineEditFormProps) {
+export function InlineEditForm({
+  draft,
+  pending,
+  onChange,
+  onConfirm,
+  onCancel,
+}: InlineEditFormProps) {
   return (
     <div className="flex flex-1 flex-col gap-3 overflow-y-auto p-4">
       <label className="flex flex-col gap-1 text-sm">

@@ -22,7 +22,15 @@ const ITEM: ReviewQueueItem = {
 
 describe('SolveStep', () => {
   it('shows the stem and all four options, never a key or explanation', () => {
-    render(<SolveStep item={ITEM} selected={null} pending={false} onSelect={() => {}} onSubmit={() => {}} />);
+    render(
+      <SolveStep
+        item={ITEM}
+        selected={null}
+        pending={false}
+        onSelect={() => {}}
+        onSubmit={() => {}}
+      />,
+    );
 
     expect(screen.getByText(ITEM.stem)).toBeTruthy();
     for (const option of ITEM.options) {
@@ -53,18 +61,26 @@ describe('SolveStep', () => {
 
   it('disables submit until an option is selected', () => {
     const { rerender } = render(
-      <SolveStep item={ITEM} selected={null} pending={false} onSelect={() => {}} onSubmit={() => {}} />,
+      <SolveStep
+        item={ITEM}
+        selected={null}
+        pending={false}
+        onSelect={() => {}}
+        onSubmit={() => {}}
+      />,
     );
-    expect(
-      screen.getByRole('button', { name: /submit/i }).hasAttribute('disabled'),
-    ).toBe(true);
+    expect(screen.getByRole('button', { name: /submit/i }).hasAttribute('disabled')).toBe(true);
 
     rerender(
-      <SolveStep item={ITEM} selected="B" pending={false} onSelect={() => {}} onSubmit={() => {}} />,
+      <SolveStep
+        item={ITEM}
+        selected="B"
+        pending={false}
+        onSelect={() => {}}
+        onSubmit={() => {}}
+      />,
     );
-    expect(
-      screen.getByRole('button', { name: /submit/i }).hasAttribute('disabled'),
-    ).toBe(false);
+    expect(screen.getByRole('button', { name: /submit/i }).hasAttribute('disabled')).toBe(false);
   });
 
   it('calls onSubmit when the submit button is tapped with a selection', async () => {
@@ -85,9 +101,9 @@ describe('SolveStep', () => {
   });
 
   it('disables submit while pending, so a double tap cannot double-submit', () => {
-    render(<SolveStep item={ITEM} selected="A" pending={true} onSelect={() => {}} onSubmit={() => {}} />);
-    expect(
-      screen.getByRole('button', { name: /submit/i }).hasAttribute('disabled'),
-    ).toBe(true);
+    render(
+      <SolveStep item={ITEM} selected="A" pending={true} onSelect={() => {}} onSubmit={() => {}} />,
+    );
+    expect(screen.getByRole('button', { name: /submit/i }).hasAttribute('disabled')).toBe(true);
   });
 });

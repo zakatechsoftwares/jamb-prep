@@ -80,7 +80,7 @@ describe('useReviewFlowKeyboard', () => {
     act(() => {
       fireEvent.keyDown(window, { key: 'b' });
     });
-    expect(screen.getByTestId('selected').textContent).toBe('B');
+    await waitFor(() => expect(screen.getByTestId('selected').textContent).toBe('B'));
 
     await act(async () => {
       fireEvent.keyDown(window, { key: 'Enter' });
@@ -102,7 +102,7 @@ describe('useReviewFlowKeyboard', () => {
     act(() => {
       fireEvent.keyDown(window, { key: '3' });
     });
-    expect(screen.getByTestId('status').textContent).toBe('choosingReason');
+    await waitFor(() => expect(screen.getByTestId('status').textContent).toBe('choosingReason'));
   });
 
   it('Escape cancels out of choosingReason back to deciding', async () => {
@@ -115,10 +115,10 @@ describe('useReviewFlowKeyboard', () => {
 
     await waitFor(() => expect(screen.getByTestId('status').textContent).toBe('deciding'));
     act(() => fireEvent.keyDown(window, { key: '3' }));
-    expect(screen.getByTestId('status').textContent).toBe('choosingReason');
+    await waitFor(() => expect(screen.getByTestId('status').textContent).toBe('choosingReason'));
 
     act(() => fireEvent.keyDown(window, { key: 'Escape' }));
-    expect(screen.getByTestId('status').textContent).toBe('deciding');
+    await waitFor(() => expect(screen.getByTestId('status').textContent).toBe('deciding'));
   });
 
   it('ignores A-D and 1-4 while a text field has focus, but Escape still cancels', async () => {
@@ -138,15 +138,18 @@ describe('useReviewFlowKeyboard', () => {
       fireEvent.keyDown(screen.getByLabelText('stem'), { key: '3' });
     });
     // Still deciding — '3' typed into a text field must not start reject.
+    // No waitFor here on purpose: this asserts a negative (nothing
+    // happened), so there is nothing to await — a real regression would
+    // still show up deterministically as a status mismatch.
     expect(screen.getByTestId('status').textContent).toBe('deciding');
 
     act(() => fireEvent.keyDown(window, { key: '3' }));
-    expect(screen.getByTestId('status').textContent).toBe('choosingReason');
+    await waitFor(() => expect(screen.getByTestId('status').textContent).toBe('choosingReason'));
 
     act(() => {
       screen.getByLabelText('stem').focus();
       fireEvent.keyDown(screen.getByLabelText('stem'), { key: 'Escape' });
     });
-    expect(screen.getByTestId('status').textContent).toBe('deciding');
+    await waitFor(() => expect(screen.getByTestId('status').textContent).toBe('deciding'));
   });
 });

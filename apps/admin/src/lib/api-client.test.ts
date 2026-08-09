@@ -32,9 +32,7 @@ function fakeFetch(responses: { status: number; body?: unknown }[]): {
     index += 1;
 
     return new Response(
-      response.status === 204 || response.body === undefined
-        ? null
-        : JSON.stringify(response.body),
+      response.status === 204 || response.body === undefined ? null : JSON.stringify(response.body),
       { status: response.status },
     );
   };
@@ -178,7 +176,12 @@ describe('reveal', () => {
     const { fetchImpl, calls } = fakeFetch([
       {
         status: 200,
-        body: { correctOption: 'C', explanation: 'Because...', verdict: 'agreed', agreesWithKey: true },
+        body: {
+          correctOption: 'C',
+          explanation: 'Because...',
+          verdict: 'agreed',
+          agreesWithKey: true,
+        },
       },
     ]);
     const client = createApiClient(fetchImpl);
@@ -188,7 +191,12 @@ describe('reveal', () => {
     expect(calls[0]).toMatchObject({ url: '/api/review/9/reveal', method: 'GET' });
     expect(result).toEqual({
       ok: true,
-      result: { correctOption: 'C', explanation: 'Because...', verdict: 'agreed', agreesWithKey: true },
+      result: {
+        correctOption: 'C',
+        explanation: 'Because...',
+        verdict: 'agreed',
+        agreesWithKey: true,
+      },
     });
   });
 
@@ -210,7 +218,10 @@ describe('reveal', () => {
 describe('decide', () => {
   it('posts the decision input with the bearer token', async () => {
     const { fetchImpl, calls } = fakeFetch([
-      { status: 200, body: { itemId: 9, status: 'approved_uncalibrated', approvalRoute: 'human_reviewed' } },
+      {
+        status: 200,
+        body: { itemId: 9, status: 'approved_uncalibrated', approvalRoute: 'human_reviewed' },
+      },
     ]);
     const client = createApiClient(fetchImpl);
 
@@ -243,7 +254,10 @@ describe('decide', () => {
 
   it('sends the edit patch for edit_and_approve', async () => {
     const { fetchImpl, calls } = fakeFetch([
-      { status: 200, body: { itemId: 9, status: 'approved_uncalibrated', approvalRoute: 'human_reviewed' } },
+      {
+        status: 200,
+        body: { itemId: 9, status: 'approved_uncalibrated', approvalRoute: 'human_reviewed' },
+      },
     ]);
     const client = createApiClient(fetchImpl);
 
