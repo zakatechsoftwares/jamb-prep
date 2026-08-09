@@ -3,6 +3,7 @@ import type { Request } from 'express';
 import { signSessionToken } from '@jamb/db/session-tokens';
 import {
   parsePositiveInteger,
+  requireContentLead,
   requireModerator,
   resolveReviewerId,
   resolveReviewerSession,
@@ -17,7 +18,10 @@ function requestWithHeader(header: string | undefined): Request {
 // resolveReviewerSession reads the real clock (it's Express middleware, not
 // a pure decision function), so a token good for these tests has to be
 // signed against actual "now" rather than a fixed past instant.
-function tokenFor(reviewerId: number, role: 'reviewer' | 'moderator' = 'reviewer'): string {
+function tokenFor(
+  reviewerId: number,
+  role: 'reviewer' | 'moderator' | 'content_lead' = 'reviewer',
+): string {
   return signSessionToken({ reviewerId, role }, SECRET, new Date(), 60);
 }
 
@@ -117,6 +121,50 @@ describe('requireModerator', () => {
 
   it('responds 403 for a valid session that is not a moderator', () => {
     const result = run(requestWithHeader(`Bearer ${tokenFor(1, 'reviewer')}`));
+    expect(result.nextCalled).toBe(false);
+    expect(result.status).toBe(403);
+  });
+});
+
+describe('requireContentLead', () => {
+  beforeEach(() => {
+    process.env.REVIEWER_SESSION_SECRET = SECRET;
+  });
+
+  function run(req: Request): { status: number; body: unknown; nextCalled: boolean } {
+    let status = 0;
+    let body: unknown;
+    let nextCalled = false;
+    const res = {
+      status(code: number) {
+        status = code;
+        return this;
+      },
+      json(payload: unknown) {
+        body = payload;
+        return this;
+      },
+    };
+    requireContentLead(req, res as never, () => {
+      nextCalled = true;
+    });
+    return { status, body, nextCalled };
+  }
+
+  it('calls next for a content-lead session', () => {
+    const result = run(requestWithHeader(`Bearer ${tokenFor(1, 'content_lead')}`));
+    expect(result.nextCalled).toBe(true);
+    expect(result.status).toBe(0);
+  });
+
+  it('responds 401 with no session', () => {
+    const result = run(requestWithHeader(undefined));
+    expect(result.nextCalled).toBe(false);
+    expect(result.status).toBe(401);
+  });
+
+  it('responds 403 for a valid session that is not content_lead', () => {
+    const result = run(requestWithHeader(`Bearer ${tokenFor(1, 'moderator')}`));
     expect(result.nextCalled).toBe(false);
     expect(result.status).toBe(403);
   });

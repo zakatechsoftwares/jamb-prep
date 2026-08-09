@@ -90,6 +90,27 @@ export function requireModerator(req: Request, res: Response, next: NextFunction
   next();
 }
 
+/**
+ * Express middleware guarding the content-lead dashboard and payment-run
+ * routes (plan 7.11). Same shape as `requireModerator` — 401 with no
+ * session, 403 with a valid session that isn't `content_lead`.
+ */
+export function requireContentLead(req: Request, res: Response, next: NextFunction): void {
+  const session = resolveReviewerSession(req);
+
+  if (session === null) {
+    res.status(401).json({ error: 'authentication required' });
+    return;
+  }
+
+  if (session.role !== 'content_lead') {
+    res.status(403).json({ error: 'content lead role required' });
+    return;
+  }
+
+  next();
+}
+
 /** A small, reusable "is this a positive integer" parser for route inputs. */
 export function parsePositiveInteger(raw: unknown): number | null {
   if (typeof raw !== 'string') {
