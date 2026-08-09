@@ -6,6 +6,7 @@ import {
   canReveal,
   parseDecisionInput,
   parseOptionLabel,
+  parseResolveEscalationInput,
   type ItemSnapshot,
 } from './review-decision-policy';
 
@@ -383,5 +384,51 @@ describe('parseDecisionInput', () => {
   it('covers every review action and every rejection reason, so growing either vocabulary is noticed here', () => {
     expect(REVIEW_ACTIONS).toHaveLength(4);
     expect(REJECTION_REASONS).toHaveLength(8);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// parseResolveEscalationInput
+// ---------------------------------------------------------------------------
+
+describe('parseResolveEscalationInput', () => {
+  it('parses an approve', () => {
+    expect(parseResolveEscalationInput({ action: 'approve' })).toEqual({ action: 'approve' });
+  });
+
+  it('parses a reject', () => {
+    expect(parseResolveEscalationInput({ action: 'reject' })).toEqual({ action: 'reject' });
+  });
+
+  it('throws when the raw input is not an object', () => {
+    for (const bad of ['approve', 42, null, undefined, [], true]) {
+      expect(() => parseResolveEscalationInput(bad)).toThrow();
+    }
+  });
+
+  it('throws when action is missing or not a string', () => {
+    expect(() => parseResolveEscalationInput({})).toThrow(/action/i);
+    expect(() => parseResolveEscalationInput({ action: 3 })).toThrow(/action/i);
+    expect(() => parseResolveEscalationInput({ action: null })).toThrow(/action/i);
+  });
+
+  // A moderator ruling on an escalated item only ever approves or rejects —
+  // there is no edit_and_approve here and no further escalation from
+  // escalated, so the wider ReviewAction vocabulary is deliberately not
+  // accepted, unlike parseDecisionInput.
+  it.each(['escalate', 'edit_and_approve'] as const)(
+    'rejects %s, which is not a valid ruling on an escalated item',
+    (action) => {
+      expect(() => parseResolveEscalationInput({ action })).toThrow(/action/i);
+    },
+  );
+
+  it('rejects rejectionReason or edits smuggled onto the input — neither is ever valid here', () => {
+    expect(() =>
+      parseResolveEscalationInput({ action: 'reject', rejectionReason: 'wrong_key' }),
+    ).toThrow(/rejectionReason/i);
+    expect(() =>
+      parseResolveEscalationInput({ action: 'approve', edits: { stem: 'x' } }),
+    ).toThrow(/edits/i);
   });
 });

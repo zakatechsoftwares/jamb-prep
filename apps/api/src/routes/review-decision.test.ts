@@ -1,6 +1,19 @@
 import { afterAll, describe, expect, it } from 'vitest';
 import type { ReviewDecisionService } from '@jamb/shared';
+import { signSessionToken } from '@jamb/db/session-tokens';
 import { createApp } from '../app';
+
+process.env.REVIEWER_SESSION_SECRET ??= 'test-secret-do-not-use-in-prod';
+
+function authHeader(reviewerId: number, role: 'reviewer' | 'moderator' = 'reviewer') {
+  const token = signSessionToken(
+    { reviewerId, role },
+    process.env.REVIEWER_SESSION_SECRET!,
+    new Date(),
+    60,
+  );
+  return { Authorization: `Bearer ${token}` };
+}
 
 interface Recorded {
   solveCalls: { reviewerId: number; itemId: number; answer: string }[];
@@ -80,9 +93,9 @@ describe('POST /review/:itemId/solve', () => {
       submitBlindAnswer: async (reviewerId, itemId, answer) => ({ ok: true, itemId, answer }),
     });
 
-    const response = await fetch(`${url}/review/9/solve?reviewerId=3`, {
+    const response = await fetch(`${url}/review/9/solve`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', ...authHeader(3) },
       body: JSON.stringify({ answer: 'B' }),
     });
     const body = await readJson<{ itemId: number; answer: string }>(response);
@@ -95,9 +108,9 @@ describe('POST /review/:itemId/solve', () => {
   it('rejects an answer outside A-D before ever reaching the service', async () => {
     const { url, recorded } = run({});
 
-    const response = await fetch(`${url}/review/9/solve?reviewerId=3`, {
+    const response = await fetch(`${url}/review/9/solve`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', ...authHeader(3) },
       body: JSON.stringify({ answer: 'E' }),
     });
 
@@ -110,9 +123,9 @@ describe('POST /review/:itemId/solve', () => {
       submitBlindAnswer: async () => ({ ok: false, reason: 'not_claimed_by_you' }),
     });
 
-    const response = await fetch(`${url}/review/9/solve?reviewerId=3`, {
+    const response = await fetch(`${url}/review/9/solve`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', ...authHeader(3) },
       body: JSON.stringify({ answer: 'A' }),
     });
 
@@ -126,37 +139,40 @@ describe('POST /review/:itemId/solve', () => {
       submitBlindAnswer: async () => ({ ok: false, reason: 'already_answered' }),
     });
 
-    const response = await fetch(`${url}/review/9/solve?reviewerId=3`, {
+    const response = await fetch(`${url}/review/9/solve`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', ...authHeader(3) },
       body: JSON.stringify({ answer: 'A' }),
     });
 
     expect(response.status).toBe(409);
   });
 
-  it('rejects a malformed reviewerId or itemId', async () => {
+  it('rejects a malformed itemId', async () => {
     const { url } = run({});
 
     expect(
       (
-        await fetch(`${url}/review/9/solve`, {
+        await fetch(`${url}/review/not-a-number/solve`, {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: { 'Content-Type': 'application/json', ...authHeader(3) },
           body: JSON.stringify({ answer: 'A' }),
         })
       ).status,
     ).toBe(400);
+  });
 
-    expect(
-      (
-        await fetch(`${url}/review/not-a-number/solve?reviewerId=3`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ answer: 'A' }),
-        })
-      ).status,
-    ).toBe(400);
+  it('rejects a request with no session', async () => {
+    const { url, recorded } = run({});
+
+    const response = await fetch(`${url}/review/9/solve`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ answer: 'A' }),
+    });
+
+    expect(response.status).toBe(401);
+    expect(recorded.solveCalls).toEqual([]);
   });
 });
 
@@ -168,7 +184,7 @@ describe('GET /review/:itemId/reveal', () => {
       revealItem: async () => ({ ok: false, reason: 'not_yet_solved' }),
     });
 
-    const response = await fetch(`${url}/review/9/reveal?reviewerId=3`);
+    const response = await fetch(`${url}/review/9/reveal`, { headers: authHeader(3) });
     const body = await readJson<Record<string, unknown>>(response);
 
     expect(response.status).toBe(403);
@@ -182,7 +198,7 @@ describe('GET /review/:itemId/reveal', () => {
       revealItem: async () => ({ ok: false, reason: 'not_claimed_by_you' }),
     });
 
-    const response = await fetch(`${url}/review/9/reveal?reviewerId=3`);
+    const response = await fetch(`${url}/review/9/reveal`, { headers: authHeader(3) });
     expect(response.status).toBe(403);
   });
 
@@ -197,7 +213,7 @@ describe('GET /review/:itemId/reveal', () => {
       }),
     });
 
-    const response = await fetch(`${url}/review/9/reveal?reviewerId=3`);
+    const response = await fetch(`${url}/review/9/reveal`, { headers: authHeader(3) });
     const body = await readJson<Record<string, unknown>>(response);
 
     expect(response.status).toBe(200);
@@ -210,11 +226,16 @@ describe('GET /review/:itemId/reveal', () => {
     expect(recorded.revealCalls).toEqual([{ reviewerId: 3, itemId: 9 }]);
   });
 
-  it('rejects a malformed reviewerId or itemId', async () => {
+  it('rejects a malformed itemId', async () => {
     const { url } = run({});
 
-    expect((await fetch(`${url}/review/9/reveal`)).status).toBe(400);
-    expect((await fetch(`${url}/review/x/reveal?reviewerId=3`)).status).toBe(400);
+    expect((await fetch(`${url}/review/x/reveal`, { headers: authHeader(3) })).status).toBe(400);
+  });
+
+  it('rejects a request with no session', async () => {
+    const { url } = run({});
+
+    expect((await fetch(`${url}/review/9/reveal`)).status).toBe(401);
   });
 });
 
@@ -229,9 +250,9 @@ describe('POST /review/:itemId/decide', () => {
       }),
     });
 
-    const response = await fetch(`${url}/review/9/decide?reviewerId=3`, {
+    const response = await fetch(`${url}/review/9/decide`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', ...authHeader(3) },
       body: JSON.stringify({ action: 'approve' }),
     });
     const body = await readJson<Record<string, unknown>>(response);
@@ -250,9 +271,9 @@ describe('POST /review/:itemId/decide', () => {
     // free-text reason is refused exactly like nonsense would be.
     const { url, recorded } = run({});
 
-    const response = await fetch(`${url}/review/9/decide?reviewerId=3`, {
+    const response = await fetch(`${url}/review/9/decide`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', ...authHeader(3) },
       body: JSON.stringify({ action: 'reject', rejectionReason: 'this key looks wrong to me' }),
     });
 
@@ -263,9 +284,9 @@ describe('POST /review/:itemId/decide', () => {
   it('rejects an unrecognised action before ever reaching the service', async () => {
     const { url, recorded } = run({});
 
-    const response = await fetch(`${url}/review/9/decide?reviewerId=3`, {
+    const response = await fetch(`${url}/review/9/decide`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', ...authHeader(3) },
       body: JSON.stringify({ action: 'bulk_approve' }),
     });
 
@@ -278,9 +299,9 @@ describe('POST /review/:itemId/decide', () => {
       decideOnItem: async () => ({ ok: true, itemId: 9, status: 'rejected', approvalRoute: null }),
     });
 
-    const response = await fetch(`${url}/review/9/decide?reviewerId=3`, {
+    const response = await fetch(`${url}/review/9/decide`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', ...authHeader(3) },
       body: JSON.stringify({ action: 'reject', rejectionReason: 'wrong_key' }),
     });
 
@@ -292,9 +313,9 @@ describe('POST /review/:itemId/decide', () => {
       decideOnItem: async () => ({ ok: false, reason: 'not_claimed_by_you' }),
     });
 
-    const response = await fetch(`${url}/review/9/decide?reviewerId=3`, {
+    const response = await fetch(`${url}/review/9/decide`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', ...authHeader(3) },
       body: JSON.stringify({ action: 'approve' }),
     });
 
@@ -310,9 +331,9 @@ describe('POST /review/:itemId/decide', () => {
       }),
     });
 
-    const response = await fetch(`${url}/review/9/decide?reviewerId=3`, {
+    const response = await fetch(`${url}/review/9/decide`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', ...authHeader(3) },
       body: JSON.stringify({ action: 'approve' }),
     });
     const body = await readJson<{ message: string }>(response);
@@ -332,9 +353,9 @@ describe('POST /review/:itemId/decide', () => {
     });
 
     const edits = { stem: 'Corrected stem' };
-    const response = await fetch(`${url}/review/9/decide?reviewerId=3`, {
+    const response = await fetch(`${url}/review/9/decide`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', ...authHeader(3) },
       body: JSON.stringify({ action: 'edit_and_approve', edits }),
     });
 
@@ -345,27 +366,30 @@ describe('POST /review/:itemId/decide', () => {
     });
   });
 
-  it('rejects a malformed reviewerId or itemId', async () => {
+  it('rejects a malformed itemId', async () => {
     const { url } = run({});
 
     expect(
       (
-        await fetch(`${url}/review/9/decide`, {
+        await fetch(`${url}/review/x/decide`, {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: { 'Content-Type': 'application/json', ...authHeader(3) },
           body: JSON.stringify({ action: 'approve' }),
         })
       ).status,
     ).toBe(400);
+  });
 
-    expect(
-      (
-        await fetch(`${url}/review/x/decide?reviewerId=3`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ action: 'approve' }),
-        })
-      ).status,
-    ).toBe(400);
+  it('rejects a request with no session', async () => {
+    const { url, recorded } = run({});
+
+    const response = await fetch(`${url}/review/9/decide`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'approve' }),
+    });
+
+    expect(response.status).toBe(401);
+    expect(recorded.decideCalls).toEqual([]);
   });
 });

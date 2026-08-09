@@ -20,7 +20,7 @@ export function createReviewDecisionRouter(service: ReviewDecisionService): Rout
     const itemId = parsePositiveInteger(req.params.itemId);
 
     if (reviewerId === null) {
-      res.status(400).json({ error: 'reviewerId must be a positive integer' });
+      res.status(401).json({ error: 'authentication required' });
       return;
     }
     if (itemId === null) {
@@ -59,7 +59,7 @@ export function createReviewDecisionRouter(service: ReviewDecisionService): Rout
     const itemId = parsePositiveInteger(req.params.itemId);
 
     if (reviewerId === null) {
-      res.status(400).json({ error: 'reviewerId must be a positive integer' });
+      res.status(401).json({ error: 'authentication required' });
       return;
     }
     if (itemId === null) {
@@ -94,7 +94,7 @@ export function createReviewDecisionRouter(service: ReviewDecisionService): Rout
     const itemId = parsePositiveInteger(req.params.itemId);
 
     if (reviewerId === null) {
-      res.status(400).json({ error: 'reviewerId must be a positive integer' });
+      res.status(401).json({ error: 'authentication required' });
       return;
     }
     if (itemId === null) {

@@ -277,6 +277,35 @@ export function buildItemEditDiff(current: ItemSnapshot, patch: ItemEditPatch): 
   return diff;
 }
 
+/**
+ * The `POST /review/:itemId/resolve-escalation` boundary validator (session
+ * 04's guard 5: only a moderator resolves an escalated item). Deliberately
+ * narrower than `parseDecisionInput`: a moderator ruling on an escalated
+ * item only ever approves or rejects it — there is no `edit_and_approve`
+ * here and no further `escalate` from `escalated`, so those two are refused
+ * exactly like nonsense would be, not merely left unsupported by omission.
+ * `rejectionReason` and `edits` are never valid on this input, unlike
+ * `parseDecisionInput` where each is valid conditionally.
+ */
+export function parseResolveEscalationInput(raw: unknown): ResolveEscalationInput {
+  if (!isPlainObject(raw)) {
+    throw new Error(`resolution input must be an object, got ${JSON.stringify(raw)}`);
+  }
+
+  if (raw.action !== 'approve' && raw.action !== 'reject') {
+    throw new Error(`action must be one of approve, reject, got ${JSON.stringify(raw.action)}`);
+  }
+
+  if (raw.rejectionReason !== undefined) {
+    throw new Error('rejectionReason is not valid when resolving an escalation');
+  }
+  if (raw.edits !== undefined) {
+    throw new Error('edits is not valid when resolving an escalation');
+  }
+
+  return { action: raw.action };
+}
+
 // ---------------------------------------------------------------------------
 // The decision service contract. Declared here, implemented in
 // @jamb/db/review-decision-repository.ts, and consumed by apps/api the same
@@ -326,4 +355,27 @@ export interface ReviewDecisionService {
   submitBlindAnswer(reviewerId: number, itemId: number, answer: OptionLabel): Promise<SolveOutcome>;
   revealItem(reviewerId: number, itemId: number): Promise<RevealOutcome>;
   decideOnItem(reviewerId: number, itemId: number, input: DecideInput): Promise<DecideOutcome>;
+}
+
+/**
+ * A moderator's ruling on an item in `escalated` (session 04's guard 5). A
+ * separate input/outcome/service from the decision trio above, not a mode
+ * of `DecideInput` — this is `decideOnItem`'s sibling for the one state
+ * only a moderator may resolve, not a variant reached through it.
+ */
+export interface ResolveEscalationInput {
+  action: 'approve' | 'reject';
+}
+
+export type ResolveEscalationOutcome =
+  | ({ ok: true } & DecideResult)
+  | { ok: false; reason: 'invalid_transition'; message: string };
+
+/** What `apps/api`'s escalation-resolution route needs from the review workflow. */
+export interface ReviewEscalationService {
+  resolveEscalation(
+    reviewerId: number,
+    itemId: number,
+    input: ResolveEscalationInput,
+  ): Promise<ResolveEscalationOutcome>;
 }

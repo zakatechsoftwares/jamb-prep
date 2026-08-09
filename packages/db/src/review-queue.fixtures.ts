@@ -36,11 +36,13 @@ export async function truncateQueueWorld(client: PoolClient): Promise<void> {
   await client.query(`TRUNCATE ${TRUNCATED_TABLES.join(', ')} CASCADE`);
 }
 
-async function insertReviewer(
+/** Generalised over role, so escalation tests can seed a moderator the same way. */
+export async function insertReviewerWithRole(
   client: PoolClient,
   name: string,
   phone: string,
-  subjectIds: number[],
+  role: string,
+  subjectIds: number[] = [],
 ): Promise<{ reviewerId: number; userId: number }> {
   const userId = firstRow(
     await client.query<{ id: number }>(
@@ -51,8 +53,8 @@ async function insertReviewer(
 
   const reviewerId = firstRow(
     await client.query<{ id: number }>(
-      `INSERT INTO reviewers (user_id, role, status) VALUES ($1, 'reviewer', 'active') RETURNING id`,
-      [userId],
+      `INSERT INTO reviewers (user_id, role, status) VALUES ($1, $2, 'active') RETURNING id`,
+      [userId, role],
     ),
   ).id;
 
@@ -64,6 +66,15 @@ async function insertReviewer(
   }
 
   return { reviewerId, userId };
+}
+
+async function insertReviewer(
+  client: PoolClient,
+  name: string,
+  phone: string,
+  subjectIds: number[],
+): Promise<{ reviewerId: number; userId: number }> {
+  return insertReviewerWithRole(client, name, phone, 'reviewer', subjectIds);
 }
 
 export async function seedQueueWorld(client: PoolClient): Promise<QueueWorld> {

@@ -2,6 +2,7 @@ import {
   decideOnItem,
   getNextItem,
   getNextItemBatch,
+  resolveEscalation,
   revealItem,
   submitBlindAnswer,
 } from '@jamb/db';
@@ -21,6 +22,10 @@ const app = createApp({
       submitBlindAnswer(reviewerId, itemId, answer),
     revealItem: (reviewerId, itemId) => revealItem(reviewerId, itemId),
     decideOnItem: (reviewerId, itemId, input) => decideOnItem(reviewerId, itemId, input),
+  },
+  reviewEscalation: {
+    resolveEscalation: (reviewerId, itemId, input) =>
+      resolveEscalation(reviewerId, itemId, input),
   },
 });
 
