@@ -32,7 +32,7 @@ you need "what comes next."
 | 05        | reviewer workspace prompts | Session B — Queue assignment service                                                                                                                            | done, PR #6             |
 | 06        | reviewer workspace prompts | Session C — Review submission and the answer-before-key flow                                                                                                    | done, PR #7             |
 | 07        | reviewer workspace prompts | Session D — The reviewer workspace UI                                                                                                                           | done, PR against `main` |
-| 08        | reviewer workspace prompts | Session E — Offline layer for the workspace                                                                                                                     | not started             |
+| 08        | reviewer workspace prompts | Session E — Offline layer for the workspace                                                                                                                     | done, PR against `main` |
 | 09        | reviewer workspace prompts | Session F — Gold items, audit, and payment accrual                                                                                                              | not started             |
 | 10        | playbook                   | "Using Claude to generate the question bank" (the item generation pipeline, `tools/item-gen/`)                                                                  | not started             |
 | 11        | reviewer workspace prompts | "Then: the contributor brief board"                                                                                                                             | not started             |
@@ -507,3 +507,150 @@ resolved by keeping both). Both PRs still need to land on `main`.
 
 **Next:** session E, the offline layer for the workspace — or session
 06b/07's PRs landing on `main` first, whichever the user prioritises.
+
+## Session 08 — offline layer for the workspace (2026-08-09, `session/08-workspace-offline`, PR against `main`)
+
+Makes `apps/admin` usable with no connection (plan 7.9 "offline capable",
+8.3's sync design). Built on top of session 07's `api-client.ts` and
+`review-flow-reducer.ts` rather than a parallel path, per the session
+prompt's explicit instruction.
+
+**Pre-check (per the session prompt):** confirmed `api-client.ts` had no
+retry or queuing behaviour of any kind before this session — every method
+was a single direct `fetch`, and a network failure just returned
+`{ok:false, reason:'request_failed'}` and stopped.
+
+**Built:**
+
+- `packages/shared`: `DecisionContext = 'live' | 'late_arrival'` added to
+  `DecideResult`/`DecideOutcome`/`ResolveEscalationOutcome`.
+- `packages/db` migration `0016_review_decision_late_arrival`:
+  `review_decisions.decision_context` (`'live'` default, partial index on
+  `'late_arrival'`). `decideOnItem` gains two things in the same pass,
+  since both touch the same insert path:
+  - **The late-arrival branch.** When the caller holds no live claim,
+    `everClaimedByReviewer()` checks `item_state_transitions` for a past
+    `'claimed'` event by this reviewer (the claim row itself is
+    overwritten on reassignment and proves nothing) — if they genuinely
+    once held the item, the decision is recorded as an audit-only
+    `decision_context: 'late_arrival'` row: no `transition()` call, no
+    `items` write, no touching the current holder's claim or decision.
+    A reviewer who never held the item at all is still refused.
+  - **Idempotent retry.** The insert is
+    `ON CONFLICT (idempotency_key) DO NOTHING RETURNING id`; a conflict
+    means this exact decision was already recorded, and the outcome
+    returned is looked up fresh rather than re-derived, identical to what
+    the original request got back.
+- `apps/api`: `/decide`'s response now includes `decisionContext`.
+- `apps/admin/src/lib/offline-store.ts` (new): IndexedDB (via
+  `fake-indexeddb/auto` in tests, real in the browser) — cached items
+  (with `claimExpiresAt` and, for non-high-tier items only, a prefetched
+  `reveal`), a pending-decisions queue keyed by idempotency key, a
+  pending-solves queue for blind answers queued offline.
+- `api-client.ts`: `getNextItemBatch` wired up (the server route
+  `/next-batch` already existed from session 05 but nothing on the client
+  called it); `decide` takes an optional `idempotencyKey` and threads
+  `decisionContext` through its outcome.
+- `review-flow-reducer.ts`: `solving` gains `queued: boolean` and a new
+  `blindAnswerQueued` event — the resting state for a high-tier item's
+  blind answer recorded offline with nowhere to advance to until
+  reconnection actually reveals it. `selectOption`/`solveSubmitted` now
+  throw if dispatched once already queued.
+- `useReviewFlow.ts`: the orchestrator for all of the above —
+  `requestNextItem` serves from the cache when offline (oldest
+  `claimExpiresAt` first); `submitSolve`/`submitDecision` queue instead of
+  posting, whether genuinely offline or a live attempt failed with
+  `request_failed`; a background effect (`session`/`offlineStore`/
+  `isOnline` in its deps) flushes the queue then prefetches a fresh batch
+  on every connect or reconnect. Returns `isOnline`, `cachedItemCount`,
+  `pendingDecisionCount`, `pendingSolveCount`, `nextClaimExpiry`, and
+  `lateArrivalCount` for the UI.
+- `AuthProvider`: exposes `offlineStore: OfflineStore | null` (opened
+  lazily and asynchronously, `null` until ready), injectable for tests
+  exactly like `apiClient`.
+- Service worker (`public/sw.js`, stale-while-revalidate for same-origin
+  GETs, explicitly excluding `/api/*`) caches the app shell so the page
+  itself loads offline; registered from a small client component
+  (`ServiceWorkerRegistration`) mounted in `app/layout.tsx`. Review data
+  is never routed through it — that guarantee lives entirely in
+  `offline-store.ts`.
+- `ReviewHeader` and `SolveStep` surface the new state: an offline badge,
+  cached/pending counts, earliest claim expiry, a late-arrival count, and
+  (in `SolveStep`) a "queued — will reveal once you're back online"
+  notice with inputs disabled.
+- `fake-indexeddb` added to `apps/admin` as a devDependency (approved).
+- Tests: 60 new across `offline-store`, `api-client`, `review-flow-reducer`,
+  `useReviewFlow`, `ReviewHeader`, `SolveStep`, `ServiceWorkerRegistration`
+  (162 total in `apps/admin`, up from 115); 5 new in `packages/db`'s
+  `review-decision.integration.test.ts` (120 total). DONE WHEN's three
+  named scenarios each have a direct test: reviewing 10 items fully
+  offline then reconnecting syncs all ten exactly once
+  (`useReviewFlow.test.tsx`); the same decision uploaded three times
+  produces exactly one row, proved at both the repository layer (direct
+  `decideOnItem` calls) and the hook layer (a decision that fails once
+  with `request_failed` is retried with the *same* stored idempotency
+  key, never a fresh one); a decision against an expired, reassigned
+  claim is retained as a `decision_context: 'late_arrival'` row, proved
+  at both layers too.
+
+**Decisions worth remembering:**
+
+- **High-tier reveal stays online-only — no exceptions for offline.**
+  The plan's answer-before-key control (7.10) is enforced at the server;
+  prefetching a high-tier item's reveal into IndexedDB "just so it's
+  there" would move that guarantee onto the reducer remembering not to
+  render data it already has, which is a strictly weaker place for it to
+  live. The consequence, accepted deliberately: a high-tier item queued
+  offline blocks that review session at that item until reconnection —
+  there is no "skip it and come back," matching the same anti-cherry-
+  picking principle the workspace already enforces everywhere else.
+- **A late-arrival decision is accepted whenever the reviewer once truly
+  held the claim — full stop, not only when it was provably reassigned.**
+  `review_claims` is keyed on `item_id` alone and gets overwritten on
+  reassignment, so "expired but nobody reclaimed it yet" and "expired and
+  reassigned" are indistinguishable from that table alone. Treating any
+  post-expiry decision as late-arrival is the simpler, safer rule — an
+  offline decision's exclusive window on an item closed the moment its
+  claim expired, regardless of who (if anyone) holds it now.
+- **`decision_context` is a real, queryable column — not inferred from
+  "no state transition occurred."** The user's explicit requirement,
+  anticipating session F / canonical 09's inter-rater agreement work,
+  which needs to select on this positively rather than reconstruct it
+  from absence.
+- **The idempotency contract needs both halves to hold.** Server:
+  `ON CONFLICT (idempotency_key) DO NOTHING` plus a fallback lookup.
+  Client: the same generated key reused across every retry of one queued
+  write, never minted fresh per attempt. Documented together in
+  `CLAUDE.md` since one without the other is not actually idempotent.
+- **A stale ref in a DOM event listener effect is a real bug class, not
+  a theoretical one.** Found via a flaky keyboard test that only failed
+  under repeated/loaded runs: `useReviewFlowKeyboard`'s `[flow]`-keyed
+  effect tore down and rebuilt the `keydown` listener on every render;
+  this session's added async state (offline counts refreshing in the
+  background) increased render frequency enough to reliably expose the
+  race. Fixed with the latest-ref pattern, using `useLayoutEffect` for
+  the ref sync specifically — see `CLAUDE.md`'s new entry for why
+  `useEffect` there was insufficient.
+
+**Open at close:**
+
+- Session F / canonical 09 (gold items, audit, payment accrual,
+  inter-rater agreement) is what will actually query
+  `decision_context = 'late_arrival'` for the first time — nothing reads
+  it yet beyond the count surfaced in `ReviewHeader`.
+- No UI affordance to inspect *which* items are queued or cached (by
+  design — 7.9 forbids a queue browser, and that principle was extended
+  here rather than carved out an exception for the offline case), only
+  aggregate counts.
+- The service worker's app-shell cache is exercised only by its own
+  component test (`ServiceWorkerRegistration.test.tsx`, which mocks
+  `navigator.serviceWorker.register`); `sw.js` itself was not run in a
+  real browser this session, unlike session 07's live Playwright pass —
+  this session's DONE WHEN was phrased as tests to cover, not a live
+  driving pass, so that's what was built to.
+- Neither this PR nor (per session 07's own "open at close") any earlier
+  one has been checked against `main` in this session — the user's usual
+  PR-and-merge workflow from session 07 wasn't invoked this time.
+
+**Next:** session F (canonical 09) — gold items, audit, and payment
+accrual — or whatever PR/merge housekeeping the user prioritises first.

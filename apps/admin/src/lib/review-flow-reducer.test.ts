@@ -29,7 +29,13 @@ const REVEAL: RevealResult = {
   agreesWithKey: true,
 };
 
-const SOLVING: ReviewFlowState = { status: 'solving', pending: false, item: ITEM, selected: null };
+const SOLVING: ReviewFlowState = {
+  status: 'solving',
+  pending: false,
+  item: ITEM,
+  selected: null,
+  queued: false,
+};
 const DECIDING: ReviewFlowState = {
   status: 'deciding',
   pending: false,
@@ -75,7 +81,13 @@ describe('reduceReviewFlow', () => {
         type: 'itemNeedsSolve',
         item: ITEM,
       });
-      expect(result).toEqual({ status: 'solving', pending: false, item: ITEM, selected: null });
+      expect(result).toEqual({
+        status: 'solving',
+        pending: false,
+        item: ITEM,
+        selected: null,
+        queued: false,
+      });
     });
   });
 
@@ -140,6 +152,64 @@ describe('reduceReviewFlow', () => {
     it('throws when not solving', () => {
       expect(() => reduceReviewFlow(DECIDING, { type: 'solveSubmitted' })).toThrow(
         /solveSubmitted/,
+      );
+    });
+
+    it('throws once the blind answer has already been queued for upload', () => {
+      const selected = reduceReviewFlow(SOLVING, { type: 'selectOption', option: 'A' });
+      const submitted = reduceReviewFlow(selected, { type: 'solveSubmitted' });
+      const queued = reduceReviewFlow(submitted, { type: 'blindAnswerQueued' });
+      expect(() => reduceReviewFlow(queued, { type: 'solveSubmitted' })).toThrow(
+        /solveSubmitted/,
+      );
+    });
+  });
+
+  describe('blindAnswerQueued', () => {
+    // Session 08: a high-tier item's reveal stays online-only, so a blind
+    // answer submitted offline has nowhere to advance to yet — the flow
+    // rests here, marked queued, until reconnection resolves it via the
+    // ordinary itemRevealed or requestFailed events.
+    it('moves from a pending solve to solving with queued set, keeping the selection', () => {
+      const selected = reduceReviewFlow(SOLVING, { type: 'selectOption', option: 'B' });
+      const submitted = reduceReviewFlow(selected, { type: 'solveSubmitted' });
+
+      const result = reduceReviewFlow(submitted, { type: 'blindAnswerQueued' });
+
+      expect(result).toEqual({
+        status: 'solving',
+        pending: false,
+        item: ITEM,
+        selected: 'B',
+        queued: true,
+      });
+    });
+
+    it('throws when not solving', () => {
+      expect(() => reduceReviewFlow(DECIDING, { type: 'blindAnswerQueued' })).toThrow(
+        /blindAnswerQueued/,
+      );
+    });
+
+    it('a queued solve still resolves normally once reconnection reveals the item', () => {
+      const selected = reduceReviewFlow(SOLVING, { type: 'selectOption', option: 'B' });
+      const submitted = reduceReviewFlow(selected, { type: 'solveSubmitted' });
+      const queued = reduceReviewFlow(submitted, { type: 'blindAnswerQueued' });
+
+      const result = reduceReviewFlow(queued, { type: 'itemRevealed', item: ITEM, reveal: REVEAL });
+
+      expect(result).toEqual({ status: 'deciding', pending: false, item: ITEM, reveal: REVEAL });
+    });
+  });
+
+  describe('selectOption once queued', () => {
+    it('throws, since the answer has already been queued for upload', () => {
+      const selected = reduceReviewFlow(SOLVING, { type: 'selectOption', option: 'A' });
+      const submitted = reduceReviewFlow(selected, { type: 'solveSubmitted' });
+      const queued = reduceReviewFlow(submitted, { type: 'blindAnswerQueued' });
+
+      expect(() => reduceReviewFlow(queued, { type: 'selectOption', option: 'B' })).toThrow(
+        /selectOption/,
       );
     });
   });

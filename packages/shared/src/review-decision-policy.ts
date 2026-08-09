@@ -339,10 +339,23 @@ export interface DecideInput extends ParsedDecisionInput {
   idempotencyKey?: string;
 }
 
+/**
+ * `'live'`: this decision drove the item's state transition, the ordinary
+ * case. `'late_arrival'`: the reviewer's live claim had already expired and
+ * been reassigned by the time this decision reached the server (the offline
+ * workspace's queued-upload case, 7.9/8.3) — the decision is recorded as an
+ * audit-only second opinion and never overwrites whichever decision the
+ * item's current holder already made. A positive flag rather than an
+ * inference from "no transition happened," so a later query (7.11's
+ * inter-rater agreement) can select on it directly.
+ */
+export type DecisionContext = 'live' | 'late_arrival';
+
 export interface DecideResult {
   itemId: number;
   status: ItemStatus;
   approvalRoute: ApprovalRoute | null;
+  decisionContext: DecisionContext;
 }
 
 export type DecideOutcome =

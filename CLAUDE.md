@@ -169,6 +169,90 @@ answer intact. Write tests for this scenario early and keep them green.
   session, not drawn from a canonical source. If a real design system
   shows up later, reconcile against it rather than assuming
   `app/globals.css` is authoritative.
+- **The reviewer workspace's offline layer (`apps/admin/src/lib/offline-store.ts`)
+  is IndexedDB, tested against `fake-indexeddb/auto`** (installed once,
+  globally, in `apps/admin/vitest.setup.ts` — jsdom has no IndexedDB of its
+  own). A test that touches it opens its own uniquely-named database
+  (`createOfflineStore('some-test-name')`) rather than relying on any
+  cross-test reset, since fake-indexeddb persists per name for the life of
+  the process. `AuthProvider` opens the app's one real store
+  (`jamb-reviewer-offline`) lazily and asynchronously on mount, exposed as
+  `offlineStore: OfflineStore | null` — `null` until that resolves —
+  and accepts an already-open store as a prop for tests, exactly like
+  `apiClient`.
+- **A high-tier item's reveal payload is never prefetched for offline use,
+  on purpose.** `canReveal`'s own asymmetry (`packages/shared/review-decision-policy.ts`)
+  is the guide: a low or `not_generated` risk_tier item can be fully
+  cached including the key, since nothing gates its reveal on an answer;
+  a high-tier item's blind answer can be queued and submitted offline, but
+  its reveal call stays online-only, deferred until reconnection. This is
+  what keeps the answer-before-key guarantee (7.10) resting on the server
+  never having released the key, rather than on the client remembering not
+  to render data it already has — the stronger, correct place for that
+  control to live. `review-flow-reducer.ts`'s `solving` state carries a
+  `queued: boolean` for exactly this resting state: a blind answer
+  recorded offline with nowhere to advance to until reconnection reveals
+  it. There is no "skip this stuck item" affordance, deliberately — see
+  the "DO NOT BUILD" guard rails in `docs/reviewer-workspace-prompts.md`;
+  the same anti-cherry-picking principle extends to a high-tier item
+  queued offline.
+- **A DOM event listener that reads component state must not be
+  re-subscribed on every render.** `useReviewFlowKeyboard` originally
+  keyed its `window.addEventListener('keydown', ...)` effect on `[flow]` —
+  and `useReviewFlow` returns a fresh object literal every render, so that
+  effect tore down and re-attached the listener on every single render,
+  including ones triggered by something unrelated (the offline counts
+  refreshing in the background). That churn is a real race: a keydown can
+  land in the window between the old listener's removal and the new one's
+  attachment. Fixed with the standard "latest ref" pattern — a ref updated
+  via **`useLayoutEffect`, not `useEffect`** (the listener effect itself
+  now has empty deps and attaches exactly once). `useLayoutEffect` matters
+  specifically here: it runs synchronously with the DOM commit, whereas a
+  passive `useEffect` is scheduled afterwards — late enough that a
+  `waitFor`'s `MutationObserver` (or a synchronous `fireEvent` right after
+  it) can observe the new DOM while a plain-`useEffect`-updated ref still
+  pointed at the previous render's data. See `useReviewFlowKeyboard.ts`.
+- **Widening an existing `useCallback`'s dependency array can silently
+  break an effect's documented firing invariant.** `useReviewFlow`'s
+  bootstrap effect was `[session, requestNextItem]` with a comment
+  asserting `requestNextItem`'s identity "only changes when session does."
+  Adding `isOnline`/`offlineStore`/`refreshOfflineCounts` to
+  `requestNextItem`'s own deps (for the offline layer, session 08) made
+  that comment false without touching the effect itself — `offlineStore`
+  resolving from `null` to a real value shortly after mount now also
+  changed `requestNextItem`'s identity, re-firing the "run once per
+  session" effect mid-flight and clobbering in-progress state. The fix
+  was keying that effect on `[session]` directly rather than through a
+  callback's identity as a proxy for it. When adding a dependency to a
+  `useCallback`, grep for every effect that lists it in a dependency array
+  and re-check whether that effect's own "when does this fire" comment
+  still holds — the callback's growing dependency list is invisible to
+  that effect's own deps array.
+- **The server-side idempotent-retry pattern for a queued/offline write:**
+  `decideOnItem` (`packages/db/src/review-decision-repository.ts`) inserts
+  with `ON CONFLICT (idempotency_key) DO NOTHING RETURNING id`; when that
+  returns zero rows, a helper (`outcomeForIdempotencyKey`) looks up the
+  already-recorded row and returns the same outcome the original request
+  would have — never a raw unique-violation, never a silent double-apply.
+  The client-side half of the contract: `apps/admin`'s offline queue
+  (`offline-store.ts`'s `PendingDecision.idempotencyKey`) generates the key
+  once, at queue time, and keeps reusing that same stored key across every
+  retry until the store confirms success — never a fresh key per attempt.
+  Both halves are required; either alone is not idempotent.
+- **A write that cannot be applied as the authoritative outcome is still
+  recorded, never dropped — with a positive flag, not an inference.**
+  When a queued offline decision reaches the server after its claim
+  expired and was reassigned, `decideOnItem` records it as an audit-only
+  second opinion (`review_decisions.decision_context = 'late_arrival'`,
+  migration `0016`) rather than either rejecting it or letting it
+  overwrite the item's real outcome. The reviewer who legitimately once
+  held the item (proved via `item_state_transitions`, not by trusting the
+  claim) always gets this outcome — a forged or never-held claim still
+  gets `not_claimed_by_you`. `decision_context` is a real column, not
+  derived from "no state transition happened," specifically so a later
+  query (7.11's inter-rater agreement) can select on it directly. See
+  `packages/shared/review-decision-policy.ts`'s `DecisionContext` doc
+  comment for the full reasoning.
 
 ## Content pipeline rules
 

@@ -34,6 +34,21 @@ export default tseslint.config(
     },
   },
   {
+    // The app-shell service worker (session 08) runs in
+    // ServiceWorkerGlobalScope, not the browser window — `self` is the
+    // global scope itself, distinct from apps/admin's own `window`/`document`
+    // block above.
+    files: ['apps/admin/public/sw.js'],
+    languageOptions: {
+      globals: {
+        self: 'readonly',
+        caches: 'readonly',
+        fetch: 'readonly',
+        URL: 'readonly',
+      },
+    },
+  },
+  {
     files: ['**/*.config.js', '**/*.config.cjs'],
     languageOptions: {
       globals: {

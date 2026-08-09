@@ -38,7 +38,14 @@ export default function ReviewPage() {
 
   return (
     <div className="flex h-dvh flex-col">
-      <ReviewHeader reviewedThisSession={flow.reviewedThisSession} />
+      <ReviewHeader
+        reviewedThisSession={flow.reviewedThisSession}
+        isOnline={flow.isOnline}
+        cachedItemCount={flow.cachedItemCount}
+        pendingDecisionCount={flow.pendingDecisionCount}
+        nextClaimExpiry={flow.nextClaimExpiry}
+        lateArrivalCount={flow.lateArrivalCount}
+      />
 
       {state.status === 'loading' && (
         <div className="flex flex-1 items-center justify-center text-sm text-gray-500">
@@ -57,6 +64,7 @@ export default function ReviewPage() {
           item={state.item}
           selected={state.selected}
           pending={state.pending}
+          queued={state.queued}
           onSelect={flow.selectOption}
           onSubmit={() => void flow.submitSolve()}
         />

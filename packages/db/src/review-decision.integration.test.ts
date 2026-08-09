@@ -256,6 +256,7 @@ describe.runIf(hasDatabase)('review decision endpoints', () => {
         itemId,
         status: 'approved_uncalibrated',
         approvalRoute: 'human_reviewed',
+        decisionContext: 'live',
       });
 
       const row = await client.query<{ status: string; approval_route: string }>(
@@ -294,7 +295,13 @@ describe.runIf(hasDatabase)('review decision endpoints', () => {
         edits: null,
       });
 
-      expect(result).toEqual({ ok: true, itemId, status: 'rejected', approvalRoute: null });
+      expect(result).toEqual({
+        ok: true,
+        itemId,
+        status: 'rejected',
+        approvalRoute: null,
+        decisionContext: 'live',
+      });
 
       const decisionRow = await client.query<{ rejection_reason: string }>(
         `SELECT rejection_reason FROM review_decisions WHERE item_id = $1`,
@@ -315,7 +322,13 @@ describe.runIf(hasDatabase)('review decision endpoints', () => {
         edits: null,
       });
 
-      expect(result).toEqual({ ok: true, itemId, status: 'escalated', approvalRoute: null });
+      expect(result).toEqual({
+        ok: true,
+        itemId,
+        status: 'escalated',
+        approvalRoute: null,
+        decisionContext: 'live',
+      });
     });
   });
 
@@ -406,6 +419,7 @@ describe.runIf(hasDatabase)('review decision endpoints', () => {
         itemId,
         status: 'needs_second_review',
         approvalRoute: null,
+        decisionContext: 'live',
       });
 
       // Second, independent reviewer picks it up from needs_second_review.
@@ -424,6 +438,7 @@ describe.runIf(hasDatabase)('review decision endpoints', () => {
         itemId,
         status: 'approved_uncalibrated',
         approvalRoute: 'human_reviewed',
+        decisionContext: 'live',
       });
 
       const decisionCount = await client.query(
@@ -431,6 +446,171 @@ describe.runIf(hasDatabase)('review decision endpoints', () => {
         [itemId],
       );
       expect(Number(decisionCount.rows[0]?.count)).toBe(2);
+    });
+  });
+
+  // -------------------------------------------------------------------------
+  // The offline workspace (session 08): a claim expires while the reviewer
+  // is offline, and their decision arrives after the item has already moved
+  // on. Never discarded, never overwrites the authoritative outcome.
+  // -------------------------------------------------------------------------
+
+  it('records a late-arriving decision as an audit-only second opinion, without touching the item’s current state', async () => {
+    await withWorld(async ({ world, fixtures, client, queue, decisions }) => {
+      const itemId = await fixtures.insertQueueItem(client, world, { riskTier: 'low' });
+
+      // First reviewer claims it, then goes offline — their claim expires
+      // with no decision ever reaching the server.
+      await queue.getNextItemBatch(world.reviewerId, 1, { random: neverGold });
+      await client.query(
+        `UPDATE review_claims SET claimed_at = now() - interval '2 hours', expires_at = now() - interval '1 minute' WHERE item_id = $1`,
+        [itemId],
+      );
+      expect(await queue.releaseExpiredClaims()).toBe(1);
+
+      // A second, independent reviewer claims and decides while the first
+      // is still offline — this is the authoritative decision.
+      await queue.getNextItemBatch(world.secondReviewerId, 1, { random: neverGold });
+      const authoritative = await decisions.decideOnItem(world.secondReviewerId, itemId, {
+        action: 'approve',
+        rejectionReason: null,
+        edits: null,
+      });
+      expect(authoritative).toEqual({
+        ok: true,
+        itemId,
+        status: 'approved_uncalibrated',
+        approvalRoute: 'human_reviewed',
+        decisionContext: 'live',
+      });
+
+      // The first reviewer reconnects and syncs the decision they made
+      // offline, against a claim that no longer exists.
+      const lateArrival = await decisions.decideOnItem(world.reviewerId, itemId, {
+        action: 'reject',
+        rejectionReason: 'wrong_key',
+        edits: null,
+        idempotencyKey: 'offline-decision-1',
+      });
+
+      expect(lateArrival).toEqual({
+        ok: true,
+        itemId,
+        // The item's current, unchanged status/route — not driven by this
+        // decision, just reported back so the client can display it.
+        status: 'approved_uncalibrated',
+        approvalRoute: 'human_reviewed',
+        decisionContext: 'late_arrival',
+      });
+
+      // The item itself never moved because of the late decision.
+      const item = await client.query<{ status: string; approval_route: string }>(
+        `SELECT status, approval_route FROM items WHERE id = $1`,
+        [itemId],
+      );
+      expect(item.rows[0]).toEqual({
+        status: 'approved_uncalibrated',
+        approval_route: 'human_reviewed',
+      });
+
+      // Both decisions are on the record — the second reviewer's live
+      // approval was never overwritten.
+      const rows = await client.query<{
+        reviewer_id: number;
+        action: string;
+        decision_context: string;
+      }>(
+        `SELECT reviewer_id, action, decision_context FROM review_decisions
+          WHERE item_id = $1 ORDER BY created_at`,
+        [itemId],
+      );
+      expect(rows.rows).toEqual([
+        { reviewer_id: world.secondReviewerId, action: 'approve', decision_context: 'live' },
+        { reviewer_id: world.reviewerId, action: 'reject', decision_context: 'late_arrival' },
+      ]);
+    });
+  });
+
+  it('still refuses a decision from a reviewer who never held the item at all', async () => {
+    await withWorld(async ({ world, fixtures, client, decisions }) => {
+      const itemId = await fixtures.insertQueueItem(client, world, { riskTier: 'low' });
+      // Nobody has ever claimed it, so there is no legitimate late arrival.
+      const result = await decisions.decideOnItem(world.reviewerId, itemId, {
+        action: 'approve',
+        rejectionReason: null,
+        edits: null,
+      });
+      expect(result).toEqual({ ok: false, reason: 'not_claimed_by_you' });
+    });
+  });
+
+  it('uploading the same decision three times produces exactly one row', async () => {
+    await withWorld(async ({ world, fixtures, client, queue, decisions }) => {
+      const itemId = await fixtures.insertQueueItem(client, world, { riskTier: 'low' });
+      await queue.getNextItemBatch(world.reviewerId, 1, { random: neverGold });
+
+      const input = {
+        action: 'approve' as const,
+        rejectionReason: null,
+        edits: null,
+        idempotencyKey: 'retry-key-1',
+      };
+
+      const first = await decisions.decideOnItem(world.reviewerId, itemId, input);
+      const second = await decisions.decideOnItem(world.reviewerId, itemId, input);
+      const third = await decisions.decideOnItem(world.reviewerId, itemId, input);
+
+      expect(first).toEqual(second);
+      expect(second).toEqual(third);
+      expect(first).toEqual({
+        ok: true,
+        itemId,
+        status: 'approved_uncalibrated',
+        approvalRoute: 'human_reviewed',
+        decisionContext: 'live',
+      });
+
+      const count = await client.query('SELECT count(*) FROM review_decisions WHERE item_id = $1', [
+        itemId,
+      ]);
+      expect(Number(count.rows[0]?.count)).toBe(1);
+    });
+  });
+
+  it('a retried late-arrival decision also produces exactly one audit row', async () => {
+    await withWorld(async ({ world, fixtures, client, queue, decisions }) => {
+      const itemId = await fixtures.insertQueueItem(client, world, { riskTier: 'low' });
+      await queue.getNextItemBatch(world.reviewerId, 1, { random: neverGold });
+      await client.query(
+        `UPDATE review_claims SET claimed_at = now() - interval '2 hours', expires_at = now() - interval '1 minute' WHERE item_id = $1`,
+        [itemId],
+      );
+      await queue.releaseExpiredClaims();
+      await queue.getNextItemBatch(world.secondReviewerId, 1, { random: neverGold });
+      await decisions.decideOnItem(world.secondReviewerId, itemId, {
+        action: 'approve',
+        rejectionReason: null,
+        edits: null,
+      });
+
+      const input = {
+        action: 'reject' as const,
+        rejectionReason: 'wrong_key' as const,
+        edits: null,
+        idempotencyKey: 'offline-decision-retry-1',
+      };
+
+      const first = await decisions.decideOnItem(world.reviewerId, itemId, input);
+      const second = await decisions.decideOnItem(world.reviewerId, itemId, input);
+
+      expect(first).toEqual(second);
+      expect(first).toMatchObject({ ok: true, decisionContext: 'late_arrival' });
+
+      const count = await client.query(
+        `SELECT count(*) FROM review_decisions WHERE item_id = $1 AND reviewer_id = $2`,
+        [itemId, world.reviewerId],
+      );
+      expect(Number(count.rows[0]?.count)).toBe(1);
     });
   });
 });

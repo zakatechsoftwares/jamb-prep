@@ -53,6 +53,7 @@ function startApp(service: Partial<ReviewDecisionService>): {
             itemId,
             status: 'approved_uncalibrated',
             approvalRoute: null,
+            decisionContext: 'live',
           })
         );
       },
@@ -247,6 +248,7 @@ describe('POST /review/:itemId/decide', () => {
         itemId: 9,
         status: 'approved_uncalibrated',
         approvalRoute: 'human_reviewed',
+        decisionContext: 'live',
       }),
     });
 
@@ -262,6 +264,7 @@ describe('POST /review/:itemId/decide', () => {
       itemId: 9,
       status: 'approved_uncalibrated',
       approvalRoute: 'human_reviewed',
+      decisionContext: 'live',
     });
     expect(recorded.decideCalls[0]?.input).toMatchObject({ action: 'approve' });
   });
@@ -296,7 +299,13 @@ describe('POST /review/:itemId/decide', () => {
 
   it('accepts a reject with a valid structured reason', async () => {
     const { url } = run({
-      decideOnItem: async () => ({ ok: true, itemId: 9, status: 'rejected', approvalRoute: null }),
+      decideOnItem: async () => ({
+        ok: true,
+        itemId: 9,
+        status: 'rejected',
+        approvalRoute: null,
+        decisionContext: 'live',
+      }),
     });
 
     const response = await fetch(`${url}/review/9/decide`, {
@@ -349,6 +358,7 @@ describe('POST /review/:itemId/decide', () => {
         itemId: 9,
         status: 'approved_uncalibrated',
         approvalRoute: 'human_reviewed',
+        decisionContext: 'live',
       }),
     });
 
