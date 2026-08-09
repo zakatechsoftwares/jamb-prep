@@ -20,7 +20,7 @@ export function createReviewQueueRouter(service: ReviewQueueService): Router {
     const reviewerId = resolveReviewerId(req);
 
     if (reviewerId === null) {
-      res.status(400).json({ error: 'reviewerId must be a positive integer' });
+      res.status(401).json({ error: 'authentication required' });
       return;
     }
 
@@ -44,7 +44,7 @@ export function createReviewQueueRouter(service: ReviewQueueService): Router {
     const count = parsePositiveInteger(req.query.count);
 
     if (reviewerId === null) {
-      res.status(400).json({ error: 'reviewerId must be a positive integer' });
+      res.status(401).json({ error: 'authentication required' });
       return;
     }
 

@@ -1,8 +1,21 @@
 import { afterAll, describe, expect, it } from 'vitest';
 import type { ReviewQueueItem, ReviewQueueService } from '@jamb/shared';
+import { signSessionToken } from '@jamb/db/session-tokens';
 import { createApp } from '../app';
 
+process.env.REVIEWER_SESSION_SECRET ??= 'test-secret-do-not-use-in-prod';
+
 const CLAIM_EXPIRY = new Date('2026-05-01T09:30:00.000Z');
+
+function authHeader(reviewerId: number, role: 'reviewer' | 'moderator' = 'reviewer') {
+  const token = signSessionToken(
+    { reviewerId, role },
+    process.env.REVIEWER_SESSION_SECRET!,
+    new Date(),
+    60,
+  );
+  return { Authorization: `Bearer ${token}` };
+}
 
 function item(itemId: number): ReviewQueueItem {
   return {
@@ -84,7 +97,7 @@ describe('GET /review/next', () => {
   it('serves the one item the queue assigns', async () => {
     const { url } = startApp({ getNextItem: async () => item(42) });
 
-    const response = await fetch(`${url}/review/next?reviewerId=3`);
+    const response = await fetch(`${url}/review/next`, { headers: authHeader(3) });
     const body = await readJson<{ itemId: number; stem: string; claimExpiresAt: string }>(response);
 
     expect(response.status).toBe(200);
@@ -98,7 +111,7 @@ describe('GET /review/next', () => {
     // present and merely not rendered.
     const { url } = startApp({ getNextItem: async () => item(42) });
 
-    const response = await fetch(`${url}/review/next?reviewerId=3`);
+    const response = await fetch(`${url}/review/next`, { headers: authHeader(3) });
     const body = await readJson<{ options: Record<string, unknown>[] }>(response);
 
     expect(JSON.stringify(body)).not.toMatch(/is_correct|isCorrect|correctOption/i);
@@ -110,18 +123,26 @@ describe('GET /review/next', () => {
   it('says nothing rather than an error when the queue is drained', async () => {
     const { url } = startApp({ getNextItem: async () => null });
 
-    const response = await fetch(`${url}/review/next?reviewerId=3`);
+    const response = await fetch(`${url}/review/next`, { headers: authHeader(3) });
 
     expect(response.status).toBe(204);
   });
 
-  it('rejects a missing or malformed reviewerId', async () => {
+  it('rejects a request with no session', async () => {
     const { url } = startApp({});
 
-    expect((await fetch(`${url}/review/next`)).status).toBe(400);
-    expect((await fetch(`${url}/review/next?reviewerId=nonsense`)).status).toBe(400);
-    expect((await fetch(`${url}/review/next?reviewerId=-2`)).status).toBe(400);
-    expect((await fetch(`${url}/review/next?reviewerId=1.5`)).status).toBe(400);
+    expect((await fetch(`${url}/review/next`)).status).toBe(401);
+  });
+
+  it('rejects a malformed or invalid bearer token', async () => {
+    const { url } = startApp({});
+
+    expect(
+      (await fetch(`${url}/review/next`, { headers: { Authorization: 'Bearer nonsense' } })).status,
+    ).toBe(401);
+    expect(
+      (await fetch(`${url}/review/next`, { headers: { Authorization: 'nonsense' } })).status,
+    ).toBe(401);
   });
 
   it('offers no way to browse, filter or choose', async () => {
@@ -130,12 +151,14 @@ describe('GET /review/next', () => {
     const { url, recorded } = startApp({ getNextItem: async () => item(1) });
 
     for (const path of ['/review', '/review/items', '/review/queue', '/review/list']) {
-      expect((await fetch(`${url}${path}`)).status).toBe(404);
+      expect((await fetch(`${url}${path}`, { headers: authHeader(1) })).status).toBe(404);
     }
 
     // A filter smuggled onto the assign endpoint is simply ignored: the
     // reviewer gets whatever the queue decides, not what they asked for.
-    const filtered = await fetch(`${url}/review/next?reviewerId=1&riskTier=high&subjectId=9`);
+    const filtered = await fetch(`${url}/review/next?riskTier=high&subjectId=9`, {
+      headers: authHeader(1),
+    });
     expect(filtered.status).toBe(200);
 
     // The one call that did reach the service carried nothing but the
@@ -150,7 +173,7 @@ describe('GET /review/next-batch', () => {
       getNextItemBatch: async () => [item(1), item(2), item(3)],
     });
 
-    const response = await fetch(`${url}/review/next-batch?reviewerId=3&count=3`);
+    const response = await fetch(`${url}/review/next-batch?count=3`, { headers: authHeader(3) });
     const body = await readJson<{ items: { itemId: number }[] }>(response);
 
     expect(response.status).toBe(200);
@@ -161,7 +184,7 @@ describe('GET /review/next-batch', () => {
   it('returns an empty batch rather than an error when nothing is queued', async () => {
     const { url } = startApp({ getNextItemBatch: async () => [] });
 
-    const response = await fetch(`${url}/review/next-batch?reviewerId=3&count=5`);
+    const response = await fetch(`${url}/review/next-batch?count=5`, { headers: authHeader(3) });
 
     expect(response.status).toBe(200);
     expect(await response.json()).toEqual({ items: [] });
@@ -170,9 +193,19 @@ describe('GET /review/next-batch', () => {
   it('rejects a missing or malformed count', async () => {
     const { url } = startApp({});
 
-    expect((await fetch(`${url}/review/next-batch?reviewerId=3`)).status).toBe(400);
-    expect((await fetch(`${url}/review/next-batch?reviewerId=3&count=0`)).status).toBe(400);
-    expect((await fetch(`${url}/review/next-batch?reviewerId=3&count=many`)).status).toBe(400);
+    expect((await fetch(`${url}/review/next-batch`, { headers: authHeader(3) })).status).toBe(400);
+    expect(
+      (await fetch(`${url}/review/next-batch?count=0`, { headers: authHeader(3) })).status,
+    ).toBe(400);
+    expect(
+      (await fetch(`${url}/review/next-batch?count=many`, { headers: authHeader(3) })).status,
+    ).toBe(400);
+  });
+
+  it('rejects a request with no session, before even checking count', async () => {
+    const { url } = startApp({});
+
+    expect((await fetch(`${url}/review/next-batch?count=3`)).status).toBe(401);
   });
 });
 

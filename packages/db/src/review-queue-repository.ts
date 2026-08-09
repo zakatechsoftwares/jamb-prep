@@ -13,6 +13,9 @@ import {
 } from '@jamb/shared';
 import { pool } from './client';
 import { firstRow } from './first-row';
+import { ReviewerNotActiveError } from './reviewer-errors';
+
+export { ReviewerNotActiveError } from './reviewer-errors';
 
 /**
  * The priority bands from plan 7.9, in SQL. This must stay identical to
@@ -111,9 +114,7 @@ export async function loadReviewer(
   const reviewer = firstRow(result);
 
   if (reviewer.status !== 'active') {
-    throw new Error(
-      `getNextItem: reviewer ${reviewerId} is '${reviewer.status}', not active — only an activated reviewer is served items (7.8)`,
-    );
+    throw new ReviewerNotActiveError(reviewerId, reviewer.status);
   }
 
   return reviewer;

@@ -1,0 +1,11 @@
+-- Minimal login credential for the reviewer panel (build log BLOCKING item
+-- B1). Not full account management: no self-service signup, no password
+-- reset flow. A reviewer's password is provisioned out of band (see
+-- setReviewerPassword in reviewer-auth-repository.ts) until that later work
+-- exists.
+--
+-- Nullable, deliberately: a reviewer row can exist (applied, calibrating)
+-- before a password is ever set, and login must reject that reviewer
+-- cleanly rather than the column having to be backfilled with a placeholder
+-- to satisfy a NOT NULL constraint.
+ALTER TABLE reviewers ADD COLUMN password_hash TEXT;

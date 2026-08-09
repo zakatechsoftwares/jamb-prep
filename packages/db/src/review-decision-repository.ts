@@ -12,6 +12,8 @@ import {
   type ItemSnapshot,
   type ItemStatus,
   type OptionLabel,
+  type ResolveEscalationInput,
+  type ResolveEscalationOutcome,
   type RevealOutcome,
   type RiskTier,
   type SolveOutcome,
@@ -255,6 +257,92 @@ export async function decideOnItem(
       item.status,
       transitionResult.status,
       'reviewer_decided',
+      transitionResult.actorUserId,
+      reviewer.role,
+      transitionResult.occurredAt,
+      transitionResult.approvalRoute,
+    );
+
+    return {
+      ok: true,
+      itemId,
+      status: transitionResult.status,
+      approvalRoute: transitionResult.approvalRoute,
+    };
+  });
+}
+
+/**
+ * A moderator's ruling on an item in `escalated` (session 04's guard 5).
+ * Deliberately separate from `decideOnItem` rather than a mode of it: there
+ * is no claim to check (a moderator does not claim the queue's way in), no
+ * blind answer, no idempotency key, no `edit_and_approve`. `transition()`'s
+ * own guards — only a moderator, never on your own contribution — are the
+ * authority here exactly as they are for `decideOnItem`; `requireModerator`
+ * in `apps/api` is a cheap up-front gate, not a substitute for them, which
+ * is why a non-moderator caller reaching this function directly is still
+ * refused.
+ */
+export async function resolveEscalation(
+  reviewerId: number,
+  itemId: number,
+  input: ResolveEscalationInput,
+): Promise<ResolveEscalationOutcome> {
+  return withTransaction(async (client) => {
+    const reviewer = await loadReviewer(client, reviewerId);
+
+    const item = firstRow(
+      await client.query<{
+        status: ItemStatus;
+        contributor_id: number | null;
+        risk_tier: RiskTier;
+        independent_solve_verdict: IndependentSolveVerdict;
+        sampled_for_review: boolean;
+      }>(
+        `SELECT status, contributor_id, risk_tier, independent_solve_verdict, sampled_for_review
+           FROM items WHERE id = $1 FOR UPDATE`,
+        [itemId],
+      ),
+    );
+
+    const occurredAt = new Date();
+
+    let transitionResult;
+    try {
+      transitionResult = transition(
+        item.status,
+        { type: 'moderator_ruled', action: input.action },
+        {
+          item: {
+            contributorUserId: item.contributor_id,
+            riskTier: item.risk_tier,
+            independentSolveVerdict: item.independent_solve_verdict,
+            sampledForReview: item.sampled_for_review,
+          },
+          actor: { userId: reviewer.user_id, role: reviewer.role },
+          occurredAt,
+          priorDecisions: [],
+        },
+      );
+    } catch (error) {
+      return {
+        ok: false,
+        reason: 'invalid_transition',
+        message: error instanceof Error ? error.message : String(error),
+      };
+    }
+
+    await client.query(
+      `UPDATE items SET status = $2, approval_route = COALESCE($3, approval_route) WHERE id = $1`,
+      [itemId, transitionResult.status, transitionResult.approvalRoute],
+    );
+
+    await recordTransition(
+      client,
+      itemId,
+      item.status,
+      transitionResult.status,
+      'moderator_ruled',
       transitionResult.actorUserId,
       reviewer.role,
       transitionResult.occurredAt,

@@ -9,3 +9,4 @@ export * from './item-lifecycle';
 export * from './item-state-machine';
 export * from './review-queue-policy';
 export * from './review-decision-policy';
+export * from './reviewer-auth-policy';
