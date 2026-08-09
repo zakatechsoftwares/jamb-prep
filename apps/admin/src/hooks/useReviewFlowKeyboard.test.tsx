@@ -51,9 +51,16 @@ function useReviewFlowKeyboardTestSubject() {
 }
 
 function wrapperWith(apiClient: Partial<ApiClient>) {
+  // The reconnect effect (session 08) always calls getNextItemBatch once a
+  // session exists — default it so tests written before that don't need to
+  // know about it.
+  const merged: Partial<ApiClient> = {
+    getNextItemBatch: async () => ({ ok: true, items: [] }),
+    ...apiClient,
+  };
   return function Wrapper({ children }: { children: ReactNode }) {
     return (
-      <AuthProvider apiClient={apiClient as ApiClient} initialSession={SESSION}>
+      <AuthProvider apiClient={merged as ApiClient} initialSession={SESSION}>
         {children}
       </AuthProvider>
     );

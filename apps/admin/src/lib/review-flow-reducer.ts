@@ -39,6 +39,14 @@ export type ReviewFlowState =
       status: 'solving';
       item: ReviewQueueItem;
       selected: OptionLabel | null;
+      /**
+       * A blind answer for a high-tier item, recorded locally while offline
+       * (8.3) and not yet uploaded — reveal stays online-only (7.10's
+       * anti-anchoring control lives at the server, not in this reducer),
+       * so there is nowhere to advance to until reconnection resolves this
+       * via the ordinary `itemRevealed` or `requestFailed` events.
+       */
+      queued: boolean;
     })
   | (ReviewFlowStateCommon & { status: 'deciding'; item: ReviewQueueItem; reveal: RevealResult })
   | (ReviewFlowStateCommon & {
@@ -61,6 +69,7 @@ export type ReviewFlowEvent =
   | { type: 'itemRevealed'; item: ReviewQueueItem; reveal: RevealResult }
   | { type: 'selectOption'; option: OptionLabel }
   | { type: 'solveSubmitted' }
+  | { type: 'blindAnswerQueued' }
   | { type: 'startReject' }
   | { type: 'startEdit' }
   | { type: 'updateDraft'; patch: ItemEditDraftPatch }
@@ -90,7 +99,7 @@ export function reduceReviewFlow(state: ReviewFlowState, event: ReviewFlowEvent)
       return { status: 'empty', pending: false };
 
     case 'itemNeedsSolve':
-      return { status: 'solving', pending: false, item: event.item, selected: null };
+      return { status: 'solving', pending: false, item: event.item, selected: null, queued: false };
 
     case 'itemRevealed':
       return { status: 'deciding', pending: false, item: event.item, reveal: event.reveal };
@@ -99,6 +108,11 @@ export function reduceReviewFlow(state: ReviewFlowState, event: ReviewFlowEvent)
       if (state.status !== 'solving') {
         throw new Error(
           `reduceReviewFlow: selectOption is only valid while solving, not ${state.status}`,
+        );
+      }
+      if (state.queued) {
+        throw new Error(
+          'reduceReviewFlow: selectOption is not valid once the blind answer has already been queued for upload',
         );
       }
       return { ...state, selected: event.option };
@@ -114,7 +128,20 @@ export function reduceReviewFlow(state: ReviewFlowState, event: ReviewFlowEvent)
           'reduceReviewFlow: solveSubmitted requires an option to already be selected',
         );
       }
+      if (state.queued) {
+        throw new Error(
+          'reduceReviewFlow: solveSubmitted is not valid once the blind answer has already been queued for upload',
+        );
+      }
       return { ...state, pending: true };
+
+    case 'blindAnswerQueued':
+      if (state.status !== 'solving') {
+        throw new Error(
+          `reduceReviewFlow: blindAnswerQueued is only valid while solving, not ${state.status}`,
+        );
+      }
+      return { ...state, pending: false, queued: true };
 
     case 'startReject':
       if (state.status !== 'deciding') {

@@ -134,6 +134,74 @@ describe('getNextItem', () => {
   });
 });
 
+describe('getNextItemBatch', () => {
+  const ITEM_BODY = {
+    itemId: 42,
+    subjectId: 1,
+    objectiveId: 7,
+    stem: 'What is the SI unit of force?',
+    options: [
+      { label: 'A', text: 'newton' },
+      { label: 'B', text: 'joule' },
+      { label: 'C', text: 'watt' },
+      { label: 'D', text: 'pascal' },
+    ],
+    cognitiveLevel: 'recall',
+    independentSolveVerdict: 'agreed',
+    claimExpiresAt: '2026-08-09T10:00:00.000Z',
+  };
+
+  it('requests the given count and parses claimExpiresAt for every item', async () => {
+    const { fetchImpl, calls } = fakeFetch([
+      { status: 200, body: { items: [ITEM_BODY, { ...ITEM_BODY, itemId: 43 }] } },
+    ]);
+    const client = createApiClient(fetchImpl);
+
+    const result = await client.getNextItemBatch('tok123', 2);
+
+    expect(calls[0]).toMatchObject({
+      url: '/api/review/next-batch?count=2',
+      method: 'GET',
+      headers: { authorization: 'Bearer tok123' },
+    });
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.items).toHaveLength(2);
+      expect(result.items[0]?.claimExpiresAt).toBeInstanceOf(Date);
+      expect(result.items.map((item) => item.itemId)).toEqual([42, 43]);
+    }
+  });
+
+  it('reports an empty batch as an empty array, not an error', async () => {
+    const { fetchImpl } = fakeFetch([{ status: 200, body: { items: [] } }]);
+    const client = createApiClient(fetchImpl);
+
+    expect(await client.getNextItemBatch('tok123', 5)).toEqual({ ok: true, items: [] });
+  });
+
+  it('reports unauthorized on 401', async () => {
+    const { fetchImpl } = fakeFetch([{ status: 401, body: {} }]);
+    const client = createApiClient(fetchImpl);
+
+    expect(await client.getNextItemBatch('bad-token', 5)).toEqual({
+      ok: false,
+      reason: 'unauthorized',
+    });
+  });
+
+  it('reports request_failed when the network call itself throws', async () => {
+    const fetchImpl: FetchImpl = async () => {
+      throw new Error('offline');
+    };
+    const client = createApiClient(fetchImpl);
+
+    expect(await client.getNextItemBatch('tok123', 5)).toMatchObject({
+      ok: false,
+      reason: 'request_failed',
+    });
+  });
+});
+
 describe('submitSolve', () => {
   it('posts the answer with the bearer token', async () => {
     const { fetchImpl, calls } = fakeFetch([{ status: 200, body: { itemId: 9, answer: 'B' } }]);
@@ -220,7 +288,12 @@ describe('decide', () => {
     const { fetchImpl, calls } = fakeFetch([
       {
         status: 200,
-        body: { itemId: 9, status: 'approved_uncalibrated', approvalRoute: 'human_reviewed' },
+        body: {
+          itemId: 9,
+          status: 'approved_uncalibrated',
+          approvalRoute: 'human_reviewed',
+          decisionContext: 'live',
+        },
       },
     ]);
     const client = createApiClient(fetchImpl);
@@ -238,7 +311,65 @@ describe('decide', () => {
       itemId: 9,
       status: 'approved_uncalibrated',
       approvalRoute: 'human_reviewed',
+      decisionContext: 'live',
     });
+  });
+
+  it('reports decisionContext late_arrival distinctly, for a decision synced after its claim expired', async () => {
+    const { fetchImpl } = fakeFetch([
+      {
+        status: 200,
+        body: {
+          itemId: 9,
+          status: 'approved_uncalibrated',
+          approvalRoute: 'human_reviewed',
+          decisionContext: 'late_arrival',
+        },
+      },
+    ]);
+    const client = createApiClient(fetchImpl);
+
+    const result = await client.decide('tok123', 9, { action: 'reject', rejectionReason: 'wrong_key' });
+
+    expect(result).toMatchObject({ ok: true, decisionContext: 'late_arrival' });
+  });
+
+  it('includes a supplied idempotency key in the request body', async () => {
+    const { fetchImpl, calls } = fakeFetch([
+      {
+        status: 200,
+        body: {
+          itemId: 9,
+          status: 'approved_uncalibrated',
+          approvalRoute: 'human_reviewed',
+          decisionContext: 'live',
+        },
+      },
+    ]);
+    const client = createApiClient(fetchImpl);
+
+    await client.decide('tok123', 9, { action: 'approve' }, 'queued-decision-1');
+
+    expect(calls[0]?.body).toEqual({ action: 'approve', idempotencyKey: 'queued-decision-1' });
+  });
+
+  it('omits idempotencyKey from the body when none is supplied', async () => {
+    const { fetchImpl, calls } = fakeFetch([
+      {
+        status: 200,
+        body: {
+          itemId: 9,
+          status: 'approved_uncalibrated',
+          approvalRoute: 'human_reviewed',
+          decisionContext: 'live',
+        },
+      },
+    ]);
+    const client = createApiClient(fetchImpl);
+
+    await client.decide('tok123', 9, { action: 'approve' });
+
+    expect(calls[0]?.body).toEqual({ action: 'approve' });
   });
 
   it('sends a structured rejection reason for reject', async () => {

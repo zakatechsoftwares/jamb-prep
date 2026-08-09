@@ -37,6 +37,7 @@ function startApp(service: Partial<ReviewEscalationService>): {
             itemId,
             status: 'approved_uncalibrated',
             approvalRoute: 'moderator_ruled',
+            decisionContext: 'live',
           })
         );
       },
@@ -79,6 +80,7 @@ describe('POST /review/:itemId/resolve-escalation', () => {
         itemId: 9,
         status: 'approved_uncalibrated',
         approvalRoute: 'moderator_ruled',
+        decisionContext: 'live',
       }),
     });
 
@@ -107,6 +109,7 @@ describe('POST /review/:itemId/resolve-escalation', () => {
         itemId: 9,
         status: 'rejected',
         approvalRoute: null,
+        decisionContext: 'live',
       }),
     });
 

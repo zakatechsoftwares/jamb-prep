@@ -1,5 +1,6 @@
 import type {
   ApprovalRoute,
+  DecisionContext,
   ItemEditPatch,
   ItemStatus,
   OptionLabel,
@@ -93,6 +94,11 @@ export type GetNextItemOutcome =
   | { ok: false; reason: 'unauthorized' }
   | { ok: false; reason: 'request_failed'; message: string };
 
+export type GetNextItemBatchOutcome =
+  | { ok: true; items: ReviewQueueItem[] }
+  | { ok: false; reason: 'unauthorized' }
+  | { ok: false; reason: 'request_failed'; message: string };
+
 export type SubmitSolveOutcome =
   | { ok: true; itemId: number; answer: OptionLabel }
   | { ok: false; reason: 'unauthorized' }
@@ -112,7 +118,13 @@ export type DecideRequestInput =
   | { action: 'edit_and_approve'; edits: ItemEditPatch };
 
 export type DecideOutcome =
-  | { ok: true; itemId: number; status: ItemStatus; approvalRoute: ApprovalRoute | null }
+  | {
+      ok: true;
+      itemId: number;
+      status: ItemStatus;
+      approvalRoute: ApprovalRoute | null;
+      decisionContext: DecisionContext;
+    }
   | { ok: false; reason: 'unauthorized' }
   | { ok: false; reason: 'not_claimed_by_you' }
   | { ok: false; reason: 'invalid_transition'; message: string }
@@ -121,9 +133,21 @@ export type DecideOutcome =
 export interface ApiClient {
   login(emailOrPhone: string, password: string): Promise<LoginOutcome>;
   getNextItem(token: string): Promise<GetNextItemOutcome>;
+  getNextItemBatch(token: string, count: number): Promise<GetNextItemBatchOutcome>;
   submitSolve(token: string, itemId: number, answer: OptionLabel): Promise<SubmitSolveOutcome>;
   reveal(token: string, itemId: number): Promise<RevealOutcome>;
-  decide(token: string, itemId: number, input: DecideRequestInput): Promise<DecideOutcome>;
+  /**
+   * `idempotencyKey` is what makes a queued offline decision safe to retry
+   * (8.3) — omit it for an ordinary live decide, where each call is its own
+   * new request and the server generates one that only that one request
+   * can ever use.
+   */
+  decide(
+    token: string,
+    itemId: number,
+    input: DecideRequestInput,
+    idempotencyKey?: string,
+  ): Promise<DecideOutcome>;
 }
 
 /** `baseUrl` defaults to the same-origin proxy path — see next.config.mjs's rewrite. */
@@ -162,6 +186,19 @@ export function createApiClient(fetchImpl: FetchImpl, baseUrl = '/api/review'): 
         return { ok: true, item: null };
       }
       return { ok: true, item: toQueueItem(response.body as unknown as WireQueueItem) };
+    },
+
+    async getNextItemBatch(token, count) {
+      const response = await call(fetchImpl, 'GET', `${baseUrl}/next-batch?count=${count}`, token);
+
+      if (response.status === 0) {
+        return { ok: false, reason: 'request_failed', message: 'could not reach the server' };
+      }
+      if (response.status === 401) {
+        return { ok: false, reason: 'unauthorized' };
+      }
+      const items = (response.body?.items as unknown as WireQueueItem[] | undefined) ?? [];
+      return { ok: true, items: items.map(toQueueItem) };
     },
 
     async submitSolve(token, itemId, answer) {
@@ -208,8 +245,9 @@ export function createApiClient(fetchImpl: FetchImpl, baseUrl = '/api/review'): 
       };
     },
 
-    async decide(token, itemId, input) {
-      const response = await call(fetchImpl, 'POST', `${baseUrl}/${itemId}/decide`, token, input);
+    async decide(token, itemId, input, idempotencyKey) {
+      const body = idempotencyKey === undefined ? input : { ...input, idempotencyKey };
+      const response = await call(fetchImpl, 'POST', `${baseUrl}/${itemId}/decide`, token, body);
 
       if (response.status === 0) {
         return { ok: false, reason: 'request_failed', message: 'could not reach the server' };
@@ -223,6 +261,7 @@ export function createApiClient(fetchImpl: FetchImpl, baseUrl = '/api/review'): 
           itemId: response.body?.itemId as number,
           status: response.body?.status as ItemStatus,
           approvalRoute: (response.body?.approvalRoute as ApprovalRoute | null) ?? null,
+          decisionContext: response.body?.decisionContext as DecisionContext,
         };
       }
       if (errorReason(response, '') === 'invalid_transition') {

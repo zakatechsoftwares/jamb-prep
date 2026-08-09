@@ -106,4 +106,40 @@ describe('SolveStep', () => {
     );
     expect(screen.getByRole('button', { name: /submit/i }).hasAttribute('disabled')).toBe(true);
   });
+
+  describe('queued offline (session 08)', () => {
+    it('shows a queued notice and disables further input, since reveal stays online-only', () => {
+      render(
+        <SolveStep
+          item={ITEM}
+          selected="A"
+          pending={false}
+          queued
+          onSelect={() => {}}
+          onSubmit={() => {}}
+        />,
+      );
+
+      expect(screen.getByText(/queued/i)).toBeTruthy();
+      expect(screen.getByRole('button', { name: /submit/i }).hasAttribute('disabled')).toBe(true);
+      for (const option of ITEM.options) {
+        expect(screen.getByRole('button', { name: new RegExp(option.text) }).hasAttribute('disabled')).toBe(
+          true,
+        );
+      }
+    });
+
+    it('does not show the queued notice when not queued', () => {
+      render(
+        <SolveStep
+          item={ITEM}
+          selected="A"
+          pending={false}
+          onSelect={() => {}}
+          onSubmit={() => {}}
+        />,
+      );
+      expect(screen.queryByText(/queued/i)).toBeNull();
+    });
+  });
 });

@@ -5,8 +5,10 @@ import {
   buildItemEditDiff,
   canReveal,
   transition,
+  type ApprovalRoute,
   type DecideInput,
   type DecideOutcome,
+  type DecisionContext,
   type IndependentSolveVerdict,
   type ItemEditDiff,
   type ItemSnapshot,
@@ -131,13 +133,82 @@ export async function revealItem(reviewerId: number, itemId: number): Promise<Re
 const OPTION_LABEL_ORDER: readonly OptionLabel[] = ['A', 'B', 'C', 'D'];
 
 /**
+ * Whether `userId` (a reviewer's `users.id`, not `reviewers.id`) ever held a
+ * claim on this item — the audit trail records every 'claimed' transition
+ * permanently, unlike `review_claims`, which is keyed on `item_id` alone and
+ * gets overwritten the moment the item is reassigned. This is what lets
+ * `decideOnItem` tell a genuine late-arriving decision (offline workspace,
+ * 8.3: this reviewer really did have the item, just too late) apart from a
+ * forged one (this reviewer never touched it at all).
+ */
+async function everClaimedByReviewer(
+  client: PoolClient,
+  itemId: number,
+  userId: number,
+): Promise<boolean> {
+  const result = await client.query(
+    `SELECT 1 FROM item_state_transitions
+      WHERE item_id = $1 AND event = 'claimed' AND actor_user_id = $2
+      LIMIT 1`,
+    [itemId, userId],
+  );
+  return (result.rowCount ?? 0) > 0;
+}
+
+/**
+ * A retry of an already-recorded decision (8.3's idempotency discipline —
+ * the offline workspace may upload the same queued decision more than
+ * once). Returns the outcome exactly as it was the first time, reading the
+ * item's current row rather than anything cached from the original
+ * request, since a live decision's status could only be this row's status
+ * anyway and a late-arrival's never depended on it.
+ */
+async function outcomeForIdempotencyKey(
+  client: PoolClient,
+  idempotencyKey: string,
+): Promise<DecideOutcome> {
+  const existing = firstRow(
+    await client.query<{ item_id: number; decision_context: DecisionContext }>(
+      `SELECT item_id, decision_context FROM review_decisions WHERE idempotency_key = $1`,
+      [idempotencyKey],
+    ),
+  );
+  const item = firstRow(
+    await client.query<{ status: ItemStatus; approval_route: ApprovalRoute | null }>(
+      `SELECT status, approval_route FROM items WHERE id = $1`,
+      [existing.item_id],
+    ),
+  );
+  return {
+    ok: true,
+    itemId: existing.item_id,
+    status: item.status,
+    approvalRoute: item.approval_route,
+    decisionContext: existing.decision_context,
+  };
+}
+
+/**
  * Records one of the four review actions (7.9) and drives the resulting
  * state transition, in the same transaction as any `edit_and_approve`
- * patch. Requires the caller to currently hold a live claim on the item —
- * a decision is not a thing to make on an item you were never assigned.
+ * patch. Ordinarily requires the caller to currently hold a live claim on
+ * the item — a decision is not a thing to make on an item you were never
+ * assigned.
  *
- * `transition()`'s guards (self-review, deciding twice, an item that isn't
- * actually awaiting this kind of decision) are reported as
+ * The one exception is the offline workspace's late-arrival case (8.3): a
+ * decision queued while offline can reach the server after its claim
+ * expired and was reassigned. Rather than reject it outright, a reviewer
+ * who can prove (via `everClaimedByReviewer`) they genuinely held the item
+ * gets it recorded as an audit-only `decision_context: 'late_arrival'` row
+ * — no state transition, no `items` write, no touching whichever claim or
+ * decision belongs to the item's current holder. `transition()`'s guards
+ * (self-review, deciding twice) are therefore not evaluated for a
+ * late-arrival, since nothing is transitioning; a late-arrival is always
+ * accepted once ownership is proven, which is a known, deliberately narrow
+ * simplification, not an oversight.
+ *
+ * `transition()`'s guards on the live path (self-review, deciding twice, an
+ * item that isn't actually awaiting this kind of decision) are reported as
  * `invalid_transition` rather than allowed to throw past this function:
  * they are conflicts with the item's current state, not caller bugs, and
  * the router turns this into 409 rather than 500.
@@ -157,10 +228,18 @@ export async function decideOnItem(
       [itemId, reviewer.reviewer_id],
     );
 
+    let reviewerAnswer: OptionLabel | null = null;
+    let claimedAt: Date | null = null;
+    let isLateArrival = false;
+
     if (claim.rowCount === 0) {
-      return { ok: false, reason: 'not_claimed_by_you' };
+      if (!(await everClaimedByReviewer(client, itemId, reviewer.user_id))) {
+        return { ok: false, reason: 'not_claimed_by_you' };
+      }
+      isLateArrival = true;
+    } else {
+      ({ reviewer_answer: reviewerAnswer, claimed_at: claimedAt } = firstRow(claim));
     }
-    const { reviewer_answer: reviewerAnswer, claimed_at: claimedAt } = firstRow(claim);
 
     const item = firstRow(
       await client.query<{
@@ -180,52 +259,65 @@ export async function decideOnItem(
       ),
     );
 
-    const priorDecisions = (await loadPriorDecisions(client, [itemId])).get(itemId) ?? [];
     const occurredAt = new Date();
+    let transitionResult: ReturnType<typeof transition> | null = null;
 
-    let transitionResult;
-    try {
-      transitionResult = transition(
-        item.status,
-        { type: 'reviewer_decided', action: input.action },
-        {
-          item: {
-            contributorUserId: item.contributor_id,
-            riskTier: item.risk_tier,
-            independentSolveVerdict: item.independent_solve_verdict,
-            sampledForReview: item.sampled_for_review,
+    if (!isLateArrival) {
+      const priorDecisions = (await loadPriorDecisions(client, [itemId])).get(itemId) ?? [];
+      try {
+        transitionResult = transition(
+          item.status,
+          { type: 'reviewer_decided', action: input.action },
+          {
+            item: {
+              contributorUserId: item.contributor_id,
+              riskTier: item.risk_tier,
+              independentSolveVerdict: item.independent_solve_verdict,
+              sampledForReview: item.sampled_for_review,
+            },
+            actor: { userId: reviewer.user_id, role: reviewer.role },
+            occurredAt,
+            priorDecisions,
           },
-          actor: { userId: reviewer.user_id, role: reviewer.role },
-          occurredAt,
-          priorDecisions,
-        },
-      );
-    } catch (error) {
-      return {
-        ok: false,
-        reason: 'invalid_transition',
-        message: error instanceof Error ? error.message : String(error),
-      };
+        );
+      } catch (error) {
+        return {
+          ok: false,
+          reason: 'invalid_transition',
+          message: error instanceof Error ? error.message : String(error),
+        };
+      }
     }
 
     let editDiff: ItemEditDiff | null = null;
     if (input.action === 'edit_and_approve') {
       // parseDecisionInput guarantees edits is non-null exactly when the
-      // action is edit_and_approve.
+      // action is edit_and_approve. For a late arrival the diff is recorded
+      // for audit purposes only and never applied — the item's live content
+      // belongs to whichever decision was actually authoritative.
       editDiff = buildItemEditDiff(await loadItemSnapshot(client, itemId, item), input.edits!);
-      await applyItemEdit(client, itemId, editDiff);
+      if (!isLateArrival) {
+        await applyItemEdit(client, itemId, editDiff);
+      }
     }
 
-    const secondsTaken = Math.max(
-      0,
-      Math.round((occurredAt.getTime() - claimedAt.getTime()) / 1000),
-    );
+    // A late arrival has no live claim to time against — the reviewer's own
+    // device knows how long they actually took, but the server's only
+    // record of a start time (the claim) is gone by the time this lands.
+    const secondsTaken =
+      isLateArrival || claimedAt === null
+        ? 0
+        : Math.max(0, Math.round((occurredAt.getTime() - claimedAt.getTime()) / 1000));
 
-    await client.query(
+    const idempotencyKey = input.idempotencyKey ?? randomUUID();
+
+    const inserted = await client.query<{ id: number }>(
       `INSERT INTO review_decisions (
          item_id, reviewer_id, action, rejection_reason, reviewer_answer,
-         seconds_taken, idempotency_key, edit_diff
-       ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
+         seconds_taken, idempotency_key, edit_diff, decision_context
+       ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+       ON CONFLICT (idempotency_key) DO NOTHING
+       RETURNING id`,
       [
         itemId,
         reviewer.reviewer_id,
@@ -233,10 +325,40 @@ export async function decideOnItem(
         input.rejectionReason,
         reviewerAnswer,
         secondsTaken,
-        input.idempotencyKey ?? randomUUID(),
+        idempotencyKey,
         editDiff ? JSON.stringify(editDiff) : null,
+        isLateArrival ? 'late_arrival' : 'live',
       ],
     );
+
+    if (inserted.rowCount === 0) {
+      // ON CONFLICT (idempotency_key) fired: this exact decision was
+      // already recorded by an earlier attempt (8.3's idempotent retry).
+      // Nothing here has been applied twice — the transaction still commits
+      // (there is nothing left to commit), and the caller gets back the
+      // same outcome as the original request.
+      return await outcomeForIdempotencyKey(client, idempotencyKey);
+    }
+
+    if (isLateArrival) {
+      const current = firstRow(
+        await client.query<{ status: ItemStatus; approval_route: ApprovalRoute | null }>(
+          `SELECT status, approval_route FROM items WHERE id = $1`,
+          [itemId],
+        ),
+      );
+      return {
+        ok: true,
+        itemId,
+        status: current.status,
+        approvalRoute: current.approval_route,
+        decisionContext: 'late_arrival',
+      };
+    }
+
+    // transitionResult is non-null here: it is only ever left null on the
+    // late-arrival branch, which returned above.
+    const result = transitionResult!;
 
     // A null approvalRoute means "this transition establishes none; leave
     // the item's existing one alone" (see TransitionResult in
@@ -244,7 +366,7 @@ export async function decideOnItem(
     // SQL rather than overwriting a real route with NULL.
     await client.query(
       `UPDATE items SET status = $2, approval_route = COALESCE($3, approval_route) WHERE id = $1`,
-      [itemId, transitionResult.status, transitionResult.approvalRoute],
+      [itemId, result.status, result.approvalRoute],
     );
 
     // The item leaves in_review regardless of where it lands next, so the
@@ -255,19 +377,20 @@ export async function decideOnItem(
       client,
       itemId,
       item.status,
-      transitionResult.status,
+      result.status,
       'reviewer_decided',
-      transitionResult.actorUserId,
+      result.actorUserId,
       reviewer.role,
-      transitionResult.occurredAt,
-      transitionResult.approvalRoute,
+      result.occurredAt,
+      result.approvalRoute,
     );
 
     return {
       ok: true,
       itemId,
-      status: transitionResult.status,
-      approvalRoute: transitionResult.approvalRoute,
+      status: result.status,
+      approvalRoute: result.approvalRoute,
+      decisionContext: 'live',
     };
   });
 }
@@ -354,6 +477,7 @@ export async function resolveEscalation(
       itemId,
       status: transitionResult.status,
       approvalRoute: transitionResult.approvalRoute,
+      decisionContext: 'live',
     };
   });
 }

@@ -69,6 +69,7 @@ describe.runIf(hasDatabase)('resolveEscalation', () => {
         itemId,
         status: 'approved_uncalibrated',
         approvalRoute: 'moderator_ruled',
+        decisionContext: 'live',
       });
 
       const row = await client.query<{ status: string; approval_route: string }>(
@@ -101,7 +102,13 @@ describe.runIf(hasDatabase)('resolveEscalation', () => {
         action: 'reject',
       });
 
-      expect(result).toEqual({ ok: true, itemId, status: 'rejected', approvalRoute: null });
+      expect(result).toEqual({
+        ok: true,
+        itemId,
+        status: 'rejected',
+        approvalRoute: null,
+        decisionContext: 'live',
+      });
 
       const row = await client.query<{ status: string }>(`SELECT status FROM items WHERE id = $1`, [
         itemId,

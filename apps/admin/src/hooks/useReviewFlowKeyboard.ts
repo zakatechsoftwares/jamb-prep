@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect } from 'react';
+import { useEffect, useLayoutEffect, useRef } from 'react';
 import { resolveKeyboardIntent, type KeyboardMode } from '../lib/keyboard-shortcuts';
 import type { useReviewFlow } from './useReviewFlow';
 
@@ -28,8 +28,27 @@ function modeFor(status: string): KeyboardMode | null {
  * the stem must not start a rejection), but Escape always still cancels.
  */
 export function useReviewFlowKeyboard(flow: ReturnType<typeof useReviewFlow>): void {
+  // useReviewFlow returns a fresh object every render (no useMemo wrapping
+  // it), so a naive `useEffect(..., [flow])` would tear down and re-attach
+  // the window listener on every single render — including ones triggered
+  // by something unrelated to this hook, like the offline counts refreshing
+  // in the background (8.3). That churn opens a real window where a keydown
+  // can land between the old listener's removal and the new one's
+  // attachment. The listener attaches exactly once per mount instead, and
+  // always reads the latest `flow` through this ref.
+  const flowRef = useRef(flow);
+  // useLayoutEffect, not useEffect: it runs synchronously right after the
+  // DOM commit, in the same phase — a passive effect here would be
+  // scheduled for afterwards, leaving a real window where a synchronous
+  // keydown (or even a testing-library `waitFor` poll) could observe the
+  // new DOM while this ref still pointed at the previous render's flow.
+  useLayoutEffect(() => {
+    flowRef.current = flow;
+  });
+
   useEffect(() => {
     function handleKeyDown(event: KeyboardEvent): void {
+      const flow = flowRef.current;
       const mode = modeFor(flow.state.status);
       if (!mode) {
         return;
@@ -81,5 +100,5 @@ export function useReviewFlowKeyboard(flow: ReturnType<typeof useReviewFlow>): v
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [flow]);
+  }, []);
 }

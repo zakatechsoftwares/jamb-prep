@@ -131,6 +131,7 @@ export function createReviewDecisionRouter(service: ReviewDecisionService): Rout
           itemId: outcome.itemId,
           status: outcome.status,
           approvalRoute: outcome.approvalRoute,
+          decisionContext: outcome.decisionContext,
         });
       })
       .catch(next);
