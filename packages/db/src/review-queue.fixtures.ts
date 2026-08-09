@@ -36,7 +36,7 @@ export async function truncateQueueWorld(client: PoolClient): Promise<void> {
   await client.query(`TRUNCATE ${TRUNCATED_TABLES.join(', ')} CASCADE`);
 }
 
-async function insertReviewer(
+export async function insertReviewer(
   client: PoolClient,
   name: string,
   phone: string,

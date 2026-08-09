@@ -177,6 +177,35 @@ async function lockCandidates(
   return result.rows;
 }
 
+/**
+ * Item ids this reviewer already holds a live, unexpired claim on, in the
+ * same priority order `lockCandidates` would use — so a reviewer who
+ * re-polls while still holding one or more claims (a page reload mid-item
+ * is the real-world trigger) gets exactly what they already hold, not a
+ * fresh assignment. These items need no re-claiming: they are already
+ * `in_review`, already rowed in `review_claims`, and `lockCandidates`
+ * already excludes any item with a live claim — including this reviewer's
+ * own — so there is no risk of this set overlapping whatever
+ * `lockCandidates` returns afterward.
+ */
+async function ownLiveClaims(
+  client: PoolClient,
+  reviewer: QueueReviewerRow,
+  limit: number,
+): Promise<number[]> {
+  const result = await client.query<{ item_id: number }>(
+    `SELECT c.item_id
+       FROM review_claims c
+       JOIN items i ON i.id = c.item_id
+      WHERE c.reviewer_id = $1 AND c.expires_at > now()
+      ORDER BY ${QUEUE_PRIORITY_SQL}, i.created_at, i.id
+      LIMIT $2`,
+    [reviewer.reviewer_id, limit],
+  );
+
+  return result.rows.map((row) => row.item_id);
+}
+
 /** Prior decisions per item, keyed by item id, as the state machine wants them. */
 export async function loadPriorDecisions(
   client: PoolClient,
@@ -455,12 +484,22 @@ export async function getNextItemBatch(
 
     const reviewer = await loadReviewer(client, reviewerId);
 
+    // A live claim this reviewer already holds is not competing for a
+    // priority slot — it wins outright, before the queue is even
+    // consulted. Otherwise a reviewer re-polling for work while still
+    // holding an item (a page reload mid-item, in particular) would have
+    // that claim excluded by lockCandidates' own-live-claim filter same as
+    // anyone else's, and be handed something else — stranding the
+    // original item in in_review until it naturally expires.
+    const ownClaimIds = await ownLiveClaims(client, reviewer, count);
+    const remaining = count - ownClaimIds.length;
+
     // Gold items are drawn per served item, not per request, so a batch
     // carries roughly the configured proportion rather than being wholly
     // gold or wholly ordinary.
     const candidates: LockedCandidate[] = [];
 
-    for (let served = 0; served < count; served += 1) {
+    for (let served = 0; served < remaining; served += 1) {
       const wantsGold = shouldServeGoldItem(config.goldItemRate, random);
       const alreadyTaken = new Set(candidates.map((candidate) => candidate.id));
 
@@ -487,7 +526,8 @@ export async function getNextItemBatch(
       candidates.push(next);
     }
 
-    const claimedIds = await claimItems(client, reviewer, candidates, config);
+    const newlyClaimedIds = await claimItems(client, reviewer, candidates, config);
+    const claimedIds = [...ownClaimIds, ...newlyClaimedIds];
 
     if (claimedIds.length === 0) {
       return [];
