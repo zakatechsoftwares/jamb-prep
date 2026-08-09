@@ -49,7 +49,7 @@ describe.runIf(hasDatabase)('scoreGoldDecision', () => {
     }
   });
 
-  it('is a no-op for an ordinary, non-gold item', async () => {
+  it('records no score row for an ordinary, non-gold item, and leaves accuracy_score unaffected', async () => {
     await withWorld(async ({ client, world, fixtures, quality }) => {
       const itemId = await fixtures.insertQueueItem(client, world);
       await fixtures.insertDecision(client, itemId, world.reviewerId, 'approve');
@@ -66,6 +66,52 @@ describe.runIf(hasDatabase)('scoreGoldDecision', () => {
         itemId,
       ]);
       expect(scores.rowCount).toBe(0);
+
+      // No prior gold history for this reviewer, so the unconditional
+      // recompute (run for query-count/timing symmetry with the gold path)
+      // still writes NULL, not a fabricated score.
+      const reviewer = await client.query<{ accuracy_score: string | null }>(
+        `SELECT accuracy_score FROM reviewers WHERE id = $1`,
+        [world.reviewerId],
+      );
+      expect(reviewer.rows[0]?.accuracy_score).toBeNull();
+    });
+  });
+
+  it('a non-gold decision still rewrites accuracy_score to the same recomputed value, for query-count symmetry with a gold decision', async () => {
+    await withWorld(async ({ client, world, fixtures, quality }) => {
+      const gold = await fixtures.insertQueueItem(client, world, {
+        gold: { referenceDecision: 'approve', referenceKey: 'A', plantedErrorType: null },
+      });
+      await fixtures.insertDecision(client, gold, world.reviewerId, 'approve');
+      const goldDecisionId = (
+        await client.query<{ id: number }>(`SELECT id FROM review_decisions WHERE item_id = $1`, [
+          gold,
+        ])
+      ).rows[0]!.id;
+      await quality.scoreGoldDecision(client, gold, world.reviewerId, goldDecisionId, {
+        action: 'approve',
+      });
+
+      const ordinary = await fixtures.insertQueueItem(client, world);
+      await fixtures.insertDecision(client, ordinary, world.reviewerId, 'approve');
+      const ordinaryDecisionId = (
+        await client.query<{ id: number }>(`SELECT id FROM review_decisions WHERE item_id = $1`, [
+          ordinary,
+        ])
+      ).rows[0]!.id;
+      await quality.scoreGoldDecision(client, ordinary, world.reviewerId, ordinaryDecisionId, {
+        action: 'approve',
+      });
+
+      // Still 1/1 — the non-gold decision recorded no gold_item_scores row,
+      // so the recompute it triggered wrote back the same value the gold
+      // decision alone had already produced.
+      const reviewer = await client.query<{ accuracy_score: string }>(
+        `SELECT accuracy_score FROM reviewers WHERE id = $1`,
+        [world.reviewerId],
+      );
+      expect(Number(reviewer.rows[0]?.accuracy_score)).toBe(1);
     });
   });
 

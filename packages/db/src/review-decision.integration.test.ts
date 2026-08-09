@@ -738,4 +738,55 @@ describe.runIf(hasDatabase)('review decision endpoints', () => {
       expect(Number(earning.rows[0]?.amount_kobo)).toBe(5000);
     });
   });
+
+  it('decideOnItem returns an identically-shaped outcome for a gold item and an ordinary one — gold-item scoring never leaks through the response', async () => {
+    await withWorld(async ({ world, fixtures, client, queue, decisions }) => {
+      const goldItemId = await fixtures.insertQueueItem(client, world, {
+        riskTier: 'low',
+        gold: { referenceDecision: 'approve', referenceKey: 'A', plantedErrorType: null },
+      });
+      // Gold items are excluded from ordinary serving unless the draw
+      // fires — force it here, the same way the scoring test above does.
+      await queue.getNextItemBatch(world.reviewerId, 1, { random: alwaysGold });
+      const goldResult = await decisions.decideOnItem(world.reviewerId, goldItemId, {
+        action: 'approve',
+        rejectionReason: null,
+        edits: null,
+      });
+
+      const ordinaryItemId = await fixtures.insertQueueItem(client, world, { riskTier: 'low' });
+      await queue.getNextItemBatch(world.secondReviewerId, 1, { random: neverGold });
+      const ordinaryResult = await decisions.decideOnItem(world.secondReviewerId, ordinaryItemId, {
+        action: 'approve',
+        rejectionReason: null,
+        edits: null,
+      });
+
+      // Same key set on both — nothing about gold scoring rides along on
+      // the outcome object, and TypeScript's own DecideResult type (four
+      // fixed fields) makes this the only shape either branch can produce.
+      expect(Object.keys(goldResult).sort()).toEqual(Object.keys(ordinaryResult).sort());
+      // Same status/approvalRoute/decisionContext values too — a low-tier,
+      // sole reviewer, live approval lands identically regardless of gold.
+      expect(goldResult).toMatchObject({
+        ok: true,
+        status: 'approved_uncalibrated',
+        approvalRoute: 'human_reviewed',
+        decisionContext: 'live',
+      });
+      expect(ordinaryResult).toMatchObject({
+        ok: true,
+        status: 'approved_uncalibrated',
+        approvalRoute: 'human_reviewed',
+        decisionContext: 'live',
+      });
+
+      // The one place gold status is genuinely, silently recorded — never
+      // reflected back to the caller of decideOnItem above.
+      const score = await client.query('SELECT 1 FROM gold_item_scores WHERE item_id = $1', [
+        goldItemId,
+      ]);
+      expect(score.rowCount).toBe(1);
+    });
+  });
 });
