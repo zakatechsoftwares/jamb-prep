@@ -19,4 +19,10 @@ export {
 // rest of the decision service's shapes live in @jamb/shared (they are the
 // contract apps/api is wired against), the same split ReviewQueueItem and
 // ReviewQueueService already established for the queue.
-export { decideOnItem, revealItem, submitBlindAnswer } from './review-decision-repository';
+export {
+  decideOnItem,
+  resolveEscalation,
+  revealItem,
+  submitBlindAnswer,
+} from './review-decision-repository';
+export { authenticateReviewer, setReviewerPassword } from './reviewer-auth-repository';

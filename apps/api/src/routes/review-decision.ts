@@ -20,7 +20,7 @@ export function createReviewDecisionRouter(service: ReviewDecisionService): Rout
     const itemId = parsePositiveInteger(req.params.itemId);
 
     if (reviewerId === null) {
-      res.status(400).json({ error: 'reviewerId must be a positive integer' });
+      res.status(401).json({ error: 'authentication required' });
       return;
     }
     if (itemId === null) {
@@ -59,7 +59,7 @@ export function createReviewDecisionRouter(service: ReviewDecisionService): Rout
     const itemId = parsePositiveInteger(req.params.itemId);
 
     if (reviewerId === null) {
-      res.status(400).json({ error: 'reviewerId must be a positive integer' });
+      res.status(401).json({ error: 'authentication required' });
       return;
     }
     if (itemId === null) {
@@ -94,7 +94,7 @@ export function createReviewDecisionRouter(service: ReviewDecisionService): Rout
     const itemId = parsePositiveInteger(req.params.itemId);
 
     if (reviewerId === null) {
-      res.status(400).json({ error: 'reviewerId must be a positive integer' });
+      res.status(401).json({ error: 'authentication required' });
       return;
     }
     if (itemId === null) {
@@ -120,12 +120,10 @@ export function createReviewDecisionRouter(service: ReviewDecisionService): Rout
       .decideOnItem(reviewerId, itemId, { ...parsed, idempotencyKey })
       .then((outcome) => {
         if (!outcome.ok) {
-          res
-            .status(outcome.reason === 'not_claimed_by_you' ? 403 : 409)
-            .json({
-              error: outcome.reason,
-              ...('message' in outcome ? { message: outcome.message } : {}),
-            });
+          res.status(outcome.reason === 'not_claimed_by_you' ? 403 : 409).json({
+            error: outcome.reason,
+            ...('message' in outcome ? { message: outcome.message } : {}),
+          });
           return;
         }
 
