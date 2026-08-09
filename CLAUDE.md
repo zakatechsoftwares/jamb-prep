@@ -143,6 +143,32 @@ answer intact. Write tests for this scenario early and keep them green.
   `session-tokens.ts` and `password-hashing.ts` — precisely so a minimal
   session mechanism never needed a `jsonwebtoken` or `bcrypt` dependency
   approved. Extend these rather than reaching for a new package.
+- **A browser-facing app talking to `apps/api` proxies through Next.js
+  `rewrites()`, never a `cors` dependency on the API.** See
+  `apps/admin/next.config.mjs`: the browser only ever calls same-origin
+  `/api/review/...`, and Next.js forwards it server-side to
+  `API_BASE_URL`. This is why `apps/admin`'s dev server runs on a
+  non-default port (3001) — the API keeps its own default (3000), and
+  the two must never collide when both run locally at once.
+- **`apps/admin` has real component-testing set up: `jsdom` +
+  `@testing-library/react` + `@testing-library/user-event`
+  (devDependencies), configured in `vitest.config.mts` and
+  `vitest.setup.ts`.** RTL's own auto-cleanup does not register under
+  vitest without `test.globals: true` (which this repo deliberately
+  doesn't set — explicit imports over implicit globals), so
+  `vitest.setup.ts` calls `cleanup()` in an `afterEach` itself; a new
+  admin test file doesn't need to re-solve this. `@testing-library/jest-dom`
+  was deliberately not added — use plain DOM assertions
+  (`element.hasAttribute('disabled')`, not `toBeDisabled()`) rather than
+  pulling in another dependency for a handful of matchers.
+- **No design-tokens source exists in this repo.** `docs/reviewer-workspace-prompts.md`
+  references "the frontend-design skill," which does not exist — not as
+  a Claude Code skill, not as a file anywhere in this repo. `apps/admin`'s
+  tokens (48px touch targets, a 360px-first type scale, the color
+  palette) in `app/globals.css`'s `@theme` block are hand-picked for this
+  session, not drawn from a canonical source. If a real design system
+  shows up later, reconcile against it rather than assuming
+  `app/globals.css` is authoritative.
 
 ## Content pipeline rules
 

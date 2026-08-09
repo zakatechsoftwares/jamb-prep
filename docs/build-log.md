@@ -23,22 +23,22 @@ document (`Session 3`, `Session B`, …) is not the same number as this
 project's session (`03`, `05`, …); read the table, not the heading, when
 you need "what comes next."
 
-| Canonical | Source document            | Heading in that document                                                                                                                                        | Status      |
-| --------- | -------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------- |
-| 01        | playbook                   | Session 1 — Scaffold                                                                                                                                            | done, PR #2 |
-| 02        | playbook                   | Session 2 — Data model                                                                                                                                          | done, PR #3 |
-| 03        | playbook                   | Session 3 — Scoring engine (pure logic, no I/O)                                                                                                                 | done, PR #4 |
-| 04        | reviewer workspace prompts | Session A — Item state machine and review domain model                                                                                                          | done, PR #5 |
-| 05        | reviewer workspace prompts | Session B — Queue assignment service                                                                                                                            | done, PR #6 |
-| 06        | reviewer workspace prompts | Session C — Review submission and the answer-before-key flow                                                                                                    | done, PR #7 |
-| 07        | reviewer workspace prompts | Session D — The reviewer workspace UI                                                                                                                           | not started |
-| 08        | reviewer workspace prompts | Session E — Offline layer for the workspace                                                                                                                     | not started |
-| 09        | reviewer workspace prompts | Session F — Gold items, audit, and payment accrual                                                                                                              | not started |
-| 10        | playbook                   | "Using Claude to generate the question bank" (the item generation pipeline, `tools/item-gen/`)                                                                  | not started |
-| 11        | reviewer workspace prompts | "Then: the contributor brief board"                                                                                                                             | not started |
-| 12        | playbook                   | Session 4 — Mock CBT engine                                                                                                                                     | not started |
-| 13        | playbook                   | Session 5 — Offline sync                                                                                                                                        | not started |
-| 14+       | playbook                   | "Later sessions" (diagnostics rollup, adaptive engine, payments and entitlements, admin review tooling, institution portal) — no individual prompts written yet | not started |
+| Canonical | Source document            | Heading in that document                                                                                                                                        | Status                  |
+| --------- | -------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------- |
+| 01        | playbook                   | Session 1 — Scaffold                                                                                                                                            | done, PR #2             |
+| 02        | playbook                   | Session 2 — Data model                                                                                                                                          | done, PR #3             |
+| 03        | playbook                   | Session 3 — Scoring engine (pure logic, no I/O)                                                                                                                 | done, PR #4             |
+| 04        | reviewer workspace prompts | Session A — Item state machine and review domain model                                                                                                          | done, PR #5             |
+| 05        | reviewer workspace prompts | Session B — Queue assignment service                                                                                                                            | done, PR #6             |
+| 06        | reviewer workspace prompts | Session C — Review submission and the answer-before-key flow                                                                                                    | done, PR #7             |
+| 07        | reviewer workspace prompts | Session D — The reviewer workspace UI                                                                                                                           | done, PR against `main` |
+| 08        | reviewer workspace prompts | Session E — Offline layer for the workspace                                                                                                                     | not started             |
+| 09        | reviewer workspace prompts | Session F — Gold items, audit, and payment accrual                                                                                                              | not started             |
+| 10        | playbook                   | "Using Claude to generate the question bank" (the item generation pipeline, `tools/item-gen/`)                                                                  | not started             |
+| 11        | reviewer workspace prompts | "Then: the contributor brief board"                                                                                                                             | not started             |
+| 12        | playbook                   | Session 4 — Mock CBT engine                                                                                                                                     | not started             |
+| 13        | playbook                   | Session 5 — Offline sync                                                                                                                                        | not started             |
+| 14+       | playbook                   | "Later sessions" (diagnostics rollup, adaptive engine, payments and entitlements, admin review tooling, institution portal) — no individual prompts written yet | not started             |
 
 This resolves two forward references already sitting in the session 05
 entry below, written before this table existed: "session 09" (the content
@@ -389,3 +389,121 @@ Resolves BLOCKING item B1, opened in session 05: the five reviewer routes
 
 **Next:** Session D, the reviewer workspace UI — unblocked by this
 session.
+
+## Session 07 — reviewer workspace UI (2026-08-09, `session/07-workspace-ui`, PR against `main`)
+
+Builds `apps/admin` into the reviewer-facing app (plan 7.9): a login
+screen, and a single-item review screen — no list, filter, search, or
+queue browser anywhere, on desktop or mobile.
+
+**Built:**
+
+- `packages/db`: `getNextItem`/`getNextItemBatch` now prefer a
+  reviewer's own live claim over a fresh priority-ordered assignment.
+  Previously `lockCandidates`' `NOT EXISTS (review_claims ...)` filter
+  excluded an item with _any_ unexpired claim, including the calling
+  reviewer's own — so a reviewer re-polling while still holding an item
+  (a page reload mid-review, in particular) got handed something else,
+  stranding the original item in `in_review` until it naturally expired.
+  New `ownLiveClaims()` query fills slots from the reviewer's own claims
+  first; `lockCandidates`'s existing exclusion means the two sets can
+  never overlap. No prior test proved either behavior — confirmed
+  empirically (wrote the test, watched it fail against the unfixed
+  query) before fixing it.
+- `apps/admin/src/lib`: three pure, dependency-free modules, tested with
+  no DOM — `review-flow-reducer` (the one-item state machine: loading →
+  solving/deciding → choosingReason/editing → back to loading),
+  `api-client` (typed fetch wrappers; every one of the five reviewer
+  routes reports a uniform `unauthorized` reason on 401, `login`
+  reports `invalid_credentials` instead since a 401 there means
+  something different), `keyboard-shortcuts` (A-D / 1-4 / Enter / Esc →
+  intent, pure key-to-intent mapping with no DOM knowledge).
+- `apps/admin/src/{auth,hooks,components}`: `AuthProvider` holds the
+  session token in memory only (`useState`, never `localStorage` or
+  `sessionStorage` — a refresh logs the reviewer out, deliberately);
+  `useReviewFlow` sequences the API calls (call reveal right after
+  serving an item — `not_yet_solved` means solve-first, `ok:true` means
+  straight to deciding, so the client never needs to know an item's
+  `risk_tier` at all) and calls `logout()` on any unauthorized outcome;
+  `useReviewFlowKeyboard` wires the pure shortcut mapping to real
+  `keydown` events, suppressed inside text fields except Escape. Every
+  component (`SolveStep`, `DecideStep`, `RejectionReasonPicker`,
+  `InlineEditForm`, `ReviewHeader`, `LoginForm`, `EmptyQueueState`,
+  `ErrorState`) tested with React Testing Library.
+- Tailwind v4 with hand-rolled design tokens (48px touch targets, a
+  360px-first type scale) — the session prompt referenced "the
+  frontend-design skill" for design tokens; no such skill, or any
+  design-tokens source, exists anywhere in this repo or the available
+  skills. Flagged to the user rather than invented silently; Tailwind
+  and the token choices were then explicitly approved.
+- `next.config.mjs` rewrites `/api/review/*` to the real API
+  server-side, so the browser only ever makes same-origin requests — no
+  `cors` dependency needed on the API side. Admin's dev server moved to
+  port 3001 (both it and the API default to 3000).
+- `@testing-library/react`, `@testing-library/user-event`, and `jsdom`
+  added to `apps/admin` as devDependencies (approved) — the package had
+  zero component-testing setup beforehand (`environment: 'node'`, no
+  DOM lib in `tsconfig.json` either, fixed alongside).
+- 115 tests across the reducer, api-client, keyboard-shortcuts, auth,
+  hooks, and every component.
+- **End-to-end verification against the real running stack**, not just
+  unit tests: seeded a reviewer with a password and four items (two
+  low-tier, two high-tier) through the same fixtures the integration
+  tests use, ran the real API and admin dev servers, and drove the
+  actual browser with Playwright — a 360px touch pass (both high-tier
+  items, since `risk_tier = 'high'` is queue priority 2 and always
+  precedes priority 5's low-risk sampling: the touch pass never saw a
+  low-tier item, and that is correct behaviour, not a gap) and a
+  desktop keyboard-only pass (both low-tier items, straight to
+  deciding). Confirmed: no scrolling at 360px (`scrollHeight` equalled
+  viewport height exactly), the disagreement banner rendering
+  prominently when the blind solve disagreed with the proposed key, all
+  four actions reachable both ways, Escape cancelling the reason picker
+  back to deciding, the queue draining to the empty state, and an
+  unauthenticated visit to `/` redirecting straight to `/login`.
+
+**Decisions worth remembering:**
+
+- The client never carries a `risk_tier` field or branches on it
+  anywhere. `GET /review/:itemId/reveal`'s own response — `not_yet_solved`
+  vs `ok: true` — is the only signal the UI needs to choose solve-first
+  vs. straight-to-deciding. One less thing for the client to get wrong
+  by holding a stale copy of a server fact.
+- Disagreement with the proposed key is the most visually prominent
+  thing in `DecideStep`, per 7.9. `agreesWithKey` is `null` for a
+  low-tier item (no blind answer was ever recorded), and the UI shows
+  no agreement/disagreement indicator at all in that case, exactly
+  matching `agreesWithKey()`'s contract in `@jamb/shared`.
+- "Reviewed this session" is a real, live count; "accuracy" and
+  "earnings" render as `—`, not a guessed number. Session F / canonical
+  session 09 doesn't exist yet, and there is no honest way to compute
+  either without it.
+- Objective retagging (part of 7.9's "inline editing" list) is not
+  offered in `InlineEditForm`. There is no endpoint to browse or search
+  the objective tree — only an `objectiveId: number` on the served item
+  — so building a picker for it isn't possible yet. Stem, options, key
+  and explanation are all editable; objective is a known, flagged gap.
+
+**Merge note:** this branch was built on `main`, which did not yet have
+session 06b's auth work (`POST /review/login`, bearer-token gating) —
+that PR was never opened. Rather than build a UI against routes that
+didn't exist on this branch, `origin/session/06b-reviewer-auth` was
+merged directly into `session/07-workspace-ui` (one conflict, in
+`review-queue.fixtures.ts`'s `insertReviewer`/`insertReviewerWithRole` —
+resolved by keeping both). Both PRs still need to land on `main`.
+
+**Open at close:**
+
+- No offline layer (session E / canonical 08): a reload mid-item loses
+  client-side state; the server-side claim just expires normally at
+  `claim_duration_minutes`. `getNextItemBatch`'s own-claim preference
+  (this session) means a reviewer who reloads _before_ the claim expires
+  gets the same item back rather than a fresh one, but there is still no
+  local cache, no offline queue, and no resume of an in-flight solve
+  answer that hadn't been submitted yet.
+- No rate limiting anywhere in the login path (carried over from
+  session 06b's own open item).
+- Neither this PR nor session 06b's has been merged into `main` yet.
+
+**Next:** session E, the offline layer for the workspace — or session
+06b/07's PRs landing on `main` first, whichever the user prioritises.

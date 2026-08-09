@@ -68,7 +68,7 @@ export async function insertReviewerWithRole(
   return { reviewerId, userId };
 }
 
-async function insertReviewer(
+export async function insertReviewer(
   client: PoolClient,
   name: string,
   phone: string,

@@ -69,10 +69,28 @@ describe.runIf(hasDatabase)('review queue', () => {
         });
       }
 
+      // Twenty distinct reviewers, not one reviewer called twenty times: the
+      // own-live-claim preference (a reviewer re-polling gets back exactly
+      // what they already hold) means twenty concurrent calls from the same
+      // reviewer identity are no longer guaranteed twenty distinct items —
+      // a later call can legitimately see an earlier call's already-
+      // committed claim as its own. Distinct reviewers is what actually
+      // isolates the property this test exists to prove: FOR UPDATE SKIP
+      // LOCKED prevents two simultaneous callers from ever locking the same
+      // row.
+      const reviewers = [];
+      for (let index = 0; index < 20; index += 1) {
+        reviewers.push(
+          await fixtures.insertReviewer(client, `Concurrent ${index}`, `__concurrent_${index}__`, [
+            world.subjectId,
+          ]),
+        );
+      }
+
       // Twenty genuinely simultaneous calls, each on its own connection.
       const served = await Promise.all(
-        Array.from({ length: 20 }, () =>
-          repository.getNextItem(world.reviewerId, { random: neverGold }),
+        reviewers.map((reviewer) =>
+          repository.getNextItem(reviewer.reviewerId, { random: neverGold }),
         ),
       );
 
@@ -89,9 +107,26 @@ describe.runIf(hasDatabase)('review queue', () => {
         await fixtures.insertQueueItem(client, world);
       }
 
+      // Four distinct reviewers for the same reason as the single-item
+      // concurrency test above: the own-live-claim preference is scoped per
+      // reviewer, so four concurrent batch calls from one shared reviewer
+      // identity no longer isolate the row-locking property this test is
+      // for.
+      const reviewers = [];
+      for (let index = 0; index < 4; index += 1) {
+        reviewers.push(
+          await fixtures.insertReviewer(
+            client,
+            `Batch reviewer ${index}`,
+            `__batch_reviewer_${index}__`,
+            [world.subjectId],
+          ),
+        );
+      }
+
       const batches = await Promise.all(
-        Array.from({ length: 4 }, () =>
-          repository.getNextItemBatch(world.reviewerId, 5, { random: neverGold }),
+        reviewers.map((reviewer) =>
+          repository.getNextItemBatch(reviewer.reviewerId, 5, { random: neverGold }),
         ),
       );
 
@@ -305,6 +340,32 @@ describe.runIf(hasDatabase)('review queue', () => {
         event: 'claimed',
         actor_role: 'reviewer',
       });
+    });
+  });
+
+  it('returns a reviewer’s own live claim on a repeat call, instead of assigning a different item', async () => {
+    // A reviewer re-polling for work while still holding an unexpired claim
+    // (a page reload mid-item is the real-world trigger) must get that same
+    // item back, not have it silently stranded in in_review while a fresh
+    // one is assigned.
+    await withWorld(async ({ client, world, fixtures, repository }) => {
+      const itemA = await fixtures.insertQueueItem(client, world, {
+        createdAt: '2026-06-01T00:00:00Z',
+      });
+      const itemB = await fixtures.insertQueueItem(client, world, {
+        createdAt: '2026-06-02T00:00:00Z',
+      });
+
+      // Oldest first within the band, so itemA is the one claimed.
+      const first = await repository.getNextItem(world.reviewerId, { random: neverGold });
+      expect(first?.itemId).toBe(itemA);
+
+      // Without preferring the reviewer's own live claim, this call would
+      // serve itemB — the next item in priority order — rather than
+      // returning the item this reviewer already holds.
+      const second = await repository.getNextItem(world.reviewerId, { random: neverGold });
+      expect(second?.itemId).toBe(itemA);
+      expect(second?.itemId).not.toBe(itemB);
     });
   });
 

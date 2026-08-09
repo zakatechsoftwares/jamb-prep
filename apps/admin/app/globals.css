@@ -1,0 +1,29 @@
+@import 'tailwindcss';
+
+/*
+ * Design tokens for the reviewer workspace (plan 7.9). There is no
+ * pre-existing design system to draw from — see CLAUDE.md for that gap —
+ * so these are hand-picked for the stated constraints: a 360px phone, an
+ * evening, five minutes, one thumb.
+ */
+@theme {
+  /* 48px: Android's own minimum recommended touch target. Every tappable
+     control in this app — option letters, action buttons, reason chips —
+     is at least this tall. */
+  --spacing-touch: 3rem;
+
+  --color-approve: var(--color-green-600);
+  --color-approve-bg: var(--color-green-50);
+  --color-reject: var(--color-red-600);
+  --color-reject-bg: var(--color-red-50);
+  --color-escalate: var(--color-amber-600);
+  --color-escalate-bg: var(--color-amber-50);
+  --color-selected: var(--color-blue-600);
+  --color-selected-bg: var(--color-blue-50);
+}
+
+body {
+  /* 16px minimum base size: mobile legibility, not a desktop default
+     scaled down. */
+  font-size: 16px;
+}
