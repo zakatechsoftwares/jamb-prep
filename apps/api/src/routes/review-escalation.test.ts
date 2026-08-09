@@ -102,7 +102,12 @@ describe('POST /review/:itemId/resolve-escalation', () => {
 
   it('lets a moderator reject', async () => {
     const { url } = run({
-      resolveEscalation: async () => ({ ok: true, itemId: 9, status: 'rejected', approvalRoute: null }),
+      resolveEscalation: async () => ({
+        ok: true,
+        itemId: 9,
+        status: 'rejected',
+        approvalRoute: null,
+      }),
     });
 
     const response = await fetch(`${url}/review/9/resolve-escalation`, {

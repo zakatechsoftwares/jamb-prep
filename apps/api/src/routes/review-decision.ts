@@ -120,12 +120,10 @@ export function createReviewDecisionRouter(service: ReviewDecisionService): Rout
       .decideOnItem(reviewerId, itemId, { ...parsed, idempotencyKey })
       .then((outcome) => {
         if (!outcome.ok) {
-          res
-            .status(outcome.reason === 'not_claimed_by_you' ? 403 : 409)
-            .json({
-              error: outcome.reason,
-              ...('message' in outcome ? { message: outcome.message } : {}),
-            });
+          res.status(outcome.reason === 'not_claimed_by_you' ? 403 : 409).json({
+            error: outcome.reason,
+            ...('message' in outcome ? { message: outcome.message } : {}),
+          });
           return;
         }
 

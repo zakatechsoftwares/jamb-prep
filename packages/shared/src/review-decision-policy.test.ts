@@ -427,8 +427,8 @@ describe('parseResolveEscalationInput', () => {
     expect(() =>
       parseResolveEscalationInput({ action: 'reject', rejectionReason: 'wrong_key' }),
     ).toThrow(/rejectionReason/i);
-    expect(() =>
-      parseResolveEscalationInput({ action: 'approve', edits: { stem: 'x' } }),
-    ).toThrow(/edits/i);
+    expect(() => parseResolveEscalationInput({ action: 'approve', edits: { stem: 'x' } })).toThrow(
+      /edits/i,
+    );
   });
 });

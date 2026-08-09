@@ -181,7 +181,10 @@ describe.runIf(hasDatabase)('reviewer auth', () => {
       });
       await auth.setReviewerPassword(fixture.reviewerId, 'still-the-real-password');
 
-      const result = await auth.authenticateReviewer('__auth_suspended__', 'still-the-real-password');
+      const result = await auth.authenticateReviewer(
+        '__auth_suspended__',
+        'still-the-real-password',
+      );
 
       expect(result).toEqual({ ok: false, reason: 'not_active', status: 'suspended' });
     } finally {
@@ -195,7 +198,10 @@ describe.runIf(hasDatabase)('reviewer auth', () => {
     const client = await pool.connect();
 
     try {
-      const fixture = await insertReviewer(client, { phone: '__auth_applied__', status: 'applied' });
+      const fixture = await insertReviewer(client, {
+        phone: '__auth_applied__',
+        status: 'applied',
+      });
       await auth.setReviewerPassword(fixture.reviewerId, 'a-password');
 
       const result = await auth.authenticateReviewer('__auth_applied__', 'a-password');

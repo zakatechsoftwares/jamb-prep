@@ -6,9 +6,11 @@ import { parseSessionToken, type SessionTokenPayload } from '@jamb/db/session-to
  * module load. A top-level `process.env.REVIEWER_SESSION_SECRET` read would
  * be evaluated the instant this module is imported — before a test or the
  * real entrypoint has had a chance to set it — so every caller goes through
- * this function instead.
+ * this function instead. Exported so the login route signs tokens against
+ * the exact same secret this module verifies them with, rather than each
+ * re-reading the environment variable on its own.
  */
-function sessionSecret(): string {
+export function sessionSecret(): string {
   const secret = process.env.REVIEWER_SESSION_SECRET;
   if (!secret) {
     throw new Error('REVIEWER_SESSION_SECRET is not set');

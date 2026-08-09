@@ -125,6 +125,24 @@ answer intact. Write tests for this scenario early and keep them green.
   application code is meant to write, add a test asserting the column is
   actually populated with the expected value on the relevant code path —
   not merely that the migration applies or that the column exists.
+- **`@jamb/db`'s index opens a connection pool the instant it's imported**
+  (`client.ts` throws if `DATABASE_URL` is unset, and even when it's set,
+  every import shares that one pool). `apps/api`'s `app.ts` and its route
+  modules must stay importable with no database — that's what lets
+  `createApp` be unit-tested with a fake service — so none of them may
+  import `@jamb/db` directly; a service is always injected instead. A pure,
+  dependency-free module that both sides genuinely need (`session-tokens.ts`,
+  `reviewer-errors.ts`) is exposed as its own `exports` subpath in
+  `packages/db/package.json` (e.g. `@jamb/db/session-tokens`) rather than
+  re-exported from the index, so consuming it never drags the pool in. Only
+  the real entrypoint, `apps/api/src/index.ts`, imports the index itself.
+- **Session tokens and password hashes use Node's built-in `crypto`, not a
+  dependency.** HMAC-SHA256 bearer tokens (`signSessionToken` /
+  `parseSessionToken`) and `scrypt` password hashing
+  (`hashPassword` / `verifyPassword`) live in `packages/db` — see
+  `session-tokens.ts` and `password-hashing.ts` — precisely so a minimal
+  session mechanism never needed a `jsonwebtoken` or `bcrypt` dependency
+  approved. Extend these rather than reaching for a new package.
 
 ## Content pipeline rules
 

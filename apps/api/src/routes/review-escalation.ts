@@ -1,8 +1,5 @@
 import { Router } from 'express';
-import {
-  parseResolveEscalationInput,
-  type ReviewEscalationService,
-} from '@jamb/shared';
+import { parseResolveEscalationInput, type ReviewEscalationService } from '@jamb/shared';
 import { parsePositiveInteger, requireModerator, resolveReviewerId } from '../reviewer-identity';
 
 /**

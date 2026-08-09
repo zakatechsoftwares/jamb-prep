@@ -1,12 +1,10 @@
+import type { AuthenticateOutcome } from '@jamb/shared';
 import { pool } from './client';
 import { firstRow } from './first-row';
 import { hashPassword, verifyPassword } from './password-hashing';
 import { loadReviewer, ReviewerNotActiveError } from './review-queue-repository';
 
-export type AuthenticateOutcome =
-  | { ok: true; reviewerId: number; userId: number; role: string }
-  | { ok: false; reason: 'invalid_credentials' }
-  | { ok: false; reason: 'not_active'; status: string };
+export type { AuthenticateOutcome };
 
 interface CredentialRow {
   reviewer_id: number;

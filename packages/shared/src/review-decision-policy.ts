@@ -368,8 +368,7 @@ export interface ResolveEscalationInput {
 }
 
 export type ResolveEscalationOutcome =
-  | ({ ok: true } & DecideResult)
-  | { ok: false; reason: 'invalid_transition'; message: string };
+  ({ ok: true } & DecideResult) | { ok: false; reason: 'invalid_transition'; message: string };
 
 /** What `apps/api`'s escalation-resolution route needs from the review workflow. */
 export interface ReviewEscalationService {

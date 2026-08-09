@@ -1,5 +1,6 @@
 import express, { type Express } from 'express';
 import type {
+  AuthService,
   HealthStatus,
   ReviewDecisionService,
   ReviewEscalationService,
@@ -10,6 +11,7 @@ import type {
 // load (see the comment on `AppDependencies` below), exactly what injecting
 // the services instead of importing them is meant to avoid.
 import { ReviewerNotActiveError } from '@jamb/db/reviewer-errors';
+import { createAuthRouter } from './routes/auth';
 import { createReviewDecisionRouter } from './routes/review-decision';
 import { createReviewEscalationRouter } from './routes/review-escalation';
 import { createReviewQueueRouter } from './routes/review-queue';
@@ -23,6 +25,7 @@ export interface AppDependencies {
   reviewQueue?: ReviewQueueService;
   reviewDecision?: ReviewDecisionService;
   reviewEscalation?: ReviewEscalationService;
+  auth?: AuthService;
 }
 
 export function createApp(dependencies: AppDependencies = {}): Express {
@@ -34,6 +37,9 @@ export function createApp(dependencies: AppDependencies = {}): Express {
     res.json({ status, service: 'api' });
   });
 
+  if (dependencies.auth) {
+    app.use('/review', createAuthRouter(dependencies.auth));
+  }
   if (dependencies.reviewQueue) {
     app.use('/review', createReviewQueueRouter(dependencies.reviewQueue));
   }

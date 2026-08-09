@@ -23,22 +23,22 @@ document (`Session 3`, `Session B`, …) is not the same number as this
 project's session (`03`, `05`, …); read the table, not the heading, when
 you need "what comes next."
 
-| Canonical | Source document            | Heading in that document                                                                                                                                        | Status           |
-| --------- | -------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------- |
-| 01        | playbook                   | Session 1 — Scaffold                                                                                                                                            | done, PR #2      |
-| 02        | playbook                   | Session 2 — Data model                                                                                                                                          | done, PR #3      |
-| 03        | playbook                   | Session 3 — Scoring engine (pure logic, no I/O)                                                                                                                 | done, PR #4      |
-| 04        | reviewer workspace prompts | Session A — Item state machine and review domain model                                                                                                          | done, PR #5      |
-| 05        | reviewer workspace prompts | Session B — Queue assignment service                                                                                                                            | done, PR #6      |
-| 06        | reviewer workspace prompts | Session C — Review submission and the answer-before-key flow                                                                                                    | in review, PR #7 |
-| 07        | reviewer workspace prompts | Session D — The reviewer workspace UI                                                                                                                           | not started      |
-| 08        | reviewer workspace prompts | Session E — Offline layer for the workspace                                                                                                                     | not started      |
-| 09        | reviewer workspace prompts | Session F — Gold items, audit, and payment accrual                                                                                                              | not started      |
-| 10        | playbook                   | "Using Claude to generate the question bank" (the item generation pipeline, `tools/item-gen/`)                                                                  | not started      |
-| 11        | reviewer workspace prompts | "Then: the contributor brief board"                                                                                                                             | not started      |
-| 12        | playbook                   | Session 4 — Mock CBT engine                                                                                                                                     | not started      |
-| 13        | playbook                   | Session 5 — Offline sync                                                                                                                                        | not started      |
-| 14+       | playbook                   | "Later sessions" (diagnostics rollup, adaptive engine, payments and entitlements, admin review tooling, institution portal) — no individual prompts written yet | not started      |
+| Canonical | Source document            | Heading in that document                                                                                                                                        | Status      |
+| --------- | -------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------- |
+| 01        | playbook                   | Session 1 — Scaffold                                                                                                                                            | done, PR #2 |
+| 02        | playbook                   | Session 2 — Data model                                                                                                                                          | done, PR #3 |
+| 03        | playbook                   | Session 3 — Scoring engine (pure logic, no I/O)                                                                                                                 | done, PR #4 |
+| 04        | reviewer workspace prompts | Session A — Item state machine and review domain model                                                                                                          | done, PR #5 |
+| 05        | reviewer workspace prompts | Session B — Queue assignment service                                                                                                                            | done, PR #6 |
+| 06        | reviewer workspace prompts | Session C — Review submission and the answer-before-key flow                                                                                                    | done, PR #7 |
+| 07        | reviewer workspace prompts | Session D — The reviewer workspace UI                                                                                                                           | not started |
+| 08        | reviewer workspace prompts | Session E — Offline layer for the workspace                                                                                                                     | not started |
+| 09        | reviewer workspace prompts | Session F — Gold items, audit, and payment accrual                                                                                                              | not started |
+| 10        | playbook                   | "Using Claude to generate the question bank" (the item generation pipeline, `tools/item-gen/`)                                                                  | not started |
+| 11        | reviewer workspace prompts | "Then: the contributor brief board"                                                                                                                             | not started |
+| 12        | playbook                   | Session 4 — Mock CBT engine                                                                                                                                     | not started |
+| 13        | playbook                   | Session 5 — Offline sync                                                                                                                                        | not started |
+| 14+       | playbook                   | "Later sessions" (diagnostics rollup, adaptive engine, payments and entitlements, admin review tooling, institution portal) — no individual prompts written yet | not started |
 
 This resolves two forward references already sitting in the session 05
 entry below, written before this table existed: "session 09" (the content
@@ -71,8 +71,9 @@ in place.
 
 Items here gate other work. They are not "open notes" to be carried
 forward — nothing that depends on them may ship until they are resolved.
+Nothing is currently open.
 
-### B1 — No authentication on the reviewer endpoints (opened session 05)
+### B1 — No authentication on the reviewer endpoints (opened session 05, RESOLVED session 06b)
 
 `GET /review/next` and `GET /review/next-batch` take `reviewerId` as a
 **query parameter**. Any caller can therefore request any reviewer's queue
@@ -94,6 +95,15 @@ Resolving it means: the reviewer identity is derived server-side from the
 session, `reviewerId` disappears from the query string, and a test asserts
 that a request naming a different reviewer than the authenticated one is
 rejected rather than honoured.
+
+**Resolved in session 06b** (`session/06b-reviewer-auth`). `reviewerId`
+comes from a verified session bearer token — `resolveReviewerId` in
+`apps/api/src/reviewer-identity.ts` — on every reviewer route, including
+the new escalation-resolution route. There is no `reviewerId` in any
+request state a caller controls, so "a request naming a different
+reviewer" isn't a case that gets rejected, it's a case that cannot arise —
+stronger than the original resolution criterion asked for. `POST
+/review/login` issues the token. Session D is unblocked.
 
 ## Session 01 — scaffold (2026-08-06, `session/01-scaffold`, PR #2, merged)
 
@@ -303,3 +313,79 @@ documented in `packages/db/README.md`.
 **Next:** the decision-recording endpoint (approve / edit and approve /
 reject with reason / escalate), which is what makes the queue a workflow
 rather than a dispenser.
+
+## Session 06b — reviewer authentication (2026-08-09, `session/06b-reviewer-auth`, PR against `main`)
+
+Resolves BLOCKING item B1, opened in session 05: the five reviewer routes
+(session 06's `solve` / `reveal` / `decide` plus session 05's `next` /
+`next-batch`) took `reviewerId` as an unauthenticated query parameter.
+
+**Built:**
+
+- `packages/db`: `password_hash` on `reviewers` (migration `0015`,
+  nullable — a reviewer can exist before ever being given a credential);
+  `authenticateReviewer` / `setReviewerPassword`; stateless HMAC-SHA256
+  session tokens (`signSessionToken` / `parseSessionToken`); `scrypt`
+  password hashing — both via Node's built-in `crypto`, no new dependency.
+- `ReviewerNotActiveError` moved out of `review-queue-repository.ts` into
+  its own dependency-free `reviewer-errors.ts` (re-exported from there for
+  existing callers), and `@jamb/db/package.json` gained an `exports` map
+  exposing it and `session-tokens.ts` as standalone subpaths — so
+  `apps/api` can `instanceof`-check the error and verify tokens without
+  importing `@jamb/db`'s index, which opens a connection pool at load time.
+- `apps/api/src/reviewer-identity.ts`: `resolveReviewerId` /
+  `resolveReviewerSession` now verify a `Bearer` token instead of reading
+  `req.query.reviewerId`; `requireModerator` middleware.
+- `POST /review/login` (`emailOrPhone` + `password` → a signed token).
+  Every failure — wrong password, unknown identifier, no password set, or
+  a correctly-authenticated but inactive reviewer — returns the identical
+  `401 { error: 'invalid_credentials' }`, so the response never tells a
+  caller which case applied.
+- `POST /review/:itemId/resolve-escalation` (session 04 guard 5: only a
+  moderator rules on an `escalated` item), gated by `requireModerator`, no
+  claim check. `decideOnItem` was not touched. `transition()`'s own
+  moderator-only guard is exercised directly too — `requireModerator` is a
+  cheap up-front gate, not the authority.
+- An app-level Express error middleware maps `ReviewerNotActiveError` to
+  401 for any route, reusing `loadReviewer`'s activation check (7.8) rather
+  than adding a second one.
+- Every existing route test switched from `?reviewerId=` to a signed
+  bearer token; new tests cover 401 (missing/malformed/expired session) on
+  all five original routes plus login and resolve-escalation, and 403 for
+  a non-moderator on resolve-escalation.
+- An end-to-end test with no fakes anywhere: seeds a reviewer and password
+  against the real database, logs in over real HTTP, and uses the returned
+  token as a real `Authorization` header against `GET /review/next` wired
+  to the real `@jamb/db` services — proving the mechanism is usable, not
+  only that its pieces typecheck in isolation.
+
+**Decisions worth remembering:**
+
+- `role` is a snapshot in the token, taken at login; it does not update
+  until the token is re-issued. `status` (active/suspended) is deliberately
+  **not** in the token — it's re-checked against the database via
+  `loadReviewer` on every request, so a suspended reviewer is rejected on
+  their very next request regardless of what an unexpired token claims.
+  Documented on `SessionTokenPayload` itself so a later session doesn't
+  assume a role change is immediate.
+- A reviewer with no `password_hash` set is treated identically to a wrong
+  password — never an open door, never a crash reaching `scrypt`. Tested
+  directly (`reviewer-auth-repository.integration.test.ts`).
+- `resolveEscalation` is `decideOnItem`'s sibling, not a mode of it: no
+  claim to check, no blind answer, no idempotency key, no
+  `edit_and_approve`. `parseResolveEscalationInput` only accepts
+  `approve`/`reject` — `escalate` and `edit_and_approve` are refused like
+  nonsense, not merely unsupported by omission.
+
+**Open at close:**
+
+- No self-service signup or password reset. A reviewer's password is
+  provisioned out of band via `setReviewerPassword`, called directly —
+  there is no route for it yet. Explicitly out of scope for this session.
+- No rate limiting on `POST /review/login`.
+- Session tokens cannot be revoked before they expire — there's no
+  server-side session store to revoke against, by design (stateless). A
+  compromised token is live until its TTL runs out.
+
+**Next:** Session D, the reviewer workspace UI — unblocked by this
+session.
