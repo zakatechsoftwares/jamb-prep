@@ -8,6 +8,7 @@ process.env.PGPOOL_MAX ??= '10';
 
 const hasDatabase = Boolean(process.env.DATABASE_URL);
 const neverGold = () => 0.999999;
+const alwaysGold = () => 0;
 
 describe.runIf(hasDatabase)('review decision endpoints', () => {
   async function withWorld<T>(
@@ -611,6 +612,181 @@ describe.runIf(hasDatabase)('review decision endpoints', () => {
         [itemId, world.reviewerId],
       );
       expect(Number(count.rows[0]?.count)).toBe(1);
+    });
+  });
+
+  // -------------------------------------------------------------------------
+  // Gold scoring and earnings wiring (session 09) — a column existing is not
+  // a column being written: this proves decideOnItem itself populates
+  // gold_item_scores and reviewer_earnings, not just that the standalone
+  // repository functions work when called directly.
+  // -------------------------------------------------------------------------
+
+  it('decideOnItem records a gold-item score and an earning for an ordinary live decision', async () => {
+    await withWorld(async ({ world, fixtures, client, queue, decisions }) => {
+      const itemId = await fixtures.insertQueueItem(client, world, {
+        riskTier: 'low',
+        gold: { referenceDecision: 'approve', referenceKey: 'A', plantedErrorType: null },
+      });
+      // The gold draw is a random gate on top of a gold_items row existing —
+      // getNextItemBatch excludes gold items entirely when not specifically
+      // drawing one, so this item is only servable via a forced draw.
+      await queue.getNextItemBatch(world.reviewerId, 1, { random: alwaysGold });
+
+      const result = await decisions.decideOnItem(world.reviewerId, itemId, {
+        action: 'approve',
+        rejectionReason: null,
+        edits: null,
+      });
+      expect(result.ok).toBe(true);
+
+      const score = await client.query<{ agreed: boolean }>(
+        `SELECT agreed FROM gold_item_scores WHERE item_id = $1 AND reviewer_id = $2`,
+        [itemId, world.reviewerId],
+      );
+      expect(score.rows[0]?.agreed).toBe(true);
+
+      const reviewer = await client.query<{ accuracy_score: string }>(
+        `SELECT accuracy_score FROM reviewers WHERE id = $1`,
+        [world.reviewerId],
+      );
+      expect(Number(reviewer.rows[0]?.accuracy_score)).toBe(1);
+
+      const earning = await client.query<{ amount_kobo: string }>(
+        `SELECT amount_kobo FROM reviewer_earnings re
+           JOIN review_decisions rd ON rd.id = re.review_decision_id
+          WHERE rd.item_id = $1 AND rd.reviewer_id = $2`,
+        [itemId, world.reviewerId],
+      );
+      expect(Number(earning.rows[0]?.amount_kobo)).toBe(5000);
+    });
+  });
+
+  it('decideOnItem pays the second-review bonus when the decision resolves needs_second_review', async () => {
+    await withWorld(async ({ world, fixtures, client, queue, decisions }) => {
+      const itemId = await fixtures.insertQueueItem(client, world, { riskTier: 'high' });
+
+      await queue.getNextItemBatch(world.reviewerId, 1, { random: neverGold });
+      await decisions.submitBlindAnswer(world.reviewerId, itemId, 'A');
+      await decisions.revealItem(world.reviewerId, itemId);
+      const first = await decisions.decideOnItem(world.reviewerId, itemId, {
+        action: 'approve',
+        rejectionReason: null,
+        edits: null,
+      });
+      expect(first).toMatchObject({ status: 'needs_second_review' });
+
+      await queue.getNextItemBatch(world.secondReviewerId, 1, { random: neverGold });
+      const second = await decisions.decideOnItem(world.secondReviewerId, itemId, {
+        action: 'approve',
+        rejectionReason: null,
+        edits: null,
+      });
+      expect(second).toMatchObject({ status: 'approved_uncalibrated' });
+
+      // First reviewer: high-tier bonus only (8000) — their decision did not
+      // resolve needs_second_review, it created it.
+      const firstEarning = await client.query<{ amount_kobo: string }>(
+        `SELECT re.amount_kobo FROM reviewer_earnings re
+           JOIN review_decisions rd ON rd.id = re.review_decision_id
+          WHERE rd.item_id = $1 AND rd.reviewer_id = $2`,
+        [itemId, world.reviewerId],
+      );
+      expect(Number(firstEarning.rows[0]?.amount_kobo)).toBe(8000);
+
+      // Second reviewer: high-tier bonus AND second-review bonus (10000) —
+      // their decision is what actually resolved it.
+      const secondEarning = await client.query<{ amount_kobo: string }>(
+        `SELECT re.amount_kobo FROM reviewer_earnings re
+           JOIN review_decisions rd ON rd.id = re.review_decision_id
+          WHERE rd.item_id = $1 AND rd.reviewer_id = $2`,
+        [itemId, world.secondReviewerId],
+      );
+      expect(Number(secondEarning.rows[0]?.amount_kobo)).toBe(10000);
+    });
+  });
+
+  it('decideOnItem records an earning for a late-arrival decision too, at the base/high-tier rate but never the second-review bonus', async () => {
+    await withWorld(async ({ world, fixtures, client, queue, decisions }) => {
+      const itemId = await fixtures.insertQueueItem(client, world, { riskTier: 'low' });
+      await queue.getNextItemBatch(world.reviewerId, 1, { random: neverGold });
+      await client.query(
+        `UPDATE review_claims SET claimed_at = now() - interval '2 hours', expires_at = now() - interval '1 minute' WHERE item_id = $1`,
+        [itemId],
+      );
+      await queue.releaseExpiredClaims();
+      await queue.getNextItemBatch(world.secondReviewerId, 1, { random: neverGold });
+      await decisions.decideOnItem(world.secondReviewerId, itemId, {
+        action: 'approve',
+        rejectionReason: null,
+        edits: null,
+      });
+
+      const lateArrival = await decisions.decideOnItem(world.reviewerId, itemId, {
+        action: 'reject',
+        rejectionReason: 'wrong_key',
+        edits: null,
+      });
+      expect(lateArrival).toMatchObject({ decisionContext: 'late_arrival' });
+
+      const earning = await client.query<{ amount_kobo: string }>(
+        `SELECT re.amount_kobo FROM reviewer_earnings re
+           JOIN review_decisions rd ON rd.id = re.review_decision_id
+          WHERE rd.item_id = $1 AND rd.reviewer_id = $2`,
+        [itemId, world.reviewerId],
+      );
+      expect(Number(earning.rows[0]?.amount_kobo)).toBe(5000);
+    });
+  });
+
+  it('decideOnItem returns an identically-shaped outcome for a gold item and an ordinary one — gold-item scoring never leaks through the response', async () => {
+    await withWorld(async ({ world, fixtures, client, queue, decisions }) => {
+      const goldItemId = await fixtures.insertQueueItem(client, world, {
+        riskTier: 'low',
+        gold: { referenceDecision: 'approve', referenceKey: 'A', plantedErrorType: null },
+      });
+      // Gold items are excluded from ordinary serving unless the draw
+      // fires — force it here, the same way the scoring test above does.
+      await queue.getNextItemBatch(world.reviewerId, 1, { random: alwaysGold });
+      const goldResult = await decisions.decideOnItem(world.reviewerId, goldItemId, {
+        action: 'approve',
+        rejectionReason: null,
+        edits: null,
+      });
+
+      const ordinaryItemId = await fixtures.insertQueueItem(client, world, { riskTier: 'low' });
+      await queue.getNextItemBatch(world.secondReviewerId, 1, { random: neverGold });
+      const ordinaryResult = await decisions.decideOnItem(world.secondReviewerId, ordinaryItemId, {
+        action: 'approve',
+        rejectionReason: null,
+        edits: null,
+      });
+
+      // Same key set on both — nothing about gold scoring rides along on
+      // the outcome object, and TypeScript's own DecideResult type (four
+      // fixed fields) makes this the only shape either branch can produce.
+      expect(Object.keys(goldResult).sort()).toEqual(Object.keys(ordinaryResult).sort());
+      // Same status/approvalRoute/decisionContext values too — a low-tier,
+      // sole reviewer, live approval lands identically regardless of gold.
+      expect(goldResult).toMatchObject({
+        ok: true,
+        status: 'approved_uncalibrated',
+        approvalRoute: 'human_reviewed',
+        decisionContext: 'live',
+      });
+      expect(ordinaryResult).toMatchObject({
+        ok: true,
+        status: 'approved_uncalibrated',
+        approvalRoute: 'human_reviewed',
+        decisionContext: 'live',
+      });
+
+      // The one place gold status is genuinely, silently recorded — never
+      // reflected back to the caller of decideOnItem above.
+      const score = await client.query('SELECT 1 FROM gold_item_scores WHERE item_id = $1', [
+        goldItemId,
+      ]);
+      expect(score.rowCount).toBe(1);
     });
   });
 });

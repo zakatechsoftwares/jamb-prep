@@ -1,10 +1,14 @@
 import {
   authenticateReviewer,
   decideOnItem,
+  getAuditSample,
+  getContentLeadDashboard,
   getNextItem,
   getNextItemBatch,
+  recordModeratorAudit,
   resolveEscalation,
   revealItem,
+  runWeeklyPayment,
   submitBlindAnswer,
 } from '@jamb/db';
 import { createApp } from './app';
@@ -29,6 +33,13 @@ const app = createApp({
   },
   reviewEscalation: {
     resolveEscalation: (reviewerId, itemId, input) => resolveEscalation(reviewerId, itemId, input),
+  },
+  contentLead: {
+    getDashboard: (since) => getContentLeadDashboard(since),
+    runWeeklyPayment: (runAt) => runWeeklyPayment(runAt),
+    getAuditSample: (reviewerId, since, count) => getAuditSample(reviewerId, since, count),
+    recordModeratorAudit: (itemId, moderatorId, agreed, note) =>
+      recordModeratorAudit(itemId, moderatorId, agreed, note),
   },
 });
 

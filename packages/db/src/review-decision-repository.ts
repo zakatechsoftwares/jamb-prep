@@ -21,6 +21,8 @@ import {
   type SolveOutcome,
 } from '@jamb/shared';
 import { firstRow } from './first-row';
+import { recordEarning } from './reviewer-earnings-repository';
+import { scoreGoldDecision } from './reviewer-quality-repository';
 import {
   loadPriorDecisions,
   loadReviewer,
@@ -261,9 +263,19 @@ export async function decideOnItem(
 
     const occurredAt = new Date();
     let transitionResult: ReturnType<typeof transition> | null = null;
+    // Whether this live decision resolves needs_second_review — i.e. a
+    // prior, different reviewer's decision already exists for this item.
+    // Not derivable from item.status: claiming an item in needs_second_review
+    // already moves it to in_review before decideOnItem ever reads status,
+    // so status alone can never distinguish a first decision from a second
+    // one at decide time. A late arrival never resolves anything (no
+    // transition happens for it at all), so it is never the second review,
+    // whatever the item's status looks like by the time it lands.
+    let isSecondReview = false;
 
     if (!isLateArrival) {
       const priorDecisions = (await loadPriorDecisions(client, [itemId])).get(itemId) ?? [];
+      isSecondReview = priorDecisions.length > 0;
       try {
         transitionResult = transition(
           item.status,
@@ -336,9 +348,26 @@ export async function decideOnItem(
       // already recorded by an earlier attempt (8.3's idempotent retry).
       // Nothing here has been applied twice — the transaction still commits
       // (there is nothing left to commit), and the caller gets back the
-      // same outcome as the original request.
+      // same outcome as the original request. Gold scoring and earnings
+      // were already recorded the first time this idempotency key was
+      // seen — recording them again here would double-count both.
       return await outcomeForIdempotencyKey(client, idempotencyKey);
     }
+
+    const reviewDecisionId = firstRow(inserted).id;
+
+    // Gold-item scoring (7.11): silent, and applies to a late arrival
+    // exactly as to a live decision — a late-arriving second opinion on a
+    // gold item is still a genuine accuracy data point. Never reflected in
+    // anything returned from this function.
+    await scoreGoldDecision(client, itemId, reviewer.reviewer_id, reviewDecisionId, {
+      action: input.action,
+      editedKey: input.action === 'edit_and_approve' ? input.edits?.key : undefined,
+    });
+
+    // Earnings (7.11) — see isSecondReview's own comment above for why it
+    // is computed from priorDecisions rather than item.status.
+    await recordEarning(client, reviewDecisionId, reviewer.reviewer_id, item.risk_tier, isSecondReview);
 
     if (isLateArrival) {
       const current = firstRow(

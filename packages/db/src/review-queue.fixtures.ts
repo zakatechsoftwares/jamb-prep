@@ -15,7 +15,13 @@ import { firstRow } from './first-row';
  * module never opens a connection.
  */
 
-const TRUNCATED_TABLES = ['subjects', 'users'];
+// payment_batches has no FK pointing back into the subjects/users graph —
+// it's only ever referenced *from* reviewer_earnings/payment_batch_lines,
+// never the reverse — so `TRUNCATE subjects, users CASCADE` alone can never
+// reach it. Named explicitly so a test that runs a real payment (e.g.
+// content-lead-service.integration.test.ts) doesn't leave a batch row that
+// pollutes another file's row-count assertions.
+const TRUNCATED_TABLES = ['subjects', 'users', 'payment_batches'];
 
 export interface QueueWorld {
   subjectId: number;
@@ -163,7 +169,9 @@ export interface QueueItemOptions {
   createdAt?: string;
   subjectId?: number;
   objectiveId?: number;
-  gold?: boolean;
+  gold?:
+    | boolean
+    | { referenceDecision?: string; referenceKey?: string; plantedErrorType?: string | null };
 }
 
 export async function insertQueueItem(
@@ -209,10 +217,16 @@ export async function insertQueueItem(
   }
 
   if (options.gold) {
+    const gold = options.gold === true ? {} : options.gold;
     await client.query(
       `INSERT INTO gold_items (item_id, reference_decision, reference_key, planted_error_type)
-       VALUES ($1, 'reject', 'A', 'wrong_key')`,
-      [itemId],
+       VALUES ($1, $2, $3, $4)`,
+      [
+        itemId,
+        gold.referenceDecision ?? 'reject',
+        gold.referenceKey ?? 'A',
+        gold.plantedErrorType === undefined ? 'wrong_key' : gold.plantedErrorType,
+      ],
     );
   }
 

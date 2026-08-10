@@ -33,7 +33,7 @@ you need "what comes next."
 | 06        | reviewer workspace prompts | Session C — Review submission and the answer-before-key flow                                                                                                    | done, PR #7             |
 | 07        | reviewer workspace prompts | Session D — The reviewer workspace UI                                                                                                                           | done, PR against `main` |
 | 08        | reviewer workspace prompts | Session E — Offline layer for the workspace                                                                                                                     | done, PR against `main` |
-| 09        | reviewer workspace prompts | Session F — Gold items, audit, and payment accrual                                                                                                              | not started             |
+| 09        | reviewer workspace prompts | Session F — Gold items, audit, and payment accrual                                                                                                              | done, PR against `main` |
 | 10        | playbook                   | "Using Claude to generate the question bank" (the item generation pipeline, `tools/item-gen/`)                                                                  | not started             |
 | 11        | reviewer workspace prompts | "Then: the contributor brief board"                                                                                                                             | not started             |
 | 12        | playbook                   | Session 4 — Mock CBT engine                                                                                                                                     | not started             |
@@ -654,3 +654,168 @@ was a single direct `fetch`, and a network failure just returned
 
 **Next:** session F (canonical 09) — gold items, audit, and payment
 accrual — or whatever PR/merge housekeeping the user prioritises first.
+
+## Session 09 — gold items, audit, and payment accrual (2026-08-09, `session/09-audit-payment`, PR against `main`)
+
+Closes the quality loop and the money loop (plan 7.11): gold-item scoring,
+moderator audit, accuracy thresholds, inter-rater agreement, payment
+accrual, the weekly payment run, and the content-lead dashboard.
+
+**Built:**
+
+- `packages/shared`: four new pure logic modules, each tests-first —
+  `gold-scoring-policy.ts` (`scoresAgreement`, `edit_and_approve` counts as
+  approve, and checks the edited key against the reference when both are
+  present), `earnings-policy.ts` (`computeEarningsKobo` deliberately takes
+  no `action` parameter — rejections pay the same as approvals *by
+  construction*, not by convention, so there is nothing to "optimise"
+  later), `accuracy-threshold-policy.ts` (`evaluateAccuracyThreshold`:
+  `ok` / `recalibrate` / `deactivate`, tracking consecutive failures),
+  `inter-rater-agreement.ts` (`computeInterRaterAgreement`, explicitly
+  documented as a content signal, not a reviewer signal). `content-lead-policy.ts`
+  adds the dashboard's shapes, the `ContentLeadService` contract, and
+  `aggregateRejectionReasons` — sums the repository's per-subject-week rows
+  into one per-subject-reason total across the whole window, which is what
+  actually answers "which prompt defect to fix next" rather than a single
+  week's top row.
+- `packages/db` migrations `0017`–`0019`: `items.inference_cost_usd`;
+  `payment_rate_configs` / `payment_batches` / `payment_batch_lines` /
+  `reviewer_earnings` (versioned-config-table pattern, append-only guard
+  triggers); `gold_item_scores` (append-only) and
+  `accuracy_threshold_configs`. `reviewer_earnings` gets a *partial*
+  immutability guard: `amount_kobo`/`rate_basis` never change; `paid_at`/
+  `payment_batch_id` may move from NULL to a value exactly once.
+- Repositories, each with its own integration tests against a real
+  Postgres: `reviewer-quality-repository.ts` (`scoreGoldDecision`, rolling
+  `accuracy_score`), `reviewer-earnings-repository.ts` (`recordEarning`,
+  reads the active `payment_rate_configs` row), `moderator-audit-repository.ts`
+  (random weekly sample of one reviewer's approvals, excluding anything
+  already audited), `accuracy-threshold-sweep.ts` (recalibrate re-issues
+  nothing yet — it only flips `reviewers.status` to `'calibrating'`, since
+  generating an actual 30-item set is unbuilt; deactivate reuses the
+  *existing* `quarantined`→`reworked` transitions to requeue the reviewer's
+  recent approvals, rather than inventing a new lifecycle event — both
+  handlers were already actor-free), `inter-rater-agreement-repository.ts`
+  (pairs the two chronologically-earliest *live* decisions per item — the
+  state machine's own guards mean a live-decided item never accumulates a
+  third), `payment-run-repository.ts` (`generatePaymentRun`: locks every
+  unpaid `reviewer_earnings` row, idempotent within one transaction because
+  a second call sees its own prior UPDATE and finds nothing left unpaid),
+  `content-dashboard-repository.ts` (five metrics), `content-lead-service.ts`
+  (the pool-managed composition of all of the above, exposed from `@jamb/db`'s
+  index — only the composed functions, never the per-client pieces).
+- `decideOnItem` wires gold scoring and earnings into its existing
+  transaction, for both `'live'` and `'late_arrival'` decisions alike.
+  Neither call's result is ever reflected in the outcome returned to the
+  caller.
+- `apps/api`: `requireContentLead` middleware (mirrors `requireModerator`).
+  `/content-lead/dashboard` and `/content-lead/payment-runs` are
+  content-lead-gated; `/content-lead/audit-sample` and
+  `/content-lead/audits/:itemId` are moderator-gated, with `moderatorId`
+  always taken from the session, never the request body.
+- `apps/admin`: `/content-lead`, a `content_lead`-only route (redirects
+  anyone else to `/`; login sends a `content_lead` session there instead
+  of the reviewer workspace). `ContentLeadDashboard` renders all six
+  metrics, with a "Fix next" callout driven by `aggregateRejectionReasons`.
+  `useContentLeadDashboard` takes an explicit `enabled` flag — without it,
+  the fetch effect fires once on mount for *any* authenticated session
+  before the page's own redirect-away effect has a chance to run, since
+  hooks run unconditionally ahead of a component's early return.
+
+**DONE WHEN verification:** ran the real stack against a live, seeded
+Postgres database — `pnpm typecheck` and `pnpm test` clean across all five
+packages (831 tests, zero failures, zero skips with `DATABASE_URL` set);
+seeded a `content_lead` reviewer and a deliberately lopsided rejection
+history (`implausible_distractor` dominant at 9 across two weeks, beating
+any single week's row), started `apps/api` and `apps/admin`'s dev servers,
+logged in through the real `/api/review/login` route and fetched
+`/api/content-lead/dashboard` through the same Next.js proxy the browser
+uses — the response matched the seed exactly, `implausible_distractor`
+first. Playwright is not installed in this environment and wasn't added
+without asking first, so this was a live HTTP round-trip through the real
+proxy and route stack rather than a captured screenshot; `ContentLeadDashboard.test.tsx`
+separately proves that exact response shape renders correctly in the DOM.
+
+**Decisions worth remembering:**
+
+- **Earnings are never clawed back on deactivation.** When
+  `sweepReviewerAccuracy` deactivates a reviewer and requeues their recent
+  approvals for re-review, the `reviewer_earnings` rows for those decisions
+  are left untouched. The user's own framing: the work was genuinely done
+  at the time, and removal from the panel is the remedy, not retroactive
+  unpaid work. Stated here and in `sweepReviewerAccuracy`'s own doc comment
+  so it isn't rediscovered as a question later.
+- **Convention: a comparison that must stay blind to the user needs
+  symmetric work, not just symmetric output.** Gold-item scoring must not
+  leak through timing any more than through status codes or response
+  shape. `scoreGoldDecision` originally ran one query for a non-gold
+  decision but four for a gold one (lookup, insert, average, update) — a
+  reviewer measuring response latency across many decisions could in
+  principle use that asymmetry to infer which of their own past items were
+  gold. Fixed by running the accuracy recompute-and-write unconditionally:
+  for a non-gold decision it just rewrites the same value, since no new
+  `gold_item_scores` row exists to change it. Only the one `INSERT` still
+  differs. A dedicated integration test asserts `decideOnItem`'s outcome is
+  identically shaped and valued for a gold item and an ordinary one — same
+  reasoning as collapsing the two 403 cases in session 06, extended from
+  "the response must look the same" to "the server must have done the same
+  amount of work to produce it." Matching output while branching
+  internally on the hidden fact is not enough — the branch itself is a
+  side channel. **This will come up again in session 10:** sampled review
+  (an item pulled for spot-check re-review, invisible to the reviewer who
+  drew it) is the same shape of problem as a gold item — a decision whose
+  hidden status must not be inferable from how the request behaves. Route
+  it through the same discipline: identify every place the sampled/
+  not-sampled branch changes query count, call count, or control flow, and
+  make the unsampled path do the equivalent work rather than skip it.
+- **A reviewer's second-review status cannot be read from `item.status` at
+  decide time.** Claiming an item already transitions it from
+  `needs_second_review` to `in_review` *before* `decideOnItem`'s own
+  `SELECT status ... FOR UPDATE` runs, so `item.status === 'needs_second_review'`
+  can never be true when a live decision is being recorded — regardless of
+  whether it's the first or second reviewer. Found via an end-to-end wiring
+  test (the second reviewer's earnings came back short the high-tier
+  second-review bonus), fixed by computing `isSecondReview` from
+  `priorDecisions.length > 0` instead, which was already being loaded for
+  the state-machine call at that point.
+- **`inference_cost_usd` and `reviewer_earnings.amount_kobo` are never
+  summed.** Different currencies; blending them without a real exchange
+  rate would fabricate precision that doesn't exist. The dashboard reports
+  `avgInferenceCostUsd` and `avgReviewerFeesKobo` as two separate numbers —
+  the plan's own "split into" framing, taken literally.
+- **`TRUNCATE subjects, users CASCADE` cannot reach `payment_batches`.**
+  It's referenced *from* `reviewer_earnings`/`payment_batch_lines`, never
+  the reverse, so nothing in the subjects/users cascade graph points at it.
+  A test that runs a real payment left a stray batch row polluting a later
+  file's row-count assertions; fixed by adding `payment_batches` to
+  `review-queue.fixtures.ts`'s `TRUNCATED_TABLES` explicitly, which also
+  protects every future test that touches payment data the same way.
+
+**Open at close:**
+
+- Recalibration (`sweepReviewerAccuracy`'s `'recalibrate'` verdict) only
+  flips `reviewers.status` to `'calibrating'` — it does not re-issue an
+  actual 30-item calibration set, because nothing in this repo generates
+  or serves one yet. Whatever session eventually builds calibration sets
+  should read this status as its trigger.
+- No bank-transfer batch *file* is generated — `generatePaymentRun`
+  produces `payment_batches`/`payment_batch_lines` rows and a per-reviewer
+  statement is queryable from them, but nothing writes them out to a file
+  format a real payment processor would accept. The session prompt's
+  "generate a bank transfer batch file" is satisfied at the data level,
+  not the file-export level.
+- The content-lead dashboard has no UI for triggering a payment run or
+  recording a moderator audit — `/content-lead/payment-runs` and
+  `/content-lead/audits/:itemId` exist and are tested at the route level,
+  but nothing in `apps/admin` calls them yet. The DONE WHEN requirement was
+  specifically the dashboard rendering live data with the rejection-reason
+  aggregation obvious at a glance; those two routes were built because the
+  session prompt named them explicitly, not because the dashboard page
+  needed them.
+- Subject names never reach the dashboard — every subject-scoped row
+  renders as `Subject #<id>`. `ContentDashboard` only carries `subjectId`;
+  resolving it to a name would mean either a join the repository queries
+  don't currently do or a second fetch the admin app doesn't yet make.
+
+**Next:** whatever PR/merge housekeeping the user prioritises first, or
+the item generation pipeline (canonical session 10).

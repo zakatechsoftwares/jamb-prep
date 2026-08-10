@@ -8,7 +8,10 @@ const apiBaseUrl = process.env.API_BASE_URL ?? 'http://localhost:3000';
 const nextConfig = {
   reactStrictMode: true,
   async rewrites() {
-    return [{ source: '/api/review/:path*', destination: `${apiBaseUrl}/review/:path*` }];
+    return [
+      { source: '/api/review/:path*', destination: `${apiBaseUrl}/review/:path*` },
+      { source: '/api/content-lead/:path*', destination: `${apiBaseUrl}/content-lead/:path*` },
+    ];
   },
 };
 

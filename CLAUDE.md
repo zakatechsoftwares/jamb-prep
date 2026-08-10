@@ -228,6 +228,20 @@ answer intact. Write tests for this scenario early and keep them green.
   and re-check whether that effect's own "when does this fire" comment
   still holds — the callback's growing dependency list is invisible to
   that effect's own deps array.
+- **A data-fetching hook used by a role-gated page needs an explicit
+  `enabled` flag — the page's own early return does not stop the hook's
+  effect from firing first.** React calls every hook in a component
+  unconditionally, before any `if (...) return null` in that component's
+  body runs — so `ContentLeadPage`'s redirect-away effect for a
+  non-`content_lead` session does not prevent `useContentLeadDashboard`'s
+  fetch effect from firing once on the very same mount, hitting a route
+  that session has no business calling. Fixed by adding an `enabled:
+  boolean` parameter the hook's effect checks before fetching, passed as
+  `session?.role === 'content_lead'` from the page. Caught by a test that
+  rendered the page with a non-`content_lead` session and asserted the
+  mocked `apiClient` method was never called — asserting only on the
+  redirect, as `app/page.test.tsx`'s existing pattern does, would have
+  missed it.
 - **The server-side idempotent-retry pattern for a queued/offline write:**
   `decideOnItem` (`packages/db/src/review-decision-repository.ts`) inserts
   with `ON CONFLICT (idempotency_key) DO NOTHING RETURNING id`; when that
@@ -253,6 +267,84 @@ answer intact. Write tests for this scenario early and keep them green.
   query (7.11's inter-rater agreement) can select on it directly. See
   `packages/shared/review-decision-policy.ts`'s `DecisionContext` doc
   comment for the full reasoning.
+- **A money table gets a *partial* immutability guard, not the full
+  append-only one.** `reviewer_earnings.amount_kobo`/`rate_basis` are
+  immutable forever, exactly like `review_decisions`/`item_state_transitions`
+  — but `paid_at`/`payment_batch_id` legitimately need to move, exactly
+  once, from `NULL` to a real value when the weekly payment run pays the
+  row. The guard trigger (`forbid_reviewer_earnings_rewrite`, migration
+  `0018`) allows that one NULL→value transition on those two columns and
+  rejects every other change, including a second attempt to set them.
+  Money rows that can be silently rewritten are worse than none. (When
+  writing a test for a guard like this: Postgres's `now()` is constant for
+  the whole transaction, not per-statement — a test that calls
+  `SET paid_at = now()` twice in one transaction is setting the *same*
+  value twice, which a correct guard allows as a no-op. Use
+  `now() + interval '1 minute'` to force a genuinely different value.)
+- **A "never leaks" requirement covers status codes, response shape,
+  *and* timing.** Gold-item scoring (7.11) must be undetectable by the
+  reviewer being scored — same reasoning as collapsing the two 403 cases
+  in session 06, extended to timing. `decideOnItem`'s return type
+  (`DecideResult`, four fixed fields) makes shape/status leakage a
+  compile-time impossibility, not just a runtime discipline. Timing is
+  easier to get wrong silently: `scoreGoldDecision` originally ran one
+  query for a non-gold decision but four for a gold one, which a reviewer
+  measuring response latency across many decisions could in principle use
+  to infer which of their own past items were gold. Fixed by running the
+  accuracy recompute-and-write unconditionally — for a non-gold decision
+  it just rewrites the same value, since no new `gold_item_scores` row
+  exists to change it. When a value is computed conditionally on a fact
+  that must stay hidden, ask whether the *query count*, not just the
+  returned value, still varies with that fact.
+- **A deactivated reviewer keeps the earnings for the decisions that got
+  them deactivated.** When `sweepReviewerAccuracy` (accuracy-threshold-sweep.ts)
+  deactivates a reviewer and requeues their recent approvals for
+  re-review, `reviewer_earnings` rows for those decisions are left
+  untouched — never clawed back. The work was genuinely done at the time;
+  removal from the panel is the remedy, not retroactively unpaid work.
+  This is a deliberate product decision, not an oversight — stated here
+  and in `sweepReviewerAccuracy`'s own doc comment specifically so it
+  isn't rediscovered as an open question by a later session.
+- **Reuse an existing actor-free state transition instead of inventing a
+  new lifecycle event, when the existing one already fits.** Requeuing a
+  deactivated reviewer's approvals for re-review needed no new
+  `LifecycleEvent` — `item-state-machine.ts`'s existing
+  `approved_uncalibrated` → `quarantined` → `reworked` transitions were
+  already actor-free (neither guard dereferences `context.item`), so
+  `accuracy-threshold-sweep.ts` drives an item through both rather than
+  adding a fifth thing to `ITEM_STATUSES`. Check whether the state machine
+  already has a path that means what you need before adding a new event
+  or status to it.
+- **`item.status` cannot tell you whether a decision is the first or
+  second review, at decide time.** Claiming an item already transitions
+  it from `needs_second_review` to `in_review` *before* `decideOnItem`'s
+  own `SELECT status ... FOR UPDATE` runs, so `item.status ===
+  'needs_second_review'` can never be true when a live decision is being
+  recorded — regardless of whether it's the first or second reviewer. Use
+  `priorDecisions.length > 0` instead (already loaded for the
+  state-machine transition call at that point). This was a real bug,
+  found by an end-to-end wiring test asserting the actual earnings amount,
+  not a narrower unit test — a reminder that "the state machine transition
+  succeeded" and "the field I read to decide *how* to score it was
+  correct" are different claims, and only an end-to-end assertion catches
+  the second one.
+- **Two currencies in one dashboard number is a red flag, not a
+  convenience.** `items.inference_cost_usd` (USD) and
+  `reviewer_earnings.amount_kobo` (NGN kobo) are never summed —
+  `costPerApprovedItem` reports `avgInferenceCostUsd` and
+  `avgReviewerFeesKobo` as two separate fields. Blending them without a
+  real exchange rate would fabricate a precision that doesn't exist.
+- **`TRUNCATE subjects, users CASCADE` cannot reach a table that's only
+  ever referenced *from*, never *pointed at by*, that graph.**
+  `payment_batches` has no FK into subjects/users, only tables
+  (`reviewer_earnings`, `payment_batch_lines`) that point *at* it — so
+  `review-queue.fixtures.ts`'s existing truncate helper silently missed it
+  until a test that ran a real payment left a stray row polluting a later
+  file's row-count assertions. `TRUNCATED_TABLES` now names
+  `payment_batches` explicitly. When a new table is money- or
+  batch-shaped (something other tables reference rather than the reverse),
+  check whether the shared truncate fixture actually reaches it before
+  assuming it does.
 
 ## Content pipeline rules
 

@@ -426,3 +426,63 @@ describe('decide', () => {
     });
   });
 });
+
+describe('getContentDashboard', () => {
+  it('requests the dashboard with since as an ISO query parameter', async () => {
+    const { fetchImpl, calls } = fakeFetch([
+      {
+        status: 200,
+        body: {
+          acceptedItemsPerReviewerHour: 3.5,
+          rejectionReasons: [
+            { subjectId: 1, week: '2026-01-05T00:00:00.000Z', rejectionReason: 'wrong_key', count: 4 },
+          ],
+          queueDepth: [{ subjectId: 1, depth: 12 }],
+          itemsByState: [{ status: 'pending_review', count: 12 }],
+          costPerApprovedItem: { approvedCount: 10, avgInferenceCostUsd: 0.02, avgReviewerFeesKobo: 5000 },
+          interRaterAgreement: [{ subjectId: 1, pairCount: 4, agreementRate: 0.75 }],
+        },
+      },
+    ]);
+    const client = createApiClient(fetchImpl);
+
+    const result = await client.getContentDashboard('tok123', new Date('2026-01-01T00:00:00.000Z'));
+
+    expect(calls[0]?.url).toBe(
+      '/api/content-lead/dashboard?since=2026-01-01T00%3A00%3A00.000Z',
+    );
+    expect(result).toEqual({
+      ok: true,
+      dashboard: {
+        acceptedItemsPerReviewerHour: 3.5,
+        rejectionReasons: [
+          { subjectId: 1, week: new Date('2026-01-05T00:00:00.000Z'), rejectionReason: 'wrong_key', count: 4 },
+        ],
+        queueDepth: [{ subjectId: 1, depth: 12 }],
+        itemsByState: [{ status: 'pending_review', count: 12 }],
+        costPerApprovedItem: { approvedCount: 10, avgInferenceCostUsd: 0.02, avgReviewerFeesKobo: 5000 },
+        interRaterAgreement: [{ subjectId: 1, pairCount: 4, agreementRate: 0.75 }],
+      },
+    });
+  });
+
+  it('reports unauthorized on 401', async () => {
+    const { fetchImpl } = fakeFetch([{ status: 401, body: {} }]);
+    const client = createApiClient(fetchImpl);
+
+    expect(await client.getContentDashboard('tok123', new Date())).toEqual({
+      ok: false,
+      reason: 'unauthorized',
+    });
+  });
+
+  it('reports forbidden on 403, distinct from unauthorized', async () => {
+    const { fetchImpl } = fakeFetch([{ status: 403, body: {} }]);
+    const client = createApiClient(fetchImpl);
+
+    expect(await client.getContentDashboard('tok123', new Date())).toEqual({
+      ok: false,
+      reason: 'forbidden',
+    });
+  });
+});

@@ -26,3 +26,14 @@ export {
   submitBlindAnswer,
 } from './review-decision-repository';
 export { authenticateReviewer, setReviewerPassword } from './reviewer-auth-repository';
+// The content-lead dashboard and its two write actions (plan 7.11), composed
+// from content-dashboard-repository / inter-rater-agreement-repository /
+// payment-run-repository / moderator-audit-repository. Only the composed,
+// pool-managed functions are exported here — the per-client pieces stay
+// internal, the same split `withTransaction` already established.
+export {
+  getAuditSample,
+  getContentLeadDashboard,
+  recordModeratorAudit,
+  runWeeklyPayment,
+} from './content-lead-service';
