@@ -745,17 +745,29 @@ separately proves that exact response shape renders correctly in the DOM.
   at the time, and removal from the panel is the remedy, not retroactive
   unpaid work. Stated here and in `sweepReviewerAccuracy`'s own doc comment
   so it isn't rediscovered as a question later.
-- **Gold-item scoring must not leak through timing either.**
-  `scoreGoldDecision` originally ran one query for a non-gold decision but
-  four for a gold one (lookup, insert, average, update) — a reviewer
-  measuring response latency across many decisions could in principle use
-  that asymmetry to infer which of their own past items were gold. Fixed
-  by running the accuracy recompute-and-write unconditionally: for a
-  non-gold decision it just rewrites the same value, since no new
+- **Convention: a comparison that must stay blind to the user needs
+  symmetric work, not just symmetric output.** Gold-item scoring must not
+  leak through timing any more than through status codes or response
+  shape. `scoreGoldDecision` originally ran one query for a non-gold
+  decision but four for a gold one (lookup, insert, average, update) — a
+  reviewer measuring response latency across many decisions could in
+  principle use that asymmetry to infer which of their own past items were
+  gold. Fixed by running the accuracy recompute-and-write unconditionally:
+  for a non-gold decision it just rewrites the same value, since no new
   `gold_item_scores` row exists to change it. Only the one `INSERT` still
   differs. A dedicated integration test asserts `decideOnItem`'s outcome is
   identically shaped and valued for a gold item and an ordinary one — same
-  reasoning as collapsing the two 403 cases in session 06.
+  reasoning as collapsing the two 403 cases in session 06, extended from
+  "the response must look the same" to "the server must have done the same
+  amount of work to produce it." Matching output while branching
+  internally on the hidden fact is not enough — the branch itself is a
+  side channel. **This will come up again in session 10:** sampled review
+  (an item pulled for spot-check re-review, invisible to the reviewer who
+  drew it) is the same shape of problem as a gold item — a decision whose
+  hidden status must not be inferable from how the request behaves. Route
+  it through the same discipline: identify every place the sampled/
+  not-sampled branch changes query count, call count, or control flow, and
+  make the unsampled path do the equivalent work rather than skip it.
 - **A reviewer's second-review status cannot be read from `item.status` at
   decide time.** Claiming an item already transitions it from
   `needs_second_review` to `in_review` *before* `decideOnItem`'s own
