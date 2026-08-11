@@ -949,6 +949,14 @@ run is the user's to make once real keys are set.
   packages' DB-touching integration tests ever run at the same time. Each
   package's own `fileParallelism: false` already prevented the same race
   *within* one package; this closes the gap *between* packages.
+  **This trades CI wall-clock time for correctness, deliberately — it is
+  not a permanent ceiling.** If that trade stops being worth it as more
+  packages accrue their own integration suites, the real fix is giving
+  each package's integration tests their own database or schema, so
+  concurrent truncation across packages stops being possible in the first
+  place, rather than raising this back toward concurrent execution and
+  reintroducing the race. `--workspace-concurrency=1` is the cheap fix for
+  today's package count, not the permanent shape of this trade-off.
 - **Rebalancing the key distribution controls the prompt, not the parser.**
   `permuteToRebalance` needs `explanation`/`method_steps` to reference an
   option after its label has changed. Regex-guessing which literal letter
