@@ -346,6 +346,68 @@ answer intact. Write tests for this scenario early and keep them green.
   check whether the shared truncate fixture actually reaches it before
   assuming it does.
 
+- **A comparison that must stay blind needs symmetric work — but only
+  where something is actually hidden.** Session 09's timing-side-channel
+  convention (gold-item scoring) generalizes, but it is not "make every
+  branch do identical work no matter what." The item-generation pipeline's
+  sampling draw (7.3) only runs for a low-risk item — a high-risk item is
+  already excluded from the automated route by `risk_tier` alone, and
+  `risk_tier` is visible in the item's own content (a calculation item
+  looks like one); nobody is trying to keep that hidden. Before applying
+  the symmetric-work discipline, ask what fact is actually secret. If
+  nothing is, skipping work on the branch that doesn't need it reveals
+  nothing.
+- **A heuristic that backstops a self-report may only raise the flag,
+  never lower it.** `resolveContainsCalculation`
+  (`packages/shared/item-gen-gates.ts`) is `modelSelfReport OR
+  heuristicMatch` — the model's own `contains_calculation` field is never
+  overridden down to `false`. The asymmetry matches the cost of being
+  wrong in each direction: a false positive costs one extra human review;
+  a false negative risks an unreviewed wrong key reaching a candidate.
+  Apply this pattern anywhere a cheap heuristic backstops a more expensive
+  or authoritative signal rather than replacing it.
+- **When a batch's total cost must be apportioned across its outputs,
+  decide explicitly whether failed outputs' share is written off or
+  redistributed — and say which, in the code, because it changes what a
+  downstream metric means.** `apportionAuthoringCost`
+  (`packages/shared/item-gen-cost.ts`) divides one authoring call's cost
+  by the items that actually became rows (including a `gate_failed`
+  item), not the items requested — a malformed draft's share is
+  redistributed onto the items that did survive, never excluded. Silently
+  excluding it would make a batch with heavy waste report exactly the
+  same average `inference_cost_usd` as a clean one, hiding the signal a
+  content lead most needs.
+- **`pnpm -r run test` runs every package's script concurrently by
+  default, and CI's `pnpm test` does exactly that against one shared
+  Postgres service.** Each package's own `fileParallelism: false` (see
+  above) only prevents a race *within* that package's own test files — it
+  does nothing about two different packages' integration tests truncating
+  and inserting into the same shared tables at the same time. Session 10
+  hit this for real: `apps/api`'s `login-end-to-end.integration.test.ts`
+  inserts a `users` row and then a `reviewers` row in two separate,
+  unguarded queries, and a `tools/item-gen` integration test truncating
+  `users` mid-way produced an intermittent FK-violation failure — confirmed
+  by running `apps/api`'s suite alone (always passes) against the full
+  `pnpm test` (flaked). Fixed at the root, not by patching the one test
+  that happened to lose the race: the root `test` script now runs with
+  `--workspace-concurrency=1`, so no two packages' DB-touching test suites
+  ever overlap. Any new package with its own truncate-based integration
+  tests inherits this protection automatically; nothing per-package to
+  remember.
+- **When a batch operation needs to rewrite a reference embedded in
+  free-form prose the model wrote, control the prompt so the reference is
+  a stable placeholder, not a literal value to regex-guess after the
+  fact.** `permuteToRebalance` needs to rewrite which option letter an
+  item's `explanation`/`method_steps` refers to after rebalancing changes
+  the labels. Guessing which literal capital letter in the model's prose
+  means "option A" — versus the article "a," or an unrelated capital
+  letter — is exactly the kind of fragile heuristic this repo avoids
+  elsewhere. The authoring prompt instead asks the model to write
+  `{{OPTION:A}}`, and rebalancing becomes a deterministic string
+  substitution. When you control the producer of a value you'll need to
+  transform later, make the value easy to transform instead of writing a
+  parser to cope with what a free-text producer might have written.
+
 ## Content pipeline rules
 
 - Generated items enter with `status: 'generated'`
@@ -355,6 +417,14 @@ answer intact. Write tests for this scenario early and keep them green.
   without sight of the proposed key) before any item reaches a human reviewer
 - Rebalance the A/B/C/D key distribution across each batch — generated banks
   skew heavily and this is a real defect, not cosmetic
+- Implemented in `tools/item-gen` (session 10) — `run-generation.ts` is the
+  orchestration core, tested against fake HTTP and a real database with no
+  API key required; `cli.ts` is the thin real-dependency entry point. The
+  independent-solve prompt's input type (`IndependentSolveInput`) carries
+  no `isCorrect`/`distractorRationale` field at all, so leaking the key
+  into that call is a compile-time impossibility, the same discipline
+  `RevealResult`/`DecideResult` already established for the reviewer
+  workspace.
 
 ### Approval routes
 

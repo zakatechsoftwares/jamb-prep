@@ -1,0 +1,22 @@
+{
+  "name": "item-gen",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "scripts": {
+    "start": "tsx src/cli.ts",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@jamb/db": "workspace:*",
+    "@jamb/shared": "workspace:*",
+    "pg": "^8.16.3"
+  },
+  "devDependencies": {
+    "@types/node": "^26.1.2",
+    "@types/pg": "^8.15.5",
+    "tsx": "^4.23.5",
+    "vitest": "^4.1.10"
+  }
+}

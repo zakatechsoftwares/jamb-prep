@@ -12,6 +12,7 @@ export {
   goldStockoutsSince,
   loadActiveQueueConfig,
   releaseExpiredClaims,
+  withTransaction,
   type GetNextItemOptions,
   type GoldStockoutCount,
 } from './review-queue-repository';
@@ -37,3 +38,15 @@ export {
   recordModeratorAudit,
   runWeeklyPayment,
 } from './content-lead-service';
+// The item-generation pipeline's own database access (item-generation-spec.md,
+// plan 7.4) — tools/item-gen is the only consumer of these today.
+export {
+  insertGeneratedItem,
+  loadLiveBankEmbeddings,
+  loadObjectiveContext,
+  promoteGeneratedItem,
+  type EmbeddingCandidate,
+  type GeneratedItemInsert,
+  type GeneratedOptionInsert,
+  type ObjectiveContext,
+} from './item-generation-repository';

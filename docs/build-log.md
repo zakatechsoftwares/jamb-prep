@@ -34,7 +34,7 @@ you need "what comes next."
 | 07        | reviewer workspace prompts | Session D — The reviewer workspace UI                                                                                                                           | done, PR against `main` |
 | 08        | reviewer workspace prompts | Session E — Offline layer for the workspace                                                                                                                     | done, PR against `main` |
 | 09        | reviewer workspace prompts | Session F — Gold items, audit, and payment accrual                                                                                                              | done, PR against `main` |
-| 10        | playbook                   | "Using Claude to generate the question bank" (the item generation pipeline, `tools/item-gen/`)                                                                  | not started             |
+| 10        | playbook                   | "Using Claude to generate the question bank" (the item generation pipeline, `tools/item-gen/`)                                                                  | done, PR against `main` |
 | 11        | reviewer workspace prompts | "Then: the contributor brief board"                                                                                                                             | not started             |
 | 12        | playbook                   | Session 4 — Mock CBT engine                                                                                                                                     | not started             |
 | 13        | playbook                   | Session 5 — Offline sync                                                                                                                                        | not started             |
@@ -819,3 +819,172 @@ separately proves that exact response shape renders correctly in the DOM.
 
 **Next:** whatever PR/merge housekeeping the user prioritises first, or
 the item generation pipeline (canonical session 10).
+
+## Session 10 — the item generation pipeline (2026-08-09, `session/10-generation-pipeline`, PR against `main`)
+
+Builds `tools/item-gen`, the batch program that authors items with the
+Anthropic API, gates them automatically, and writes them into the same
+lifecycle every other item goes through (item-generation-spec.md, plan
+7.3/7.4/7.14). Wires the two things earlier sessions built with no
+caller: `shouldSampleForReview` (session 05) and `items.inference_cost_usd`
+(session 09).
+
+**Built:**
+
+- Workspace: `pnpm-workspace.yaml`'s `tools` entry becomes `tools/*`
+  (previously matched nothing — no `package.json` sat directly under
+  `tools/`). New `item-gen` package; a root `item-gen` script filters into
+  it so `pnpm item-gen --subject chemistry --objective-id 42 --count 10`
+  works verbatim from the repo root.
+- Migration `0020_item_embeddings`: `items.stem_embedding DOUBLE
+  PRECISION[]`, nullable. No pgvector — duplicate detection is a linear
+  scan of one subject's rows in application code, fine at plan 7.2's
+  target volumes (thousands per subject, not millions).
+- `packages/shared`: `item-gen-gates.ts` (tests first) —
+  `computeKeyDistribution`, `permuteToRebalance` (greedy least-used-label
+  assignment, `{{OPTION:A}}` placeholder rewriting instead of regex-guessing
+  literal letters in the model's prose — see its own doc comment),
+  `validateItemSchema` (four options, one key, distractor_rationale on
+  every wrong option, no duplicate/all-or-none/length-outlier options),
+  `cosineSimilarity`, `detectsCalculationHeuristic` +
+  `resolveContainsCalculation` (three independent signals: explicit
+  operators, calculation-indicating phrasing, all-numeric options — ORs
+  with the model's own self-report, never lowers it). `item-gen-cost.ts`
+  (tests first) — `computeCallCostUsd` against a maintained pricing table,
+  `apportionAuthoringCost`, `computeItemInferenceCostUsd`.
+- `packages/db`: `item-generation-repository.ts` —
+  `loadObjectiveContext` (subject/topic/subtopic/objective, joined up the
+  hierarchy), `insertGeneratedItem`, `loadLiveBankEmbeddings` (everything
+  in the subject not `rejected`/`retired`), `promoteGeneratedItem` — the
+  exact `applyRequeueTransition` pattern from session 09's
+  accuracy-threshold-sweep: `transition()` from `@jamb/shared`, then one
+  `items` UPDATE and one `item_state_transitions` INSERT, for both
+  `auto_gate_promote` and `gates_passed` alike. New `@jamb/db/fixtures`
+  export subpath (mirroring the existing `./session-tokens` /
+  `./reviewer-errors` pattern) so `tools/item-gen`'s integration tests can
+  seed real syllabus/subject data with `review-queue.fixtures.ts` without
+  duplicating it.
+- `tools/item-gen/src/`: `anthropic-client.ts` / `voyage-client.ts` — plain
+  `fetch`, no SDK, injectable `fetchImpl`; `retry.ts` — exponential
+  backoff, injected `sleep`; `authoring-prompt.ts` (spec §4's template plus
+  `contains_calculation` in the requested JSON, since `deriveRiskTier`
+  needs it and the spec's own listed keys don't include it) /
+  `independent-solve-prompt.ts` (stem + options only — `IndependentSolveInput`
+  has no `isCorrect`/`distractorRationale` field at all, so leaking the key
+  into the blind-solve prompt is a compile-time impossibility, not a
+  runtime discipline); `parse-authoring-response.ts` (turns the model's
+  JSON into `ItemDraft`s, dropping anything too malformed to even attempt);
+  `raw-response-logger.ts` (every raw response to `generated-items-raw/`,
+  a directory `.gitignore` already anticipated); `gate-report.ts`; the
+  orchestration core `run-generation.ts` and the thin CLI entry `cli.ts`.
+- Per-item pipeline order (cheapest checks first, so a doomed item never
+  pays for a call it didn't need): schema validation (free, local) →
+  duplicate check (one Voyage embed call) → independent solve (one
+  Anthropic call) → sampling draw (low-risk items only) → insert +
+  promote, all in one transaction. A schema failure or duplicate hit skips
+  the solve call entirely.
+- Concurrency-limited (hand-rolled limiter, no `p-limit` dependency) per
+  batch; duplicate detection compares against the live bank and every item
+  already inserted earlier in the same batch.
+
+**DONE WHEN verification:** `pnpm typecheck` and `pnpm test` clean across
+all six packages — 924 tests, zero failures. `runGeneration`'s own
+integration test suite exercises the full pipeline against fake HTTP and a
+real Postgres database: a batch producing one auto-gated item, one
+pending-review item (independent solve disagreed), and one gate-failed
+item (missing distractor_rationale) in a single run; a near-duplicate of
+an existing live item flagged without ever calling the solve API for it;
+a low-risk item forced into the sampling draw landing in pending_review
+instead of auto-gated; a structurally malformed authored item discarded
+before it ever becomes a row; authoring cost apportioned exactly across
+the items that survived to insertion. No `ANTHROPIC_API_KEY` or
+`VOYAGE_API_KEY` exists in this environment, so the literal
+"running against one Chemistry objective produces 10 items in the
+database" was not executed against the real API this session — the user
+chose "build fully tested, defer the live run" when asked, and that is
+what this delivers: every code path proven against fakes, the real batch
+run is the user's to make once real keys are set.
+
+**Decisions worth remembering:**
+
+- **A comparison that must stay blind needs symmetric work — but only
+  where something is actually hidden.** The session 09 timing-side-channel
+  convention was checked against this session's own sampling draw: a
+  high-risk item is excluded from the automated route by `risk_tier`
+  alone, and `risk_tier` is already visible in the item's own content (a
+  calculation item looks like one) — nobody is trying to keep that hidden.
+  So the sampling draw only runs for low-risk items; skipping it for a
+  high-risk item reveals nothing that wasn't already obvious. The
+  convention is about protecting a genuinely hidden fact's inferability,
+  not about making every branch do identical work regardless of whether
+  anything is actually secret.
+- **`contains_calculation` is `modelSelfReport OR heuristicMatch`, never
+  the reverse.** The heuristic (explicit operators, calculation-indicating
+  phrasing, all-numeric options) can only raise the flag to true, never
+  lower a model's own `true`. A false positive costs one extra human
+  review; a false negative risks an unreviewed wrong key reaching a
+  candidate — the asymmetry in that trade-off is why the combination isn't
+  symmetric either.
+- **Authoring cost is apportioned across the items actually inserted, not
+  the items requested — including a `gate_failed` item, excluding only a
+  draft too malformed to become a row at all.** A batch that authored 10
+  items but only 7 survived to insertion still divides the full authoring
+  cost by 7, not 10: the 3 failed items' share is redistributed onto the
+  survivors, never written off. This is a deliberate accounting choice,
+  documented in `item-gen-cost.ts`'s own comment, because it's what makes
+  the content-lead dashboard's "cost per approved item" an honest number —
+  silently excluding failed items' cost would make a batch with heavy
+  waste look exactly as cheap as a clean one.
+- **A pre-existing cross-package test race, exposed by this session's new
+  integration tests, not caused by them.** `apps/api`'s
+  `login-end-to-end.integration.test.ts` inserts a `users` row and then a
+  `reviewers` row in two separate, unguarded queries. `pnpm -r run test`
+  runs every package's test script concurrently by default, and CI's own
+  `pnpm test` step does exactly that against one shared Postgres service —
+  so a `tools/item-gen` integration test truncating `users` mid-way
+  through that two-step insert produces a real, intermittent FK-violation
+  failure, confirmed by running `apps/api`'s suite alone (passes every
+  time) versus the full `pnpm test` (flaked). Fixed at the root: the root
+  `test` script now runs with `--workspace-concurrency=1`, so no two
+  packages' DB-touching integration tests ever run at the same time. Each
+  package's own `fileParallelism: false` already prevented the same race
+  *within* one package; this closes the gap *between* packages.
+- **Rebalancing the key distribution controls the prompt, not the parser.**
+  `permuteToRebalance` needs `explanation`/`method_steps` to reference an
+  option after its label has changed. Regex-guessing which literal letter
+  in the model's free-form prose means "option A" (versus the article "a",
+  or an unrelated capital letter) is exactly the kind of fragile heuristic
+  this repo has avoided elsewhere — so the authoring prompt asks the model
+  to write `{{OPTION:A}}` instead of the letter, and rebalancing is then a
+  deterministic string substitution, not a guess.
+
+**Open at close:**
+
+- The real batch run against a live Chemistry objective — DONE WHEN's
+  literal database-row outcome — has not been executed. `runGeneration`
+  is proven against fake HTTP and a real database; the actual API cost
+  and the real model's actual output quality (does the authoring prompt
+  in practice produce items that pass the gates at a reasonable rate?)
+  are unverified until a real run happens.
+- No embedding model version pinning beyond the `VOYAGE_MODEL` env var's
+  current value — if Voyage deprecates a model version, `stem_embedding`
+  values generated under different model versions would be compared
+  against each other by `loadLiveBankEmbeddings`/`cosineSimilarity` with
+  no warning that they're not directly comparable. Not a problem at this
+  session's scale (one model, one run), worth a column recording which
+  embedding model produced a given vector before this pipeline runs at
+  real volume.
+- `MODEL_PRICING` in `item-gen-cost.ts` is a maintained constant with no
+  live pricing API behind it — its own comment says to verify it against
+  Anthropic's current published pricing before trusting a real cost
+  figure. It was not verified against a live source this session.
+- The multi-objective / whole-subject batch run the sequencing table in
+  the spec (§6) implies ("Wave 1: Use of English, Biology... 2,000 items")
+  is out of scope — the CLI processes exactly one `--objective-id` per
+  invocation, matching the literal usage example. Running a whole wave
+  means invoking it once per objective, currently with no orchestration
+  wrapper around that loop.
+
+**Next:** a real batch run against a live Chemistry objective once
+`ANTHROPIC_API_KEY`/`VOYAGE_API_KEY` are available, or whatever the user
+prioritises next.
