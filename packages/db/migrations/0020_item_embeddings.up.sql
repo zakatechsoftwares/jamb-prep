@@ -1,0 +1,11 @@
+-- Duplicate detection by embedding similarity (item-generation-spec.md §3.3,
+-- plan 7.4/7.5) needs somewhere to store the stem embedding it compares
+-- against the live bank. No pgvector extension: at the volumes this schema
+-- targets (thousands of items per subject, not millions — plan 7.2), a
+-- linear scan of one subject's rows in application code is fine, and it
+-- avoids taking on a Postgres extension for a batch tool that runs
+-- occasionally, not a hot query path.
+--
+-- Nullable: every item that existed before this migration, and any
+-- human-authored/contributed item, has no embedding at all.
+ALTER TABLE items ADD COLUMN stem_embedding DOUBLE PRECISION[];
