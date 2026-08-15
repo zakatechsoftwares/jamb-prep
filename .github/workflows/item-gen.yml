@@ -1,0 +1,137 @@
+name: Item Generation
+
+# Manual only, and deliberately so: every run spends real money on Anthropic
+# and Voyage API calls and writes items to the live database named by
+# secrets.DATABASE_URL. There is no push/schedule trigger on purpose.
+on:
+  workflow_dispatch:
+    inputs:
+      subject:
+        description: 'Subject name, e.g. chemistry'
+        required: true
+        type: string
+      objective-id:
+        description: 'Objective ID (positive integer)'
+        required: true
+        type: string
+      count:
+        description: 'Items to generate (1-50; the job refuses anything higher)'
+        required: true
+        default: '10'
+        type: string
+
+# Two concurrent runs would double-spend against the same objective. Queue
+# them instead, and never cancel one mid-flight — a cancelled run has already
+# paid for its API calls and would lose the raw-response log.
+concurrency:
+  group: item-gen
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  generate:
+    runs-on: ubuntu-latest
+
+    env:
+      # Pinned rather than left to cli.ts's `import.meta.dirname`-relative
+      # default, so the artifact globs below and the CLI agree on one path.
+      ITEM_GEN_LOG_DIR: ${{ github.workspace }}/generated-items-raw
+
+    steps:
+      # Runs before checkout: a mistyped count should cost nothing at all.
+      # Inputs are read via env, never interpolated into the script body —
+      # `${{ }}` substitution happens before the shell sees the text, so an
+      # input containing shell metacharacters would otherwise execute in a
+      # job that holds three secrets.
+      - name: Validate inputs and enforce the generation cap
+        env:
+          COUNT: ${{ inputs.count }}
+          SUBJECT: ${{ inputs.subject }}
+          OBJECTIVE_ID: ${{ inputs['objective-id'] }}
+        run: |
+          # Leading zeros are rejected, not tolerated: bash arithmetic reads
+          # `060` as octal 48 and would pass it, while the CLI's Number()
+          # reads the same string as 60 — a silent way past the cap.
+          if ! [[ "$COUNT" =~ ^[1-9][0-9]*$ ]]; then
+            echo "::error::count must be a positive integer with no leading zeros, got: $COUNT"
+            exit 1
+          fi
+          if (( COUNT > 50 )); then
+            echo "::error::count must not exceed 50, got: $COUNT"
+            exit 1
+          fi
+
+          # cli.ts requires a positive integer here too; failing now costs
+          # nothing, whereas failing there costs an install and a DB round trip.
+          if ! [[ "$OBJECTIVE_ID" =~ ^[1-9][0-9]*$ ]]; then
+            echo "::error::objective-id must be a positive integer, got: $OBJECTIVE_ID"
+            exit 1
+          fi
+
+          # Also keeps both values safe to embed in an artifact name, which
+          # rejects / \ : < > | * ? and quotes. The upload steps run under
+          # always(), so a name that fails validation there would lose the
+          # raw-response log of a run that had already spent money.
+          if ! [[ "$SUBJECT" =~ ^[A-Za-z0-9][A-Za-z0-9\ _-]*$ ]]; then
+            echo "::error::subject must be letters, digits, spaces, hyphens or underscores, got: $SUBJECT"
+            exit 1
+          fi
+
+          echo "Generating $COUNT item(s) for '$SUBJECT', objective $OBJECTIVE_ID."
+
+      - uses: actions/checkout@v7
+
+      - uses: pnpm/action-setup@v6
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+
+      # DATABASE_URL must be reachable from a GitHub-hosted runner over the
+      # public internet — this is not docker-compose's localhost Postgres.
+      - name: Run database migrations
+        run: pnpm --filter @jamb/db migrate:up
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+
+      - name: Generate items
+        env:
+          SUBJECT: ${{ inputs.subject }}
+          OBJECTIVE_ID: ${{ inputs['objective-id'] }}
+          COUNT: ${{ inputs.count }}
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          VOYAGE_API_KEY: ${{ secrets.VOYAGE_API_KEY }}
+        run: |
+          pnpm item-gen \
+            --subject "$SUBJECT" \
+            --objective-id "$OBJECTIVE_ID" \
+            --count "$COUNT"
+
+      # `always()`, not `success()`: a run that failed partway has already
+      # paid for its API calls, and its raw-response log is the only record
+      # of what those calls returned.
+      - name: Upload gate report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: gate-report-${{ inputs.subject }}-obj${{ inputs['objective-id'] }}-${{ github.run_number }}
+          path: generated-items-raw/*-gate-report.json
+          if-no-files-found: warn
+          retention-days: 30
+
+      - name: Upload raw response log
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: raw-responses-${{ inputs.subject }}-obj${{ inputs['objective-id'] }}-${{ github.run_number }}
+          path: |
+            generated-items-raw/
+            !generated-items-raw/*-gate-report.json
+          if-no-files-found: warn
+          retention-days: 30
