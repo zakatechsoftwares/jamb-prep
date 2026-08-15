@@ -1,0 +1,81 @@
+name: Item Generation
+
+on:
+  workflow_dispatch:
+    inputs:
+      subject:
+        description: 'Subject name (e.g., chemistry, english, mathematics, biology)'
+        required: true
+        type: string
+      objective-id:
+        description: 'Objective ID (positive integer)'
+        required: true
+        type: string
+      count:
+        description: 'Number of items to generate (max 50)'
+        required: true
+        type: string
+
+jobs:
+  generate:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Validate count input
+        run: |
+          COUNT=${{ inputs.count }}
+          if ! [[ "$COUNT" =~ ^[0-9]+$ ]]; then
+            echo "Error: count must be a positive integer, got: $COUNT"
+            exit 1
+          fi
+          if (( COUNT > 50 )); then
+            echo "Error: count must not exceed 50 (got $COUNT)"
+            exit 1
+          fi
+          if (( COUNT <= 0 )); then
+            echo "Error: count must be positive (got $COUNT)"
+            exit 1
+          fi
+
+      - uses: pnpm/action-setup@v6
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+
+      - name: Run database migrations
+        run: pnpm --filter @jamb/db migrate:up
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+
+      - name: Generate items
+        run: |
+          pnpm item-gen \
+            --subject '${{ inputs.subject }}' \
+            --objective-id '${{ inputs.objective-id }}' \
+            --count '${{ inputs.count }}'
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          VOYAGE_API_KEY: ${{ secrets.VOYAGE_API_KEY }}
+
+      - name: Upload gate report
+        if: success()
+        uses: actions/upload-artifact@v4
+        with:
+          name: gate-report
+          path: '*-gate-report.json'
+          retention-days: 30
+
+      - name: Upload raw response logs
+        if: success()
+        uses: actions/upload-artifact@v4
+        with:
+          name: raw-response-logs
+          path: generated-items-raw/
+          retention-days: 30
