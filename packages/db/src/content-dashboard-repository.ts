@@ -8,7 +8,8 @@ import type {
 } from '@jamb/shared';
 import { firstRow } from './first-row';
 
-const APPROVED_STATUSES = ['approved_uncalibrated', 'approved_calibrated'];
+/** Exported for brief-repository.ts's coverage-gap query, which needs the same "is this item live" definition. */
+export const APPROVED_STATUSES = ['approved_uncalibrated', 'approved_calibrated'];
 const QUEUE_WAITING_STATUSES = ['pending_review', 'needs_second_review'];
 
 /**

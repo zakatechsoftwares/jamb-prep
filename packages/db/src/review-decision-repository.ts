@@ -20,6 +20,8 @@ import {
   type RiskTier,
   type SolveOutcome,
 } from '@jamb/shared';
+import { recordContributorFeeOnApproval } from './brief-repository';
+import { APPROVED_STATUSES } from './content-dashboard-repository';
 import { firstRow } from './first-row';
 import { recordEarning } from './reviewer-earnings-repository';
 import { scoreGoldDecision } from './reviewer-quality-repository';
@@ -247,6 +249,7 @@ export async function decideOnItem(
       await client.query<{
         status: ItemStatus;
         contributor_id: number | null;
+        brief_id: number | null;
         risk_tier: RiskTier;
         independent_solve_verdict: IndependentSolveVerdict;
         sampled_for_review: boolean;
@@ -254,7 +257,7 @@ export async function decideOnItem(
         explanation: string;
         objective_id: number;
       }>(
-        `SELECT status, contributor_id, risk_tier, independent_solve_verdict, sampled_for_review,
+        `SELECT status, contributor_id, brief_id, risk_tier, independent_solve_verdict, sampled_for_review,
                 stem, explanation, objective_id
            FROM items WHERE id = $1 FOR UPDATE`,
         [itemId],
@@ -413,6 +416,21 @@ export async function decideOnItem(
       result.occurredAt,
       result.approvalRoute,
     );
+
+    // Contributor fee (plan 7.12 step 7): fires alongside the reviewer's own
+    // earnings above, only for a brief-linked item that just landed in an
+    // approved status. A contributed item's risk_tier ('not_generated')
+    // always satisfies transition()'s requiresSecondOpinion check
+    // (riskTier !== 'low'), so it always needs a genuine second reviewer
+    // before it can be approved — the same staffing implication as a
+    // high-risk generated item. That is exactly why gating on
+    // APPROVED_STATUSES rather than "this decision" is correct: the first
+    // decision lands in needs_second_review (not an approved status, so
+    // this never fires), and only the second reviewer's decision reaches an
+    // approved status — the one moment this ever fires for a given item.
+    if (item.brief_id !== null && (APPROVED_STATUSES as string[]).includes(result.status)) {
+      await recordContributorFeeOnApproval(client, itemId, item.brief_id);
+    }
 
     return {
       ok: true,

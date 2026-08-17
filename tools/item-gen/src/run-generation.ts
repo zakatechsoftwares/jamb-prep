@@ -271,6 +271,8 @@ async function processOneItem(
       rawResponseLogPath: batch.authoringLogPath,
     },
     options: draft.options,
+    contributorId: null,
+    briefId: null,
   });
 
   const insertAndPromote = async (

@@ -50,3 +50,17 @@ export {
   type GeneratedOptionInsert,
   type ObjectiveContext,
 } from './item-generation-repository';
+// The contributor brief board (plan 7.12, canonical session 11, Phase 1).
+export {
+  claimBrief,
+  createBrief,
+  getCoverageGaps,
+  listOpenBriefs,
+  submitContributedItem,
+  BriefNotClaimableError,
+  BriefNotClaimedByContributorError,
+  BriefNotFoundError,
+  type Brief,
+  type BriefInsert,
+  type ContributedItemDraft,
+} from './brief-repository';
