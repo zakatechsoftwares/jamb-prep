@@ -1285,3 +1285,152 @@ Biology remains fully unexercised against the OpenAI pipeline.
 **Next:** review the growing `pending_review` backlog through the reviewer
 workspace; decide whether to extend generation into a calculation subject
 next or hold there; whatever the user prioritises.
+
+## Staffing note: one reviewer per subject is not enough wherever second review triggers (2026-08-17)
+
+Surfaced while the user was scoping a contracting plan (one subject-matter
+teacher hired per subject) against how review assignment actually works.
+`reviewer_subjects` + `isEligibleForReviewer`'s subject check
+(`packages/shared/src/review-queue-policy.ts`) do exactly match a
+one-reviewer-per-subject model for *ordinary* review. But
+`isEligibleForReviewer` also excludes a reviewer from any item they've
+already decided — "7.10's second opinion comes from a second *independent*
+reviewer," per its own comment — and this exclusion has no override. Any
+item that reaches `needs_second_review` (every `high` risk_tier item after
+a first approval, and every item where the independent AI solve
+disagreed, after a first approval) can only ever be finished by a
+*different* reviewer already assigned to that same subject. A moderator's
+escalation-resolution path is a separate mechanism (session 04's guard 5)
+and does not substitute for this.
+
+**Consequence: Mathematics, Physics, and Chemistry need at least two
+reviewers each, not one.** `deriveRiskTier` (`packages/db/src/risk-tier.ts`)
+tiers these three subjects `high` as whole categories regardless of
+content, so *every* approved item in them will route to
+`needs_second_review` and need a second person to clear it. English and
+Biology can run on one primary reviewer each, but will still accumulate
+disagreement-driven second-review items no one can clear without an
+occasional backup — real in practice, not theoretical: one 10-item English
+batch already produced 5 disagreement-flagged items in this session's own
+runs.
+
+Not yet a problem in the data (no item has had even a first decision made
+yet, so nothing has reached `needs_second_review` in this database today)
+but will become one the moment review actually starts on Math/Physics/
+Chemistry content with only one reviewer assigned.
+
+## Session 11 — the contributor brief board, Phase 1: text items (2026-08-17)
+
+Plan 7.12: gap detection, brief creation, the open board, claiming,
+structured authoring, submission into the ordinary review queue, and
+contributor payment. **Scope split, agreed before starting:** the
+diagram-request/illustration-ticket/illustrator-queue sub-flow is deferred
+to a follow-up session — it needs file upload and object storage, both
+completely greenfield in this codebase (confirmed by exploration: zero
+existing upload code anywhere, no storage credentials in any `.env`), and
+a new dependency for that needs its own sign-off separately from this
+session's scope.
+
+**Built:**
+
+- `packages/shared`: `gap-detection-policy.ts` (`detectCoverageGaps`, tests
+  first), `brief-policy.ts` (`isBriefClaimable`, `apportionBriefFeeKobo` —
+  tests first, shown before implementing per this repo's standing rule),
+  `brief-lifecycle.ts` (`BRIEF_STATUSES`, mirroring `item-lifecycle.ts`'s
+  single-source-of-truth pattern), `brief-board-policy.ts` (`BriefSummary`,
+  `CreateBriefInput`, `ContributedItemInput`, `BriefBoardService` — the wire
+  contract `apps/api`'s brief routes need). `content-lead-policy.ts` gains
+  `getGaps`/`createBrief` on `ContentLeadService`.
+- Migration `0021_contributor_briefs`: `objectives.target_item_count`/
+  `requires_human_authorship`; `briefs` table (`open`/`claimed`/`completed`,
+  claim-consistency CHECK); `items.brief_id`; `reviewer_earnings.review_decision_id`
+  relaxed to nullable with a new `brief_item_id` and a `num_nonnulls(...) = 1`
+  consistency CHECK — a contributor fee has no `review_decisions` row to
+  reference, so it's keyed to the approved item instead. Reversible; proven
+  up/down/up on `jamb_prep_test`. `brief-lifecycle-vocabulary.test.ts`
+  (sibling to `lifecycle-vocabulary.test.ts`) guards the new CHECK against
+  drift from `BRIEF_STATUSES`.
+- `packages/db/src/brief-repository.ts`: `loadObjectiveCoverage`/`getCoverageGaps`
+  (pool-managed, optional client, matching `loadActiveQueueConfig`'s
+  existing shape), `createBrief`/`claimBrief`/`submitContributedItem`
+  (each takes a `reviewers.id` and resolves `users.id` via `loadReviewer`
+  — see the new CLAUDE.md convention), `recordContributorFeeOnApproval`.
+  `claimBrief` reuses `review-queue-repository.ts`'s `FOR UPDATE SKIP LOCKED`
+  inside `withTransaction` pattern for the same reason: two contributors
+  racing to claim one brief is the identical concurrency problem as two
+  reviewers racing for one queue item. `insertGeneratedItem` (renamed
+  nothing, but now genuinely shared) gained `contributorId`/`briefId` and
+  a nullable `inferenceCostUsd` to serve both callers.
+- `review-decision-repository.ts`'s `decideOnItem` gained the one hook this
+  feature needed in existing code: when a decision lands a brief-linked
+  item in an approved status, `recordContributorFeeOnApproval` runs in the
+  same transaction as the reviewer's own earnings.
+- `apps/api`: `GET /content-lead/gaps`, `POST /content-lead/briefs`
+  (both `requireContentLead`); new `apps/api/src/routes/briefs.ts` —
+  `GET /briefs`, `POST /briefs/:id/claim`, `POST /briefs/:id/submit`, all
+  gated only on an active session, no role middleware (see the confirmed
+  access decision below).
+- `apps/admin`: `/briefs` (the open board, any session), `/briefs/[id]/author`
+  (`ContributionForm.tsx` — the full item field set: stem, four options,
+  distractor rationale per wrong option, explanation, method steps —
+  wider than `InlineEditForm.tsx`, which doesn't cover rationale/method
+  steps at all), `/content-lead/briefs` (gaps list + `CreateBriefForm.tsx`,
+  gated exactly like `/content-lead`, including the same `enabled`-flag
+  fix for the hooks-run-before-redirect bug). `difficultySpread`/
+  `cognitiveLevels` are free-form JSON text inputs, matching the database's
+  own JSONB flexibility rather than a bespoke structured picker not asked
+  for. No new devDependencies.
+- Verified against the real running stack, not just fakes: seeded a real
+  coverage gap (Biology objective, `target_item_count` set), a real
+  content-lead/contributor/second-reviewer account, and drove the actual
+  HTTP round trip — login, `GET /content-lead/gaps`, `POST
+  /content-lead/briefs`, `GET /briefs`, `POST /briefs/:id/claim`, `POST
+  /briefs/:id/submit` — against the real `apps/api` dev server and real
+  database. Separately confirmed the contributor's own `/review/next`
+  serves them a *different* pending item, never their own submission.
+
+**Decisions confirmed with the user before building:**
+
+1. Brief-board access is any active reviewer-pool account, not gated to
+   `role = 'contributor'` — matches how `isEligibleForReviewer` already
+   ignores role everywhere else.
+2. Contributor fee pays per item, at that item's approval, apportioned
+   across `item_count` — not held until the whole brief completes.
+3. Diagram/illustration sub-flow deferred to a follow-up session.
+
+**A real bug caught by the tests, not assumed away:** the first version of
+`brief-payment.integration.test.ts` assumed a contributed item needs only
+one reviewer decision to reach `approved_uncalibrated`, and failed with
+`needs_second_review` instead. The actual guard in `item-state-machine.ts`
+is `item.riskTier !== 'low' || independentSolveVerdict === 'disagreed'` —
+not `riskTier === 'high'` as a narrower reading would suggest — so
+`not_generated` also always requires a second opinion. Fixed the test (and
+a wrong code comment that had made the same assumption) rather than
+loosening the assertion. This directly confirms and strengthens the
+staffing note above: contributed items need the same two-reviewer coverage
+as a high-risk generated item, not one.
+
+**Verification:** `pnpm typecheck` (6/6), `pnpm lint` (clean), `pnpm test`
+(993 tests, zero failures, run against `jamb_prep_test`) — plus the real
+HTTP round trip above against `jamb_prep`.
+
+**Open at close:**
+
+- The diagram-request/illustration-ticket/illustrator-queue sub-flow (the
+  rest of plan 7.12) is not built. Needs its own session: an upload
+  mechanism, an object-storage decision (or a deliberate choice to defer
+  real storage further), and a new dependency approved for whichever of
+  those is chosen.
+- No content-lead UI surfaces the `payment_batches`/`payment_batch_lines`
+  a contributor's fee eventually lands in beyond what session 09 already
+  built (`/content-lead/payment-runs` triggers a run; nothing new here
+  reads a contributor's own earnings statement specifically).
+- `apps/admin`'s new pages have no dedicated page-level redirect test
+  (matching `app/content-lead/page.test.tsx`'s pattern) — component-level
+  tests for `CreateBriefForm`/`ContributionForm` exist and pass, but the
+  page-level "wrong role redirects away" behavior for `/content-lead/briefs`
+  is asserted only by inspection of the identical, already-tested pattern
+  it copies from `/content-lead`, not by its own test.
+
+**Next:** the diagram/illustration follow-up session; or review the
+growing `pending_review` backlog; or whatever the user prioritises.
