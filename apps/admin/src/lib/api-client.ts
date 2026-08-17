@@ -1,6 +1,10 @@
 import type {
   ApprovalRoute,
+  BriefSummary,
   ContentDashboard,
+  ContributedItemInput,
+  CoverageGap,
+  CreateBriefInput,
   DecisionContext,
   ItemEditPatch,
   ItemStatus,
@@ -150,6 +154,36 @@ export type GetContentDashboardOutcome =
   | { ok: false; reason: 'forbidden' }
   | { ok: false; reason: 'request_failed'; message: string };
 
+export type GetGapsOutcome =
+  | { ok: true; gaps: CoverageGap[] }
+  | { ok: false; reason: 'unauthorized' }
+  | { ok: false; reason: 'forbidden' }
+  | { ok: false; reason: 'request_failed'; message: string };
+
+export type CreateBriefOutcome =
+  | { ok: true; briefId: number }
+  | { ok: false; reason: 'unauthorized' }
+  | { ok: false; reason: 'forbidden' }
+  | { ok: false; reason: 'invalid_input'; message: string }
+  | { ok: false; reason: 'request_failed'; message: string };
+
+export type ListOpenBriefsOutcome =
+  | { ok: true; briefs: BriefSummary[] }
+  | { ok: false; reason: 'unauthorized' }
+  | { ok: false; reason: 'request_failed'; message: string };
+
+export type ClaimBriefOutcome =
+  | { ok: true; brief: BriefSummary }
+  | { ok: false; reason: 'unauthorized' }
+  | { ok: false; reason: 'not_claimable'; message: string }
+  | { ok: false; reason: 'request_failed'; message: string };
+
+export type SubmitContributedItemOutcome =
+  | { ok: true; itemId: number }
+  | { ok: false; reason: 'unauthorized' }
+  | { ok: false; reason: 'invalid_input'; message: string }
+  | { ok: false; reason: 'request_failed'; message: string };
+
 export interface ApiClient {
   login(emailOrPhone: string, password: string): Promise<LoginOutcome>;
   getNextItem(token: string): Promise<GetNextItemOutcome>;
@@ -170,6 +204,17 @@ export interface ApiClient {
   ): Promise<DecideOutcome>;
   /** The content-lead dashboard (plan 7.11) — a `content_lead` session only. */
   getContentDashboard(token: string, since: Date): Promise<GetContentDashboardOutcome>;
+  /** Coverage gaps and brief creation (plan 7.12) — a `content_lead` session only. */
+  getGaps(token: string): Promise<GetGapsOutcome>;
+  createBrief(token: string, input: CreateBriefInput): Promise<CreateBriefOutcome>;
+  /** The open brief board (plan 7.12) — any active session, no role gate. */
+  listOpenBriefs(token: string): Promise<ListOpenBriefsOutcome>;
+  claimBrief(token: string, briefId: number): Promise<ClaimBriefOutcome>;
+  submitContributedItem(
+    token: string,
+    briefId: number,
+    draft: ContributedItemInput,
+  ): Promise<SubmitContributedItemOutcome>;
 }
 
 /** `baseUrl` defaults to the same-origin proxy path — see next.config.mjs's rewrite. */
@@ -314,6 +359,81 @@ export function createApiClient(fetchImpl: FetchImpl, baseUrl = '/api/review'): 
         return { ok: false, reason: 'forbidden' };
       }
       return { ok: true, dashboard: toContentDashboard(response.body as unknown as WireContentDashboard) };
+    },
+
+    async getGaps(token) {
+      const response = await call(fetchImpl, 'GET', '/api/content-lead/gaps', token);
+
+      if (response.status === 0) {
+        return { ok: false, reason: 'request_failed', message: 'could not reach the server' };
+      }
+      if (response.status === 401) {
+        return { ok: false, reason: 'unauthorized' };
+      }
+      if (response.status === 403) {
+        return { ok: false, reason: 'forbidden' };
+      }
+      return { ok: true, gaps: (response.body?.gaps as unknown as CoverageGap[] | undefined) ?? [] };
+    },
+
+    async createBrief(token, input) {
+      const response = await call(fetchImpl, 'POST', '/api/content-lead/briefs', token, input);
+
+      if (response.status === 0) {
+        return { ok: false, reason: 'request_failed', message: 'could not reach the server' };
+      }
+      if (response.status === 401) {
+        return { ok: false, reason: 'unauthorized' };
+      }
+      if (response.status === 403) {
+        return { ok: false, reason: 'forbidden' };
+      }
+      if (response.status === 201) {
+        return { ok: true, briefId: response.body?.briefId as number };
+      }
+      return { ok: false, reason: 'invalid_input', message: errorReason(response, 'invalid input') };
+    },
+
+    async listOpenBriefs(token) {
+      const response = await call(fetchImpl, 'GET', '/api/briefs', token);
+
+      if (response.status === 0) {
+        return { ok: false, reason: 'request_failed', message: 'could not reach the server' };
+      }
+      if (response.status === 401) {
+        return { ok: false, reason: 'unauthorized' };
+      }
+      return { ok: true, briefs: (response.body?.briefs as unknown as BriefSummary[] | undefined) ?? [] };
+    },
+
+    async claimBrief(token, briefId) {
+      const response = await call(fetchImpl, 'POST', `/api/briefs/${briefId}/claim`, token);
+
+      if (response.status === 0) {
+        return { ok: false, reason: 'request_failed', message: 'could not reach the server' };
+      }
+      if (response.status === 401) {
+        return { ok: false, reason: 'unauthorized' };
+      }
+      if (response.status === 200) {
+        return { ok: true, brief: response.body as unknown as BriefSummary };
+      }
+      return { ok: false, reason: 'not_claimable', message: errorReason(response, 'brief not claimable') };
+    },
+
+    async submitContributedItem(token, briefId, draft) {
+      const response = await call(fetchImpl, 'POST', `/api/briefs/${briefId}/submit`, token, draft);
+
+      if (response.status === 0) {
+        return { ok: false, reason: 'request_failed', message: 'could not reach the server' };
+      }
+      if (response.status === 401) {
+        return { ok: false, reason: 'unauthorized' };
+      }
+      if (response.status === 201) {
+        return { ok: true, itemId: response.body?.itemId as number };
+      }
+      return { ok: false, reason: 'invalid_input', message: errorReason(response, 'invalid input') };
     },
   };
 }
