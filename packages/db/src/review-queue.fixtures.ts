@@ -23,6 +23,40 @@ import { firstRow } from './first-row';
 // pollutes another file's row-count assertions.
 const TRUNCATED_TABLES = ['subjects', 'users', 'payment_batches'];
 
+/**
+ * Refuses to run a destructive test-cleanup TRUNCATE against a database that
+ * isn't obviously disposable. CI (`.github/workflows/ci.yml`) is exempt —
+ * its `postgres` service is a fresh container per run, discarded afterward,
+ * even though it happens to be named `jamb_prep`, identical to a real local
+ * dev database's name. Outside CI, the only name treated as safe is one
+ * containing `test`, so a `DATABASE_URL` left pointed at local dev data
+ * throws instead of silently wiping it.
+ *
+ * Exists because this happened for real: running `pnpm test` locally with
+ * `DATABASE_URL` pointed at a hand-seeded `jamb_prep` dev database wiped
+ * every row in it — schema survived, all data didn't. See
+ * `docs/build-log.md`'s "Incident: local dev database wiped by running
+ * `pnpm test` against it" for the full account. Every call site that
+ * TRUNCATEs for test cleanup calls this first — `truncateQueueWorld` here,
+ * plus `reviewer-auth-repository.integration.test.ts` and
+ * `apps/api/src/login-end-to-end.integration.test.ts`, which TRUNCATE
+ * directly rather than through this fixture.
+ */
+export async function assertSafeToTruncate(client: PoolClient): Promise<void> {
+  if (process.env.CI) {
+    return;
+  }
+  const result = await client.query<{ current_database: string }>('SELECT current_database()');
+  const name = result.rows[0]?.current_database ?? '';
+  if (!name.toLowerCase().includes('test')) {
+    throw new Error(
+      `refusing to TRUNCATE: database '${name}' does not look like a disposable test database ` +
+        `(expected a name containing 'test', or CI=true). Point DATABASE_URL at a dedicated test ` +
+        `database — e.g. jamb_prep_test — instead of a database also used for local dev data.`,
+    );
+  }
+}
+
 export interface QueueWorld {
   subjectId: number;
   otherSubjectId: number;
@@ -37,6 +71,7 @@ export interface QueueWorld {
 }
 
 export async function truncateQueueWorld(client: PoolClient): Promise<void> {
+  await assertSafeToTruncate(client);
   // CASCADE reaches every table referencing these two, which is the whole
   // syllabus, item, review and session graph.
   await client.query(`TRUNCATE ${TRUNCATED_TABLES.join(', ')} CASCADE`);

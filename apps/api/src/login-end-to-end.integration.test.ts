@@ -69,6 +69,8 @@ describe.runIf(hasDatabase)('login end-to-end', () => {
     const { pool } = await import('@jamb/db');
     const client = await pool.connect();
     try {
+      const { assertSafeToTruncate } = await import('@jamb/db/fixtures');
+      await assertSafeToTruncate(client);
       await client.query('TRUNCATE users CASCADE');
     } finally {
       client.release();
@@ -79,6 +81,8 @@ describe.runIf(hasDatabase)('login end-to-end', () => {
     const { pool } = await import('@jamb/db');
     const client = await pool.connect();
     try {
+      const { assertSafeToTruncate } = await import('@jamb/db/fixtures');
+      await assertSafeToTruncate(client);
       await client.query('TRUNCATE users CASCADE');
     } finally {
       client.release();

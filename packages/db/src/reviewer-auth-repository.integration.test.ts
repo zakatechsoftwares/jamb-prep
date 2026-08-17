@@ -43,6 +43,8 @@ describe.runIf(hasDatabase)('reviewer auth', () => {
     const { pool } = await import('./client');
     const client = await pool.connect();
     try {
+      const { assertSafeToTruncate } = await import('./review-queue.fixtures');
+      await assertSafeToTruncate(client);
       await client.query('TRUNCATE users CASCADE');
     } finally {
       client.release();
@@ -53,6 +55,8 @@ describe.runIf(hasDatabase)('reviewer auth', () => {
     const { pool } = await import('./client');
     const client = await pool.connect();
     try {
+      const { assertSafeToTruncate } = await import('./review-queue.fixtures');
+      await assertSafeToTruncate(client);
       await client.query('TRUNCATE users CASCADE');
     } finally {
       client.release();
