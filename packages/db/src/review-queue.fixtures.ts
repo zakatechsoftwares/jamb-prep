@@ -21,7 +21,16 @@ import { firstRow } from './first-row';
 // reach it. Named explicitly so a test that runs a real payment (e.g.
 // content-lead-service.integration.test.ts) doesn't leave a batch row that
 // pollutes another file's row-count assertions.
-const TRUNCATED_TABLES = ['subjects', 'users', 'payment_batches'];
+//
+// exam_configs and subject_combinations are the same shape (session 12):
+// exam_configs is referenced from sessions, never the reverse; subject_combinations
+// is the parent of subject_combination_subjects (whose own subject_id FK
+// does cascade from `subjects`), but the combination row itself has no FK
+// pointing back into subjects/users either. Both need naming explicitly for
+// the same reason payment_batches does — otherwise a leftover row survives
+// truncation and a hardcoded unique value (exam_year+version, course_name)
+// in a later test run collides with it.
+const TRUNCATED_TABLES = ['subjects', 'users', 'payment_batches', 'exam_configs', 'subject_combinations'];
 
 /**
  * Refuses to run a destructive test-cleanup TRUNCATE against a database that
