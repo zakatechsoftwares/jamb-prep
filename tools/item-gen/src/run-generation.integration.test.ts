@@ -319,6 +319,8 @@ describe.runIf(hasDatabase)('runGeneration', () => {
           { label: 'C', text: 'z', isCorrect: false, distractorRationale: 'r' },
           { label: 'D', text: 'w', isCorrect: false, distractorRationale: 'r' },
         ],
+        contributorId: null,
+        briefId: null,
       });
       await client.query(`UPDATE items SET status = 'approved_uncalibrated' WHERE id = $1`, [
         existingItemId,

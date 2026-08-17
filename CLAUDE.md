@@ -440,6 +440,37 @@ answer intact. Write tests for this scenario early and keep them green.
   into that call is a compile-time impossibility, the same discipline
   `RevealResult`/`DecideResult` already established for the reviewer
   workspace.
+- **The contributor brief board** (`packages/db/src/brief-repository.ts`,
+  canonical session 11, Phase 1 — text items; the diagram/illustration
+  sub-flow is a deferred follow-up) reuses `insertGeneratedItem`/
+  `promoteGeneratedItem` unchanged for a contributor-authored item —
+  `contributor_id`/`brief_id` set, `risk_tier: 'not_generated'`, entry event
+  `gates_passed`. The self-review exclusion
+  (`assertNotOwnContribution`/`isEligibleForReviewer`) needed zero code
+  changes to cover it, since both were already keyed on `contributor_id`
+  since session 04. **`risk_tier !== 'low'` — not just `'high'` — triggers
+  `transition()`'s `requiresSecondOpinion` guard**, so a `not_generated`
+  item always needs two independent reviewers before approval, exactly like
+  a high-risk generated item; a contributor's fee is gated on
+  `APPROVED_STATUSES`, not on "this is the item's only decision," precisely
+  because of this.
+- **Every identity parameter into a decision-recording function is a
+  `reviewers.id`, never a `users.id`.** `decideOnItem`, `resolveEscalation`,
+  and now `createBrief`/`claimBrief`/`submitContributedItem` all take a
+  reviewer id and call `loadReviewer` internally to resolve the underlying
+  `users.id` — never accept a `users.id` directly from a route, even though
+  the DB columns being written (`briefs.created_by`, `items.contributor_id`)
+  are themselves `users.id` foreign keys. This also gets the active-reviewer
+  check for free, since `loadReviewer` throws `ReviewerNotActiveError`.
+- **Splitting one lump sum across several items paid one at a time, with no
+  lost or overpaid remainder, needs an explicit "how many have been paid
+  already" parameter — not just the total and the count.**
+  `apportionBriefFeeKobo(feeKobo, itemCount, alreadyPaidCount)` floors every
+  share except the last one paid, which gets the true remainder
+  (`feeKobo - perItem * (itemCount - 1)`), guaranteeing the sum across every
+  item exactly equals the fee regardless of payment order. `itemCount`
+  alone (mirroring `apportionAuthoringCost`'s shape) is not enough once
+  payments happen individually rather than all at once.
 
 ### Approval routes
 

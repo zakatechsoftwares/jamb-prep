@@ -88,6 +88,8 @@ describe.runIf(hasDatabase)('item-generation-repository', () => {
           distractorRationale: 'confuses force with pressure',
         },
       ],
+      contributorId: null,
+      briefId: null,
     };
   }
 

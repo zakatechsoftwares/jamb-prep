@@ -1,5 +1,7 @@
 import type { RejectionReason } from './item-lifecycle';
 import type { SubjectAgreement } from './inter-rater-agreement';
+import type { CoverageGap } from './gap-detection-policy';
+import type { CreateBriefInput } from './brief-board-policy';
 
 /**
  * The content lead dashboard's shapes (plan 7.11) and the service contract
@@ -98,4 +100,7 @@ export interface ContentLeadService {
     agreed: boolean,
     note: string | null,
   ): Promise<void>;
+  /** Coverage gaps (plan 7.12 step 1), sorted largest deficit first. */
+  getGaps(): Promise<CoverageGap[]>;
+  createBrief(input: CreateBriefInput, createdByReviewerId: number): Promise<{ briefId: number }>;
 }

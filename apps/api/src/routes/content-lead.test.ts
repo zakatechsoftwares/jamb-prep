@@ -28,6 +28,8 @@ interface Recorded {
     agreed: boolean;
     note: string | null;
   }[];
+  getGapsCalls: number;
+  createBriefCalls: { input: unknown; createdByReviewerId: number }[];
 }
 
 function startApp(service: Partial<ContentLeadService>): {
@@ -40,6 +42,8 @@ function startApp(service: Partial<ContentLeadService>): {
     runWeeklyPaymentCalls: [],
     getAuditSampleCalls: [],
     recordModeratorAuditCalls: [],
+    getGapsCalls: 0,
+    createBriefCalls: [],
   };
 
   const app = createApp({
@@ -72,6 +76,14 @@ function startApp(service: Partial<ContentLeadService>): {
       recordModeratorAudit: (itemId, moderatorId, agreed, note) => {
         recorded.recordModeratorAuditCalls.push({ itemId, moderatorId, agreed, note });
         return service.recordModeratorAudit?.(itemId, moderatorId, agreed, note) ?? Promise.resolve();
+      },
+      getGaps: () => {
+        recorded.getGapsCalls += 1;
+        return service.getGaps?.() ?? Promise.resolve([]);
+      },
+      createBrief: (input, createdByReviewerId) => {
+        recorded.createBriefCalls.push({ input, createdByReviewerId });
+        return service.createBrief?.(input, createdByReviewerId) ?? Promise.resolve({ briefId: 1 });
       },
     },
   });
@@ -190,6 +202,90 @@ describe('POST /content-lead/payment-runs', () => {
     });
     expect(response.status).toBe(403);
     expect(recorded.runWeeklyPaymentCalls).toEqual([]);
+  });
+});
+
+describe('GET /content-lead/gaps', () => {
+  it('returns the detected coverage gaps for a content-lead session', async () => {
+    const { url, recorded } = run({
+      getGaps: async () => [{ objectiveId: 5, deficit: 6, requiresHumanAuthorship: true }],
+    });
+
+    const response = await fetch(`${url}/content-lead/gaps`, { headers: authHeader(1) });
+    const body = await readJson<{ gaps: unknown[] }>(response);
+
+    expect(response.status).toBe(200);
+    expect(body.gaps).toEqual([{ objectiveId: 5, deficit: 6, requiresHumanAuthorship: true }]);
+    expect(recorded.getGapsCalls).toBe(1);
+  });
+
+  it('rejects a non-content-lead session with 403', async () => {
+    const { url } = run({});
+    const response = await fetch(`${url}/content-lead/gaps`, { headers: authHeader(1, 'reviewer') });
+    expect(response.status).toBe(403);
+  });
+});
+
+describe('POST /content-lead/briefs', () => {
+  const VALID_BRIEF = {
+    objectiveId: 5,
+    itemCount: 3,
+    difficultySpread: { easy: 1, moderate: 2 },
+    cognitiveLevels: { recall: 3 },
+    styleNotes: 'Keep it concise.',
+    feeKobo: 500000,
+    deadline: '2026-09-01T00:00:00.000Z',
+  };
+
+  it('creates a brief for a content-lead session, taking createdBy from the session not the body', async () => {
+    const { url, recorded } = run({ createBrief: async () => ({ briefId: 9 }) });
+
+    const response = await fetch(`${url}/content-lead/briefs`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', ...authHeader(4) },
+      body: JSON.stringify({ ...VALID_BRIEF, createdByReviewerId: 999 }),
+    });
+    const body = await readJson<{ briefId: number }>(response);
+
+    expect(response.status).toBe(201);
+    expect(body).toEqual({ briefId: 9 });
+    expect(recorded.createBriefCalls).toHaveLength(1);
+    expect(recorded.createBriefCalls[0]!.createdByReviewerId).toBe(4);
+  });
+
+  it('rejects a missing objectiveId', async () => {
+    const { url } = run({});
+    const withoutObjectiveId: Record<string, unknown> = { ...VALID_BRIEF };
+    delete withoutObjectiveId.objectiveId;
+
+    const response = await fetch(`${url}/content-lead/briefs`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', ...authHeader(4) },
+      body: JSON.stringify(withoutObjectiveId),
+    });
+    expect(response.status).toBe(400);
+  });
+
+  it('rejects an invalid deadline', async () => {
+    const { url } = run({});
+
+    const response = await fetch(`${url}/content-lead/briefs`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', ...authHeader(4) },
+      body: JSON.stringify({ ...VALID_BRIEF, deadline: 'not-a-date' }),
+    });
+    expect(response.status).toBe(400);
+  });
+
+  it('rejects a non-content-lead session with 403', async () => {
+    const { url, recorded } = run({});
+    const response = await fetch(`${url}/content-lead/briefs`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', ...authHeader(4, 'reviewer') },
+      body: JSON.stringify(VALID_BRIEF),
+    });
+    expect(response.status).toBe(403);
+    expect(recorded.createBriefCalls).toEqual([]);
   });
 });
 

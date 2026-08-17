@@ -1,11 +1,11 @@
 import type { PoolClient } from 'pg';
 import {
   transition,
-  type GeneratedRiskTier,
   type IndependentSolveVerdict,
   type ItemFacts,
   type LifecycleEvent,
   type OptionLabel,
+  type RiskTier,
   type TransitionResult,
 } from '@jamb/shared';
 import { firstRow } from './first-row';
@@ -90,19 +90,31 @@ export interface GeneratedItemInsert {
   cognitiveLevel: string;
   authorDifficulty: number;
   expectedTimeSeconds: number;
-  riskTier: GeneratedRiskTier;
+  /** 'not_generated' only for a contributor-authored item — never derived at generation. */
+  riskTier: RiskTier;
   /** 'not_run' for an item that skipped the solve call because it was already headed to gate_failed. */
   independentSolveVerdict: IndependentSolveVerdict;
   sampledForReview: boolean;
   /** Null for an item that skipped embedding because it was already headed to gate_failed on schema grounds. */
   stemEmbedding: number[] | null;
-  inferenceCostUsd: number;
+  /** Null for a contributor-authored item — it was never an inference call at all (migration 0017). */
+  inferenceCostUsd: number | null;
   /** Model, prompt version, generation timestamp, raw-response reference — plan 7.6. */
   provenance: Record<string, unknown>;
   options: GeneratedOptionInsert[];
+  /** Non-null only for a contributor-authored item (plan 7.12, session 11) — null for every generated item. */
+  contributorId: number | null;
+  /** Non-null only for a contributor-authored item submitted against a brief. */
+  briefId: number | null;
 }
 
-/** Inserts one generated item and its four options, always with status 'generated'. */
+/**
+ * Inserts one item and its four options, always with status 'generated'.
+ * Despite the name, this is shared by both the generation pipeline
+ * (`contributorId`/`briefId` null) and the contributor brief board
+ * (`brief-repository.ts`, both set) — the row shape and insert order are
+ * identical either way, only the origin fields differ.
+ */
 export async function insertGeneratedItem(
   client: PoolClient,
   draft: GeneratedItemInsert,
@@ -114,8 +126,9 @@ export async function insertGeneratedItem(
          stem, explanation, method_steps, cognitive_level,
          author_difficulty, expected_time_seconds,
          risk_tier, independent_solve_verdict, sampled_for_review,
-         stem_embedding, inference_cost_usd, provenance, status
-       ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, 'generated')
+         stem_embedding, inference_cost_usd, provenance,
+         contributor_id, brief_id, status
+       ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, 'generated')
        RETURNING id`,
       [
         draft.subjectId,
@@ -134,6 +147,8 @@ export async function insertGeneratedItem(
         draft.stemEmbedding,
         draft.inferenceCostUsd,
         JSON.stringify(draft.provenance),
+        draft.contributorId,
+        draft.briefId,
       ],
     ),
   ).id;
