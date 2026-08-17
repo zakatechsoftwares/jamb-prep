@@ -494,6 +494,52 @@ only check it has ever had, which makes that check non-negotiable.
 
 See `docs/implementation-plan.md` section 7.14 for the full rationale.
 
+## Mock CBT engine (candidate track, canonical session 12)
+
+The candidate-facing exam runtime — timer, navigation, session/attempt
+persistence — starts here. **Phase 1 only: the logic and persistence layer
+in `packages/shared` and `packages/db`, fully tested. No mobile UI yet** —
+`apps/mobile` is still a bare Expo scaffold with no SQLite or navigation
+library, and rule 7 already means almost none of this should be mobile-side
+logic anyway. Wiring it into real Expo screens is a deliberate follow-up
+session, once a local-storage library and a navigation library are chosen
+(new dependencies, need sign-off).
+
+- **Remaining time is derived, never stored as a countdown.** A session
+  persists one absolute `endAt` timestamp (`packages/shared/src/exam-timer.ts`'s
+  `computeSessionEndAt`); nothing about a countdown value is ever written
+  to roll back, which is what makes "kill the app to pause the clock"
+  impossible by construction.
+- **Guarding against a backward device clock is a monotonic ratchet, not
+  prevention.** `computeEffectiveNow(actualNow, lastObservedAt)` is
+  `max(actualNow, lastObservedAt)` — a clock wound back can never produce
+  an effective-now earlier than one already observed, so time can only
+  ever appear to move forward. A legitimate forward clock correction just
+  costs the candidate a little perceived time, the safe direction to err.
+- **`answered` and `flagged` are independent booleans in the session
+  reducer** (`mock-session-reducer.ts`), not one exclusive palette status.
+  A candidate answering an already-flagged item, or flagging one they've
+  already answered, is ordinary exam behaviour the palette must represent.
+- **`recordAttempt` never accepts `isCorrect` from the caller.** Rule 5
+  ("the server recomputes and its result wins") means correctness is
+  looked up from the item's actual key server-side, on every call —
+  `RecordAttemptInput` has no field for a client to claim otherwise, the
+  same compile-time discipline `IndependentSolveInput`/`RevealResult`
+  already established elsewhere for keeping a key out of the wrong call.
+- **`exam_configs`/`subject_combinations` are the same "referenced from,
+  never pointed at" shape `payment_batches` already taught this repo.**
+  Both are now named explicitly in `review-queue.fixtures.ts`'s
+  `TRUNCATED_TABLES` — `TRUNCATE subjects, users CASCADE` alone could never
+  reach either, which would have left a stray row to collide with a later
+  test's hardcoded unique value (`exam_year`+`version`, `course_name`).
+- **`packages/shared/src/scoring.ts` (session 03) was never added to
+  `packages/shared/src/index.ts`'s barrel export until this session** —
+  nothing outside the package had needed it directly before `packages/db`'s
+  new session/exam-config repositories did. A reminder that "it compiles
+  inside the package" and "it's actually part of the public surface" are
+  different claims; check the barrel export when a module that's existed
+  for a while turns out to be needed from outside for the first time.
+
 ## How I want you to work
 
 - Ask before installing a new dependency

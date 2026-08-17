@@ -7,6 +7,7 @@ export type HealthStatus = 'ok' | 'degraded' | 'down';
 // against them) and must exist in exactly one place.
 export * from './item-lifecycle';
 export * from './item-state-machine';
+export * from './scoring';
 export * from './review-queue-policy';
 export * from './review-decision-policy';
 export * from './reviewer-auth-policy';
@@ -21,3 +22,5 @@ export * from './brief-lifecycle';
 export * from './gap-detection-policy';
 export * from './brief-policy';
 export * from './brief-board-policy';
+export * from './exam-timer';
+export * from './mock-session-reducer';
