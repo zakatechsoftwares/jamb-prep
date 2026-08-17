@@ -1,9 +1,11 @@
 /**
- * A thin `fetch` wrapper over Voyage AI's embeddings API — Anthropic has no
- * embeddings endpoint of its own; Voyage is Anthropic's own recommended
- * embeddings partner. Same injected-`fetchImpl` shape as `anthropic-client.ts`.
+ * A thin `fetch` wrapper over Voyage AI's embeddings API — kept as its own
+ * vendor, independent of whichever provider `openai-client.ts` calls for
+ * text generation (neither Anthropic nor OpenAI has an embeddings endpoint
+ * bundled with this pipeline's chosen text-generation model). Same
+ * injected-`fetchImpl` shape as `openai-client.ts`.
  */
-import type { FetchImpl } from './anthropic-client';
+import type { FetchImpl } from './fetch-types';
 
 const VOYAGE_API_URL = 'https://api.voyageai.com/v1/embeddings';
 

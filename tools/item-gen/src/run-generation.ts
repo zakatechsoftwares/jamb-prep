@@ -27,7 +27,7 @@ import {
   type GeneratedItemInsert,
   type ObjectiveContext,
 } from '@jamb/db';
-import { callAnthropic, isRetryableAnthropicError, type FetchImpl } from './anthropic-client';
+import { callOpenAi, isRetryableOpenAiError, type FetchImpl } from './openai-client';
 import { callVoyageEmbed, isRetryableVoyageError } from './voyage-client';
 import { withRetry } from './retry';
 import { buildAuthoringPrompt, type DifficultyTarget } from './authoring-prompt';
@@ -74,8 +74,8 @@ export interface RunGenerationDependencies {
   readClient: PoolClient;
   withTransaction: <T>(fn: (client: PoolClient) => Promise<T>) => Promise<T>;
   fetchImpl: FetchImpl;
-  anthropicApiKey: string;
-  anthropicModel: string;
+  openaiApiKey: string;
+  openaiModel: string;
   voyageApiKey: string;
   voyageModel: string;
   random: () => number;
@@ -139,13 +139,13 @@ export async function runGeneration(
 
   const authoringResult = await withRetry(
     () =>
-      callAnthropic(deps.fetchImpl, {
-        apiKey: deps.anthropicApiKey,
-        model: deps.anthropicModel,
+      callOpenAi(deps.fetchImpl, {
+        apiKey: deps.openaiApiKey,
+        model: deps.openaiModel,
         messages: [{ role: 'user', content: authoringPrompt }],
         maxTokens: AUTHORING_MAX_TOKENS,
       }),
-    { ...RETRY_OPTIONS_BASE, sleep: deps.sleep, isRetryable: isRetryableAnthropicError },
+    { ...RETRY_OPTIONS_BASE, sleep: deps.sleep, isRetryable: isRetryableOpenAiError },
   );
 
   const authoringLogPath = await logRawResponse(deps.logDir, {
@@ -155,7 +155,7 @@ export async function runGeneration(
     rawResponse: authoringResult.rawResponse,
   });
 
-  const authoringCostUsd = computeCallCostUsd(deps.anthropicModel, authoringResult.usage);
+  const authoringCostUsd = computeCallCostUsd(deps.openaiModel, authoringResult.usage);
   const { drafts, discardedCount } = parseAuthoringResponse(authoringResult.text);
 
   const discardedResults: ItemGateResult[] = Array.from(
@@ -265,7 +265,7 @@ async function processOneItem(
     stemEmbedding,
     inferenceCostUsd,
     provenance: {
-      model: deps.anthropicModel,
+      model: deps.openaiModel,
       promptVersion: AUTHORING_PROMPT_VERSION,
       generatedAt: deps.now().toISOString(),
       rawResponseLogPath: batch.authoringLogPath,
@@ -368,13 +368,13 @@ async function processOneItem(
   const solvePrompt = buildIndependentSolvePrompt(toIndependentSolveInput(draft));
   const solveResult = await withRetry(
     () =>
-      callAnthropic(deps.fetchImpl, {
-        apiKey: deps.anthropicApiKey,
-        model: deps.anthropicModel,
+      callOpenAi(deps.fetchImpl, {
+        apiKey: deps.openaiApiKey,
+        model: deps.openaiModel,
         messages: [{ role: 'user', content: solvePrompt }],
         maxTokens: SOLVE_MAX_TOKENS,
       }),
-    { ...RETRY_OPTIONS_BASE, sleep: deps.sleep, isRetryable: isRetryableAnthropicError },
+    { ...RETRY_OPTIONS_BASE, sleep: deps.sleep, isRetryable: isRetryableOpenAiError },
   );
   await logRawResponse(deps.logDir, {
     callType: 'independent_solve',
@@ -382,7 +382,7 @@ async function processOneItem(
     timestamp: deps.now(),
     rawResponse: solveResult.rawResponse,
   });
-  const solveCostUsd = computeCallCostUsd(deps.anthropicModel, solveResult.usage);
+  const solveCostUsd = computeCallCostUsd(deps.openaiModel, solveResult.usage);
   const parsedSolve = parseSolveResponse(solveResult.text);
   const correctLabel = draft.options.find((option) => option.isCorrect)!.label;
   const verdict: IndependentSolveVerdict =

@@ -114,6 +114,21 @@ answer intact. Write tests for this scenario early and keep them green.
   only way to clear the append-only tables, whose `DELETE` triggers
   reject a `DELETE`. Packages whose tests do this set
   `fileParallelism: false` in their vitest config.
+- **Never run `pnpm test` locally with `DATABASE_URL` pointed at a database
+  that also holds real local dev data.** This happened for real: running
+  the suite against a hand-seeded `jamb_prep` wiped every row in it via the
+  `TRUNCATE ... CASCADE` cleanup above — schema survived, all data didn't.
+  CI is fine because its `postgres` service is a fresh, disposable container
+  per run, even though it's named `jamb_prep` too — the database *name*
+  alone can't distinguish "disposable" from "real," so `assertSafeToTruncate`
+  (`packages/db/src/review-queue.fixtures.ts`) checks `current_database()`
+  and throws unless it contains `test`, or `CI` is set. Every TRUNCATE-based
+  test cleanup call site (the shared fixture, plus the two files that
+  TRUNCATE directly: `reviewer-auth-repository.integration.test.ts`,
+  `apps/api/src/login-end-to-end.integration.test.ts`) calls it first. Run
+  local integration tests against a separate `jamb_prep_test` database
+  (`DATABASE_URL=postgres://jamb:jamb@localhost:5432/jamb_prep_test`),
+  never the dev database's connection string.
 - **A column existing is not a column being written.** Two separate bugs
   across three sessions were exactly this shape: `pg` silently returning
   `int8` as a string (session 05), and `item_state_transitions.approval_route`
@@ -460,3 +475,8 @@ See `docs/implementation-plan.md` section 7.14 for the full rationale.
   Pushing a feature branch is fine.
 - For a new pure logic module in `packages/shared`, write the tests first
   and show them before implementing.
+- Before starting any session's work, confirm the working branch descends
+  from the current merged `main` — session 07 was built on a `main` that
+  didn't yet have session 06b's auth work, forcing a same-session merge to
+  reconcile the two before the PR could land. Check `git merge-base` (or
+  equivalent) against `origin/main` first, not after hitting a conflict.

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import type { FetchImpl } from './anthropic-client';
+import type { FetchImpl } from './fetch-types';
 import { callVoyageEmbed, isRetryableVoyageError, VoyageApiError } from './voyage-client';
 
 interface Recorded {

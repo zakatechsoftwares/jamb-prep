@@ -996,3 +996,292 @@ run is the user's to make once real keys are set.
 **Next:** a real batch run against a live Chemistry objective once
 `ANTHROPIC_API_KEY`/`VOYAGE_API_KEY` are available, or whatever the user
 prioritises next.
+
+## `tools/item-gen` provider switch: Anthropic → OpenAI (2026-08-16)
+
+Not a numbered session — infra work forced by a real-world constraint, done
+while getting the app running locally for the first time (Windows, local
+PostgreSQL 18) ahead of the session 10 "real batch run" that was still open.
+**Reason: Anthropic's billing did not accept the user's available payment
+method; OpenAI credits were already paid for.** Scope was deliberately kept
+to the text-generation calls only — Voyage (embeddings, duplicate detection)
+is a separate vendor with its own payment method and was left untouched, a
+choice made explicitly rather than assumed.
+
+**Built:**
+
+- `tools/item-gen/src/openai-client.ts` replaces `anthropic-client.ts`:
+  `POST https://api.openai.com/v1/chat/completions`, `Authorization: Bearer`
+  (not `x-api-key`), request `{model, messages, max_tokens}`. OpenAI's Chat
+  Completions API has no top-level `system` field the way Anthropic's
+  Messages API does — a `system` input is prepended as a `{role: 'system'}`
+  message instead, kept as a caller-facing option on `callOpenAi` even though
+  no current call site in `run-generation.ts` uses it, for shape-parity with
+  the module it replaces. Response shape: `choices[0].message.content` /
+  `usage.prompt_tokens`/`completion_tokens`, vs. Anthropic's `content[].text`
+  / `input_tokens`/`output_tokens`. Same injected-`fetchImpl` discipline,
+  same `isRetryable*Error` classification (429/5xx retryable) as the module
+  it replaces.
+- `tools/item-gen/src/fetch-types.ts`: `FetchImpl` extracted out of the
+  provider client file it used to live in (`anthropic-client.ts`) into its
+  own tiny module, since `voyage-client.ts` already depended on that type
+  and importing a generic type from a specific provider's client file would
+  have been the wrong direction of coupling once that file was `openai-client.ts`
+  instead.
+- `run-generation.ts`: both call sites (authoring, independent-solve) swapped
+  to `callOpenAi`/`isRetryableOpenAiError`; `RunGenerationDependencies` fields
+  renamed `openaiApiKey`/`openaiModel` (matching the existing
+  provider-specific naming precedent — not a new generic abstraction, since
+  there's no present need to swap providers again easily).
+- `cli.ts`: `OPENAI_API_KEY`/`OPENAI_MODEL` env vars, default model
+  `gpt-4.1`.
+- `packages/shared/src/item-gen-cost.ts`: `MODEL_PRICING`'s Claude entries
+  removed (dead once nothing passes those model strings anymore) and
+  replaced with `gpt-4.1: { inputCostPerMillionUsd: 2, outputCostPerMillionUsd: 8 }`,
+  verified directly against `developers.openai.com/api/docs/pricing` at
+  the time this entry was added — standard tier, not cached-input or batch
+  pricing. This repo's own Claude pricing entries (session 10) were never
+  verified against a live source per that session's own build-log entry;
+  this one was, closing that gap for at least this row.
+- `.env.example`: `ANTHROPIC_API_KEY` → `OPENAI_API_KEY`, comment updated;
+  `VOYAGE_API_KEY`'s comment reworded since "Anthropic has no embeddings
+  endpoint" was the old justification for Voyage's independence and no
+  longer the accurate reason (OpenAI also has no embeddings call used by
+  this pipeline; Voyage's independence stands regardless of which vendor
+  authors items).
+- Every test touching the old shape updated: `openai-client.test.ts`
+  (replacing `anthropic-client.test.ts`, same coverage — request shape,
+  system-message prepending, text/usage extraction, error status handling,
+  retryable-error classification), `run-generation.integration.test.ts`'s
+  fake HTTP fixtures (URL host check, response body shape, token-usage
+  field names, the cost-apportionment test's hard-coded dollar amounts
+  recomputed for `gpt-4.1`'s $2/M rate instead of Claude's $3/M),
+  `voyage-client.test.ts`'s import path, and a stray `'claude-sonnet-5'`
+  literal in `item-generation-repository.integration.test.ts`'s fixture.
+
+**Verification:** `pnpm typecheck` (6/6 packages), `pnpm test` (925 tests,
+zero failures, against a real local Postgres — not Docker, the first time
+this repo's test suite has been run that way), `pnpm lint` — all clean.
+
+**Decisions worth remembering:**
+
+- **Domain logic (prompts, response parsing, gating) needed zero changes.**
+  `authoring-prompt.ts`/`independent-solve-prompt.ts` were already plain
+  text with no Claude-specific framing, and `parse-authoring-response.ts`
+  already defensively strips markdown code fences before parsing JSON — a
+  provider-agnostic pattern that happened to already cover GPT's own
+  tendency to wrap JSON in fences. The entire change was confined to the
+  HTTP client, the dependency-injection wiring, and the cost table — proof
+  that injecting `fetchImpl`/`anthropicApiKey`/`anthropicModel` rather than
+  reaching for an SDK (session 10's original design choice) paid for itself
+  the first time a provider swap was actually needed.
+- **Voyage was evaluated and deliberately kept, not assumed.** Only
+  Anthropic had a payment-method problem; Voyage is a separate vendor with
+  its own billing relationship. Consolidating embeddings onto OpenAI too
+  was asked about explicitly and declined — scope stayed to exactly the
+  constraint that motivated the change.
+
+**Open at close:** the real batch run itself (English objective 1, Biology
+objective 33, 10 items each — the pair agreed on before this switch, per
+plan §7.4's low-risk starting point) had not yet been executed against the
+new OpenAI client as of this entry; that's the very next step once
+`OPENAI_API_KEY` is in the shell that runs `tools/item-gen`.
+
+**Next:** the deferred real batch run, now against OpenAI.
+
+## Incident: local dev database wiped by running `pnpm test` against it (2026-08-16)
+
+Between this entry and the previous one, the real batch run got delayed by
+a real mistake, worth recording so it isn't repeated. Immediately after the
+provider switch above, `pnpm test` was run to verify it, with `DATABASE_URL`
+pointed at `postgres://jamb:jamb@localhost:5432/jamb_prep` — the user's one
+local Postgres database, already carrying manually-seeded content, a
+hand-created reviewer account, and two items flipped to `pending_review`
+for testing the reviewer workspace. This repo's integration tests clean up
+with `TRUNCATE ... CASCADE` on shared tables (`subjects, users CASCADE`,
+documented in `CLAUDE.md`) — a deliberate, correct pattern, but one that
+assumes the database it runs against is disposable. In CI it is: the
+`postgres` service (`.github/workflows/ci.yml`) is thrown away after every
+run. **Locally there is no separate test database — `docker-compose.yml`
+and every documented `DATABASE_URL` example point at the single `jamb_prep`
+database, for both running the app and running the tests.** `pnpm test`
+truncated every table; schema/migrations survived untouched, but `users`,
+`reviewers`, `items` — everything — went to zero rows.
+
+**Recovery (nothing here was irreplaceable — all synthetic setup, not real
+user data):** re-ran `pnpm --filter @jamb/db run seed`; recreated the
+reviewer (`reviewer@example.com` / `devpassword123`, role `reviewer`,
+status `active`, assigned to Biology via `reviewer_subjects`) by hand again,
+identically to the first time; re-flipped two Biology items to
+`pending_review`. **IDs are not stable across this incident** — Postgres's
+plain `TRUNCATE` does not reset identity sequences, so every recreated row
+got a new, higher ID than before (`users`/`reviewers` continued from
+whatever the many test runs during this session had already advanced the
+sequences to). The English/Biology objective IDs picked before the incident
+(1 and 33) no longer existed afterward — 281 and 313 replaced them. Anyone
+reading an ID out of an earlier part of this log or out of memory should
+re-query rather than trust it, for the remainder of this local database's
+lifetime.
+
+**Root cause, plainly:** running the test suite against a database also
+used for hand-seeded local development data, with no separate test
+database configured anywhere in this repo for local (non-CI) use. This
+gap existed silently through sessions 01–10 because nobody had previously
+run `pnpm test` locally against a database that also held content worth
+keeping — CI's ephemeral database made the gap invisible.
+
+**Fix — a genuinely separate local test database**, so `pnpm test` can
+never again truncate real local dev data:
+
+- A second local database, `jamb_prep_test`, created once
+  (`createdb -U jamb jamb_prep_test` or equivalent), migrated the same way
+  as `jamb_prep`.
+- Local test runs use `DATABASE_URL=postgres://jamb:jamb@localhost:5432/jamb_prep_test`
+  — never the dev database's connection string — when running `pnpm test`
+  outside CI.
+- `docker-compose.yml` and `.env.example` are unchanged (`jamb_prep` stays
+  the dev database's name, matching CI); the test database is local-only
+  setup, not part of the checked-in stack, since CI's own database is
+  already disposable and doesn't need this distinction.
+
+**Next:** the deferred real batch run — now actually executed (see below) —
+plus setting up `jamb_prep_test` so this incident's root cause is closed,
+not just patched around once.
+
+## Real batch run against OpenAI, English + Biology (2026-08-16)
+
+Executed after the incident above was recovered from, against the
+recreated objective IDs (English 281, Biology 313), `--count 10` each, real
+`OPENAI_API_KEY`, real database.
+
+**Results:**
+
+- **English (objective 281):** 2 auto-gated, 7 to human review (5 of those
+  because the independent solve disagreed with the proposed key — a much
+  higher disagreement rate than session 10's fake-HTTP tests exercised, and
+  a real, useful first data point on gpt-4.1's independent-solve behavior
+  on this objective), 1 gate-failed (`option_length_outlier`), 0 discarded.
+  Cost: $0.0333 authoring+solve, $0.0395 total recorded on inserted items.
+- **Biology (objective 313):** 5 auto-gated, 5 to human review (all via the
+  sampling draw, zero disagreements this time), 0 gate-failed, 0 discarded.
+  Cost: $0.0338 authoring+solve, $0.0420 total recorded on inserted items.
+- **Combined: 20 items requested, 20 inserted, ~$0.08 total spend across
+  both objectives** — confirms the per-item cost is a fraction of a cent to
+  low single-digit cents, matching the pre-run estimate given before asking
+  for the go-ahead.
+
+**Notable finding, worth carrying into any future batch:** *(correction —
+the first version of this entry mislabeled which subject exhibited the
+skew; superseded below with the corrected, now much better-evidenced
+account after 14 more batches)*. Biology objective 313's own batch was the
+one with `A:10 B:0 C:0 D:0` before rebalancing, not English's — English
+281 was mildly skewed (`A:3 B:2 C:2 D:3`), not extreme. See the entry below
+for the accurate, multi-batch picture.
+
+**Open at close:** `jamb_prep_test` (the fix from the incident above) has
+not actually been created yet — the real run above was executed by being
+careful with `DATABASE_URL` by hand, not by the safeguard existing. Human
+review of the 12 `pending_review` items this run produced hasn't happened.
+
+**Next:** create `jamb_prep_test` before running `pnpm test` locally again;
+review the 12 pending items through the reviewer workspace; whatever the
+user prioritises after that (canonical session 11, or the candidate-facing
+track).
+
+## Closing the incident: `jamb_prep_test` created, guard added and proven (2026-08-16)
+
+The `jamb` role had no `CREATEDB` privilege — granted by the user via
+`psql -U postgres -c "ALTER ROLE jamb CREATEDB;"` (their local Postgres 18
+install has no `psql` on `PATH`; found at
+`C:\Program Files\PostgreSQL\18\bin\psql.exe`). `jamb_prep_test` created
+(`CREATE DATABASE jamb_prep_test OWNER jamb`, via `pg` directly since
+`createdb`/`psql` weren't reachable from the shell running this session
+either) and migrated with all 20 migrations, cleanly.
+
+**A code-level guard was added, not just a documented convention** — a
+name-only rule ("remember to use jamb_prep_test") is exactly the kind of
+thing that already failed once. `assertSafeToTruncate`
+(`packages/db/src/review-queue.fixtures.ts`) checks `current_database()`
+before any test-cleanup `TRUNCATE` and throws unless the name contains
+`test` or `CI` is set — the `CI` exemption matters because CI's own
+disposable Postgres service is literally also named `jamb_prep`, so the
+name alone can never distinguish safe from unsafe; only "is this a
+throwaway container" can, and `CI` is the closest proxy available. Wired
+into all three TRUNCATE call sites: the shared fixture's own
+`truncateQueueWorld`, and the two files that TRUNCATE directly
+(`reviewer-auth-repository.integration.test.ts`,
+`apps/api/src/login-end-to-end.integration.test.ts`).
+
+**Proven, not just asserted:** ran `packages/db`'s test suite with
+`DATABASE_URL` deliberately pointed back at `jamb_prep` — every test that
+reached a TRUNCATE failed loudly with the guard's own error message,
+confirming it actually fires rather than being a no-op. Then verified
+`jamb_prep`'s data survived that probe untouched (`users:1, reviewers:1,
+items:60` — unchanged), since the guard throws before the TRUNCATE runs.
+Then ran the full suite for real against `jamb_prep_test`
+(`DATABASE_URL=postgres://jamb:jamb@localhost:5432/jamb_prep_test`):
+`pnpm typecheck` (6/6 clean), `pnpm test` (925 tests, zero failures),
+matching the same numbers as the last clean run before the incident.
+
+CLAUDE.md gained the standing convention: local integration test runs use
+`jamb_prep_test`, never the dev database's connection string.
+
+**Next:** review the 12 `pending_review` items from the real batch run
+through the reviewer workspace; whatever the user prioritises after that.
+
+## Real batch run, remaining English + Biology objectives (2026-08-16)
+
+Ran the 14 objectives left untouched in both low-risk subjects (every
+English/Biology objective besides 281/313, which each already had a real
+run) — `--count 10` each, sequentially, in the background:
+Biology 314–320 (cell organelles, monohybrid inheritance, decomposers,
+liver function, plant hormones, xylem/phloem, natural selection) and
+English 282–288 (synonyms, idiomatic interpretation, diphthongs, word
+stress, subject-verb agreement, prepositions, collocation).
+
+**Results, verified against the database (not just CLI output):** 140/140
+items requested were inserted — `approved_uncalibrated: 79, pending_review:
+51, gate_failed: 11` for these 14 objectives, reconciling exactly against
+the per-objective gate reports plus one pre-existing item whose status
+predates this run. Total items in the database: 200 (60 before this run:
+40 seed + 20 from the first English/Biology run, plus these 140). Combined
+authoring+solve spend across all 14: **≈$0.47**, consistent with the
+established ~$0.03–0.04 per 10-item batch.
+
+**The key-skew finding from the first run is now well-evidenced, and more
+precise than first written (see the correction above).** Across these 14
+batches:
+
+- **Biology skewed to a single letter, almost every time.** 6 of 7 Biology
+  batches (314, 315, 316, 317, 318, 319) authored `A:10 B:0 C:0 D:0` before
+  rebalancing — every one of that batch's 10 items had gpt-4.1 place the
+  correct answer on option A. Only objective 320 came out closer to even
+  (`A:3 B:3 C:3 D:1`).
+- **English did the same thing, but not always onto letter A.** 3 of 7
+  English batches (282, 283, 284) were `A:10/9 B:0 C:0 D:0/1`-shaped, but
+  285 skewed onto **D** (`A:0 B:1 C:3 D:6`) and 286 skewed onto **B**
+  (`A:1 B:9 C:0 D:0`). 287 and 288 were more mixed.
+- **The real pattern: gpt-4.1 tends to cluster most or all of one
+  authoring call's 10 items onto the *same* option letter, not
+  specifically onto "A."** Something about generating 10 items in one
+  response correlates their key placement — plausibly an artifact of how
+  the model orders/writes each item's options internally, consistent
+  across items produced in the same call. This is a materially stronger
+  and different claim than "gpt-4.1 defaults to A," and only became clear
+  with 14 more data points; a single batch (the first run) wasn't enough
+  to tell "always A" apart from "always the same single letter."
+  `permuteToRebalance` corrected every one of these to a roughly even
+  split as designed — no defect ever reached the live bank — but this is
+  a real, now well-supported operating characteristic of this model worth
+  knowing before authoring larger batches.
+
+**Open at close:** 51 more items landed in `pending_review` from this run
+(101 total now pending across all objectives run so far), none reviewed
+yet. No batch has been run yet for a calculation-bearing subject
+(Mathematics, Physics, Chemistry) — plan §7.4's low-risk-first guidance has
+been followed to the letter so far, but every subject besides English and
+Biology remains fully unexercised against the OpenAI pipeline.
+
+**Next:** review the growing `pending_review` backlog through the reviewer
+workspace; decide whether to extend generation into a calculation subject
+next or hold there; whatever the user prioritises.
