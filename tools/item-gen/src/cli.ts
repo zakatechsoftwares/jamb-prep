@@ -67,7 +67,7 @@ function requireEnv(name: string): string {
 
 async function main(): Promise<void> {
   const options = parseArgs(process.argv.slice(2));
-  const anthropicApiKey = requireEnv('ANTHROPIC_API_KEY');
+  const openaiApiKey = requireEnv('OPENAI_API_KEY');
   const voyageApiKey = requireEnv('VOYAGE_API_KEY');
   const logDir =
     process.env.ITEM_GEN_LOG_DIR ?? path.resolve(import.meta.dirname, '../../../', DEFAULT_LOG_DIR);
@@ -78,8 +78,8 @@ async function main(): Promise<void> {
       readClient: client,
       withTransaction,
       fetchImpl: fetch,
-      anthropicApiKey,
-      anthropicModel: process.env.ANTHROPIC_MODEL ?? 'claude-sonnet-5',
+      openaiApiKey,
+      openaiModel: process.env.OPENAI_MODEL ?? 'gpt-4.1',
       voyageApiKey,
       voyageModel: process.env.VOYAGE_MODEL ?? 'voyage-3',
       random: Math.random,

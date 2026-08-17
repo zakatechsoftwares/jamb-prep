@@ -1,5 +1,5 @@
 import { afterAll, beforeEach, describe, expect, it } from 'vitest';
-import type { FetchImpl } from './anthropic-client';
+import type { FetchImpl } from './fetch-types';
 import { runGeneration, type RunGenerationDependencies } from './run-generation';
 
 process.env.PGPOOL_MAX ??= '10';
@@ -24,7 +24,7 @@ function extractPromptOptions(content: string): { label: string; text: string }[
 
 interface FakeApiConfig {
   authoringItems: unknown[];
-  authoringUsage?: { input_tokens: number; output_tokens: number };
+  authoringUsage?: { prompt_tokens: number; completion_tokens: number };
   /** stem substring -> the option TEXT the fake solver should agree with (by content, not letter, so it survives rebalancing). */
   agreeWithTextByStemSubstring: Record<string, string>;
   /** stem substring -> a fixed embedding vector. */
@@ -39,15 +39,15 @@ function buildFakeFetch(config: FakeApiConfig): { fetchImpl: FetchImpl; calls: R
     const body = init?.body ? (JSON.parse(init.body as string) as Record<string, unknown>) : {};
     calls.push({ url, body });
 
-    if (url.includes('anthropic.com')) {
+    if (url.includes('openai.com')) {
       const messages = body.messages as { content: string }[];
       const content = messages[0]!.content;
 
       if (content.startsWith('You are an experienced Nigerian secondary school teacher')) {
         return new Response(
           JSON.stringify({
-            content: [{ type: 'text', text: JSON.stringify(config.authoringItems) }],
-            usage: config.authoringUsage ?? { input_tokens: 500, output_tokens: 1500 },
+            choices: [{ message: { content: JSON.stringify(config.authoringItems) } }],
+            usage: config.authoringUsage ?? { prompt_tokens: 500, completion_tokens: 1500 },
           }),
           { status: 200 },
         );
@@ -66,10 +66,10 @@ function buildFakeFetch(config: FakeApiConfig): { fetchImpl: FetchImpl; calls: R
 
       return new Response(
         JSON.stringify({
-          content: [
-            { type: 'text', text: JSON.stringify({ answer: answerLabel, reasoning: 'fake' }) },
+          choices: [
+            { message: { content: JSON.stringify({ answer: answerLabel, reasoning: 'fake' }) } },
           ],
-          usage: { input_tokens: 100, output_tokens: 30 },
+          usage: { prompt_tokens: 100, completion_tokens: 30 },
         }),
         { status: 200 },
       );
@@ -141,8 +141,8 @@ describe.runIf(hasDatabase)('runGeneration', () => {
       readClient: client,
       withTransaction,
       fetchImpl,
-      anthropicApiKey: 'test-key',
-      anthropicModel: 'claude-sonnet-5',
+      openaiApiKey: 'test-key',
+      openaiModel: 'gpt-4.1',
       voyageApiKey: 'test-voyage-key',
       voyageModel: 'voyage-3',
       random,
@@ -278,9 +278,9 @@ describe.runIf(hasDatabase)('runGeneration', () => {
       expect(autoGated.sampledForReview).toBe(false);
 
       // The solve call never happened for the schema-failed item -- verify
-      // by counting Anthropic calls: 1 authoring + 2 solves (not 3).
-      const anthropicCalls = calls.filter((c) => c.url.includes('anthropic.com'));
-      expect(anthropicCalls).toHaveLength(3); // 1 authoring + 2 solves
+      // by counting OpenAI calls: 1 authoring + 2 solves (not 3).
+      const openaiCalls = calls.filter((c) => c.url.includes('openai.com'));
+      expect(openaiCalls).toHaveLength(3); // 1 authoring + 2 solves
 
       // Rows actually landed with the right status in the database.
       const rows = await client.query<{ status: string; approval_route: string | null }>(
@@ -351,8 +351,8 @@ describe.runIf(hasDatabase)('runGeneration', () => {
       expect(report.items[0]?.duplicateSimilarity).toBeCloseTo(1, 6);
 
       // No solve call was made for the flagged duplicate: 1 authoring + 1 embedding, 0 solves.
-      const anthropicCalls = calls.filter((c) => c.url.includes('anthropic.com'));
-      expect(anthropicCalls).toHaveLength(1);
+      const openaiCalls = calls.filter((c) => c.url.includes('openai.com'));
+      expect(openaiCalls).toHaveLength(1);
     });
   }, 20000);
 
@@ -443,7 +443,7 @@ describe.runIf(hasDatabase)('runGeneration', () => {
     await withWorld(async ({ client, world }) => {
       const { fetchImpl } = buildFakeFetch({
         authoringItems: [ITEM_FORCE, ITEM_HISTORY],
-        authoringUsage: { input_tokens: 1_000_000, output_tokens: 0 }, // exactly the per-million input rate in USD
+        authoringUsage: { prompt_tokens: 1_000_000, completion_tokens: 0 }, // exactly the per-million input rate in USD
         agreeWithTextByStemSubstring: {
           'SI unit of force': 'newton',
           'three laws of motion': 'Isaac Newton',
@@ -466,10 +466,10 @@ describe.runIf(hasDatabase)('runGeneration', () => {
         deps,
       );
 
-      // claude-sonnet-5's input rate is $3/million (item-gen-cost.ts) -> authoring call cost = $3.
-      expect(report.totalAuthoringCostUsd).toBeCloseTo(3, 6);
-      // Split evenly across the 2 inserted items: $1.5 each, plus each item's own (tiny) solve cost.
-      const perItemAuthoringShare = 3 / 2;
+      // gpt-4.1's input rate is $2/million (item-gen-cost.ts) -> authoring call cost = $2.
+      expect(report.totalAuthoringCostUsd).toBeCloseTo(2, 6);
+      // Split evenly across the 2 inserted items: $1 each, plus each item's own (tiny) solve cost.
+      const perItemAuthoringShare = 2 / 2;
       for (const item of report.items) {
         expect(item.inferenceCostUsd).toBeGreaterThan(perItemAuthoringShare);
       }

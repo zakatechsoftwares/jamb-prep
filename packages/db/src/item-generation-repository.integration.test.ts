@@ -66,7 +66,7 @@ describe.runIf(hasDatabase)('item-generation-repository', () => {
       sampledForReview: false,
       stemEmbedding: [0.1, 0.2, 0.3],
       inferenceCostUsd: 0.0123,
-      provenance: { model: 'claude-sonnet-5', promptVersion: 1 },
+      provenance: { model: 'gpt-4.1', promptVersion: 1 },
       options: [
         { label: 'A' as const, text: 'newton', isCorrect: true, distractorRationale: null },
         {

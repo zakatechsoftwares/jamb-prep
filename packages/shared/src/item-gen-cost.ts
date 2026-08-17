@@ -1,7 +1,7 @@
 /**
  * Cost accounting for the item-generation pipeline (item-generation-spec.md
  * §1, plan 7.4/7.11) — pure arithmetic, no I/O. `tools/item-gen` supplies
- * real token counts from the Anthropic API's response; `packages/db` writes
+ * real token counts from the OpenAI API's response; `packages/db` writes
  * the result to `items.inference_cost_usd`, which is what the content-lead
  * dashboard's `costPerApprovedItem` (session 09) reads.
  */
@@ -18,14 +18,17 @@ export interface ModelPricing {
 
 /**
  * List pricing, USD per million tokens. There is no live pricing API to
- * query, so this table is a maintained constant — verify it against
- * Anthropic's current published pricing before relying on it for a real
+ * query, so this table is a maintained constant — verify it against the
+ * provider's current published pricing before relying on it for a real
  * budget figure, and update it here (not by computing a fudge factor
  * elsewhere) whenever pricing changes.
+ *
+ * `gpt-4.1`'s rate was confirmed against OpenAI's own published pricing
+ * (developers.openai.com/api/docs/pricing) at the time this entry was
+ * added — standard tier, not the cached-input or batch rate.
  */
 export const MODEL_PRICING: Record<string, ModelPricing> = {
-  'claude-sonnet-5': { inputCostPerMillionUsd: 3, outputCostPerMillionUsd: 15 },
-  'claude-haiku-4-5-20251001': { inputCostPerMillionUsd: 1, outputCostPerMillionUsd: 5 },
+  'gpt-4.1': { inputCostPerMillionUsd: 2, outputCostPerMillionUsd: 8 },
 };
 
 export function computeCallCostUsd(model: string, usage: TokenUsage): number {
