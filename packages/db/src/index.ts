@@ -67,6 +67,8 @@ export {
 // The candidate exam-session engine (plan 8.3/8.4, canonical session 12,
 // Phase 1 — logic and persistence only; no mobile UI yet).
 export { loadExamConfigForUser, type ResolvedExamConfig } from './exam-config-repository';
+// Candidate identity for progress sync (plan 8.3, follow-up session).
+export { findOrCreateCandidate, type CandidateRegistrationDraft } from './candidate-repository';
 export {
   endSession,
   loadSessionForResume,
