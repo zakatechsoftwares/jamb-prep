@@ -11,6 +11,7 @@ import type {
   ReviewDecisionService,
   ReviewEscalationService,
   ReviewQueueService,
+  SubjectCombinationService,
 } from '@jamb/shared';
 // From the dependency-free `./reviewer-errors` subpath, not `@jamb/db`'s
 // index — importing the index here would open a connection pool at module
@@ -26,6 +27,7 @@ import { createIllustrationTicketsRouter } from './routes/illustration-tickets';
 import { createReviewDecisionRouter } from './routes/review-decision';
 import { createReviewEscalationRouter } from './routes/review-escalation';
 import { createReviewQueueRouter } from './routes/review-queue';
+import { createSubjectCombinationsRouter } from './routes/subject-combinations';
 
 export interface AppDependencies {
   /**
@@ -42,6 +44,7 @@ export interface AppDependencies {
   illustrationBoard?: IllustrationBoardService;
   candidateSync?: CandidateSyncService;
   contentPack?: ContentPackService;
+  subjectCombination?: SubjectCombinationService;
 }
 
 export function createApp(dependencies: AppDependencies = {}): Express {
@@ -79,6 +82,9 @@ export function createApp(dependencies: AppDependencies = {}): Express {
   }
   if (dependencies.contentPack) {
     app.use('/candidate', createContentPacksRouter(dependencies.contentPack));
+  }
+  if (dependencies.subjectCombination) {
+    app.use('/candidate', createSubjectCombinationsRouter(dependencies.subjectCombination));
   }
 
   // The one place `ReviewerNotActiveError` becomes a 401. Every reviewer
