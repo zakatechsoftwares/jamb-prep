@@ -57,6 +57,13 @@ export default tseslint.config(
         __dirname: 'readonly',
       },
     },
+    rules: {
+      // Metro (like Babel) loads its config via Node's CJS require()
+      // directly, not through a bundler that understands ESM import
+      // syntax -- require() here isn't standing in for import, it's the
+      // only mechanism this file is ever loaded by.
+      '@typescript-eslint/no-require-imports': 'off',
+    },
   },
   {
     rules: {
