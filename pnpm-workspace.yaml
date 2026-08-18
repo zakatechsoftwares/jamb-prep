@@ -4,3 +4,23 @@ packages:
   - 'tools/*'
 allowBuilds:
   esbuild: true
+# React Native and the wider Expo ecosystem's own package.json manifests
+# under-declare a large number of their real runtime dependencies --
+# historically relied on npm's flat hoisting to make them ambiently
+# available, a well-known, long-standing pain point for React Native
+# specifically under pnpm's strict per-package isolation. A narrowly-scoped
+# publicHoistPattern was tried first and resolved 20+ packages one at a
+# time before the chain reached into entire unrelated feature surfaces
+# with no clear end in sight -- see docs/build-log.md's mobile-UI phase
+# entry for the full account. shamefullyHoist keeps pnpm's actual
+# node_modules structure and symlinks; it only makes every package
+# ambiently resolvable the way npm/yarn classic already does. (This
+# setting moved from .npmrc's `shamefully-hoist` to this camelCase
+# workspace-config key in this pnpm major version -- confirmed via
+# `pnpm config get shamefully-hoist` returning undefined until moved here.)
+shamefullyHoist: true
+minimumReleaseAgeExclude:
+  - '@expo/log-box@57.0.3'
+  - '@expo/metro-runtime@57.0.11'
+  - expo-constants@57.0.12
+  - expo-router@57.0.14

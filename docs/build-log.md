@@ -1527,3 +1527,114 @@ migration — every table this session reads or writes already existed.
 **Next:** the mobile-UI follow-up session; or the diagram/illustration
 follow-up from session 11; or review the growing `pending_review`
 backlog; or whatever the user prioritises.
+
+## Mobile-UI phase — wiring the Mock CBT engine into real Expo screens (2026-08-18)
+
+Session 12's Phase 2, following its own recommendation: wire the already-built
+and fully-tested timer/reducer/persistence logic into real Expo screens.
+**Scope decision, agreed before starting:** a fully offline demo using a
+small bundled fixture item set (4 subjects × 5 items, 10-minute timer),
+not a synced one — `apps/api` still has no session/attempt endpoints
+(deliberately deferred in session 12), and a real sync layer is a
+substantial undertaking of its own. New dependencies approved:
+`expo-sqlite` (local storage, over WatermelonDB — plan §8.2's "WatermelonDB
+or Drift" is itself questionable, since Drift is a Flutter library,
+inapplicable to this React Native stack) and `expo-router` (navigation,
+Expo's current default for new projects).
+
+**Built:** `src/lib/database.ts` (the only file touching SQL — an
+append-only local table mirroring `attempts`' shape even locally, so it's
+a natural fit for the eventual sync layer; correctness recomputed from
+the fixture's own key, never trusted from a caller, the same discipline
+`session-repository.ts` established server-side), `src/lib/demo-fixture.ts`
+(the placeholder item set), `src/hooks/useMockSession.ts` (the
+orchestrator, styled after `apps/admin`'s `useReviewFlow.ts` — owns
+`applyMockSessionEvent`'s state, awaits each SQLite write before
+dispatching, per rule 3), and four screens (`_layout`, `index`,
+`mock-session`, `results`).
+
+**A real architecture bug caught before it shipped, not after:**
+`results.tsx` was originally going to call `useMockSession()` again to
+read the computed score — but each screen calling a hook gets its own
+independent instance (no shared provider exists in `apps/mobile` the way
+`AuthProvider` is one in `apps/admin`), so the score computed on the exam
+screen would never have been visible there. Fixed by passing only the
+session id across navigation and having `results.tsx` re-derive the score
+from the database directly — the one thing both screens actually share.
+
+**The real finding this session: `pnpm typecheck` and the stub-based test
+suite were both green throughout, yet the app could not bundle for Android
+at all.** The original scaffold's `App.tsx` only ever imported three named
+exports from `react-native` — nothing before this session ever exercised
+`react-native`'s own barrel `index.js`, `expo`'s real entry chain, or what
+`expo-router` pulls in, so none of this was ever caught. Verifying this
+phase required actually running `npx expo export --platform android` (no
+Android emulator/device was available in this environment to interact
+with the UI directly — this bundling check is the ceiling of what could be
+automated here; a real on-device force-close/resume walkthrough is still
+owed and noted below). That command surfaced, in order:
+
+1. **A Metro/pnpm resolution bug**, not a missing dependency: resolving
+   `@jamb/shared`'s full barrel export (this phase's first real use of it)
+   made Metro try to bundle `vite`'s own `module-runner.js` — nothing this
+   app depends on. Generic "Expo monorepo" `metro.config.js` advice
+   (`disableHierarchicalLookup` + explicit `nodeModulesPaths`) is written
+   for npm/yarn's flat hoisting and doesn't, by itself, work for pnpm's
+   symlinked `.pnpm` structure. Fixed by adding
+   `resolver.unstable_enableSymlinks = true` alongside it.
+2. **20+ individually "missing" packages** (`invariant`, `nullthrows`,
+   `color`, `query-string`'s own transitive chain, and more) that were
+   never actually missing — confirmed by reading `react-native`'s own
+   `package.json` directly, which genuinely declares every one of them.
+   `disableHierarchicalLookup` (needed for finding #1) meant Metro could
+   only find them if hoisted somewhere its explicit `nodeModulesPaths`
+   actually looked. A narrowly-scoped `publicHoistPattern` was tried first
+   and worked, one round at a time, until the chain reached into an
+   entirely unrelated feature surface (`@expo-google-fonts/material-symbols`,
+   a font asset for `expo-router`'s native-tabs icon feature, which this
+   app doesn't use at all) with no bounded end visible. **Escalated, with
+   the user's explicit go-ahead, to `shamefullyHoist: true`** in
+   `pnpm-workspace.yaml` — resolved the entire remaining chain in one
+   pass. This setting lives in `pnpm-workspace.yaml` as camelCase in this
+   pnpm major version, not `.npmrc`'s `shamefully-hoist` (confirmed: `pnpm
+   config get shamefully-hoist` returned `undefined` until moved there).
+3. **Expo Router treats every file under its routes directory as a route
+   candidate, including test files.** The first version of
+   `screens.test.ts` lived inside `src/app/` (colocated with source, this
+   repo's normal convention) and got swept into the bundle, failing on a
+   devDependency (`vitest`'s own `expect-type`) never meant to ship.
+   Fixed by moving tests to `src/__tests__/` — the one deliberate
+   exception to "tests colocated with source" in this repo, forced by
+   Expo Router's own file-based routing.
+
+**Verification:** `pnpm typecheck` (6/6), `pnpm lint` (clean, after adding
+a `**/*.config.js` override for `@typescript-eslint/no-require-imports` —
+Metro loads its config via CJS `require()` directly, not an ESM-aware
+bundler), `pnpm test` (1042 tests, zero failures). **`npx expo export
+--platform android` succeeds for real** — 1284 modules resolved, a genuine
+2.8MB Hermes bytecode bundle produced. This is real evidence beyond `tsc`
+that the app's entire dependency graph — including everything this phase
+added — actually bundles for Android.
+
+**Open at close:**
+
+- **A real on-device walkthrough is still owed**, not performed by this
+  session: launch in Expo Go on an emulator/device, start a demo mock
+  session, answer a few items, flag one, force-close mid-session,
+  relaunch, and confirm it resumes with correct remaining time and every
+  answer intact. The Metro bundle-export check proves the app *builds*;
+  it does not prove the UI renders correctly or that SQLite reads/writes
+  behave as designed on a real device. This is the actual point of the
+  whole phase and remains unverified in the sense CLAUDE.md's release-gating
+  test demands.
+- The sync layer (real subject packs, uploaded attempts, authoritative
+  server rescoring, `apps/api` session/attempt routes) remains a
+  deliberate, separate follow-up — unchanged from session 12's own framing.
+- `shamefullyHoist: true` is a real, repo-wide change to how every
+  package's dependencies resolve, not scoped to `apps/mobile` alone —
+  worth knowing if a future session hits a surprising resolution result
+  anywhere else in the monorepo; this is the likely cause to check first.
+
+**Next:** a real on-device verification session; then the sync layer, or
+the diagram/illustration follow-up from session 11, or review the growing
+`pending_review` backlog — whatever the user prioritises.

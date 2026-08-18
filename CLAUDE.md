@@ -497,13 +497,16 @@ See `docs/implementation-plan.md` section 7.14 for the full rationale.
 ## Mock CBT engine (candidate track, canonical session 12)
 
 The candidate-facing exam runtime — timer, navigation, session/attempt
-persistence — starts here. **Phase 1 only: the logic and persistence layer
-in `packages/shared` and `packages/db`, fully tested. No mobile UI yet** —
-`apps/mobile` is still a bare Expo scaffold with no SQLite or navigation
-library, and rule 7 already means almost none of this should be mobile-side
-logic anyway. Wiring it into real Expo screens is a deliberate follow-up
-session, once a local-storage library and a navigation library are chosen
-(new dependencies, need sign-off).
+persistence — starts here. **Phase 1: the logic and persistence layer in
+`packages/shared` and `packages/db`, fully tested.** `apps/mobile` was a
+bare Expo scaffold with no SQLite or navigation library at that point, and
+rule 7 already means almost none of this should be mobile-side logic
+anyway. **Phase 2 (mobile-UI phase) wired this into real Expo screens** —
+`expo-sqlite` (local storage) and `expo-router` (navigation), both
+approved dependencies — proven by a real Metro bundle export for Android,
+not just `tsc`. A synced version (real subject packs, uploaded attempts,
+authoritative server rescoring) remains a deliberate, separate follow-up;
+Phase 2 runs a small bundled fixture item set entirely offline.
 
 - **Remaining time is derived, never stored as a countdown.** A session
   persists one absolute `endAt` timestamp (`packages/shared/src/exam-timer.ts`'s
@@ -539,6 +542,66 @@ session, once a local-storage library and a navigation library are chosen
   inside the package" and "it's actually part of the public surface" are
   different claims; check the barrel export when a module that's existed
   for a while turns out to be needed from outside for the first time.
+- **Each screen calling a hook gets its own independent instance — there
+  is no shared provider in `apps/mobile` the way `AuthProvider` is one in
+  `apps/admin`.** `results.tsx` calling `useMockSession()` a second time
+  would get blank state, not the score `mock-session.tsx`'s own instance
+  computed. The fix: pass only the session id across navigation (a route
+  param) and have the results screen re-derive its score from the
+  database — the one thing every screen actually shares — rather than
+  attempting to carry React state across a navigation boundary.
+- **`apps/mobile`'s dependency tree was never actually exercised for real
+  before this session** — the original scaffold's `App.tsx` imported only
+  three named exports from `react-native`, so nothing before this session
+  ever bundled `react-native`'s own barrel `index.js`, `expo`'s real entry
+  chain, or anything expo-router pulls in. The result: `pnpm typecheck`
+  and the stub-based vitest suite were both green throughout, yet the app
+  could not actually bundle for Android at all. **`tsc` and stub-level
+  tests prove the code is well-typed and importable; they do not prove it
+  bundles or runs.** Verifying this phase required actually running
+  `npx expo export --platform android`, which is what surfaced every
+  finding below — treat a real bundler/build check as part of "done" for
+  any mobile change with real dependency-graph depth, not just
+  `pnpm typecheck`.
+- **React Native's own ecosystem under-declares a large share of its real
+  runtime dependencies** (`invariant`, `nullthrows`, `color`,
+  `query-string`'s own transitive chain, and many more) — a long-standing,
+  well-known pain point specific to pairing React Native with pnpm's
+  strict per-package isolation, not particular to this repo. A narrowly
+  scoped `publicHoistPattern` was tried first and resolved 20+ individual
+  packages before the chain reached entire unrelated feature surfaces
+  (font assets for an `expo-router` navigation feature never used here)
+  with no bounded end in sight. **Fixed with `shamefullyHoist: true` in
+  `pnpm-workspace.yaml`** — keeps pnpm's real node_modules/symlink
+  structure, just makes every package ambiently resolvable the way
+  npm/yarn classic already does, matching what most real-world Expo+pnpm
+  setups use for exactly this reason. Note this setting lives in
+  `pnpm-workspace.yaml` as camelCase, not `.npmrc`'s `shamefully-hoist`,
+  in this pnpm major version — confirmed by `pnpm config get
+  shamefully-hoist` returning `undefined` until moved there.
+- **`apps/mobile/metro.config.js` needs `unstable_enableSymlinks: true`
+  for a pnpm monorepo — generic "Expo monorepo" advice
+  (`disableHierarchicalLookup` alone) is written for npm/yarn's flat
+  hoisting and is actively wrong for pnpm's symlinked `.pnpm` structure.**
+  Without it, Metro cannot follow the symlinks pnpm's structure is built
+  on, at all, regardless of hoisting. Both settings are needed together in
+  the end: `unstable_enableSymlinks` lets Metro follow pnpm's real
+  structure, and `disableHierarchicalLookup` (plus an explicit
+  `resolver.nodeModulesPaths` naming this package's own `node_modules`
+  then the workspace root's) stops Metro's hierarchical walk from
+  wandering into an unrelated sibling package's `.pnpm` entry entirely —
+  confirmed for real: resolving `@jamb/shared`'s full barrel export (this
+  phase's first real use of it) made Metro try to bundle `vite`'s own
+  `module-runner.js`, nothing this app depends on.
+- **Expo Router treats every file under its routes directory as a route
+  candidate, including test files.** A `.test.ts` file placed inside
+  `src/app/` got swept into the bundle and failed on a devDependency
+  (`vitest`'s own `expect-type`) that's never meant to ship. Test files
+  live outside the routes directory entirely (`src/__tests__/`), never
+  colocated with `src/app/*.tsx` the way this repo's other packages
+  colocate tests with source — the one deliberate exception to that
+  convention, and only because Expo Router's own file-based routing makes
+  colocation actively break the build here.
 
 ## How I want you to work
 
