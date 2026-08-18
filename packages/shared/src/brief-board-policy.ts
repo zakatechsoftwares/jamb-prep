@@ -1,4 +1,5 @@
 import type { BriefStatus } from './brief-lifecycle';
+import type { IllustrationTicketStatus } from './illustration-lifecycle';
 import type { OptionLabel } from './item-lifecycle';
 
 /**
@@ -41,6 +42,18 @@ export interface ContributedOptionInput {
   distractorRationale: string | null;
 }
 
+/**
+ * A contributor discovers mid-authoring, not from the brief itself, that a
+ * specific item needs a figure — `objectives.requires_human_authorship` is
+ * one undifferentiated flag covering diagram-dependent, reading-text and
+ * policy/current-affairs objectives alike, so it cannot predict this. The
+ * sketch photo itself travels as a multipart file alongside this JSON, not
+ * as a field on it.
+ */
+export interface RequestDiagramInput {
+  figureDescription: string;
+}
+
 export interface ContributedItemInput {
   stem: string;
   explanation: string;
@@ -49,6 +62,19 @@ export interface ContributedItemInput {
   authorDifficulty: number;
   expectedTimeSeconds: number;
   options: ContributedOptionInput[];
+  /** Present when this item needs a figure — defers promotion to `pending_review` until an illustrator completes the ticket. */
+  diagramRequest: RequestDiagramInput | null;
+}
+
+/**
+ * A raw file's bytes, typed as `Uint8Array` rather than Node's `Buffer` so
+ * this package (imported by `apps/mobile`'s React Native runtime too) never
+ * depends on a Node-only global. `apps/api`'s route handlers, which are
+ * Node-only, convert to/from `Buffer` at their own boundary.
+ */
+export interface SketchPhotoUpload {
+  bytes: Uint8Array;
+  contentType: string;
 }
 
 export interface BriefBoardService {
@@ -59,4 +85,40 @@ export interface BriefBoardService {
     contributorReviewerId: number,
     draft: ContributedItemInput,
   ): Promise<{ itemId: number }>;
+  /** Used instead of `submitContributedItem` when `draft.diagramRequest` is set. */
+  submitContributedItemWithDiagram(
+    briefId: number,
+    contributorReviewerId: number,
+    draft: ContributedItemInput,
+    sketchPhoto: SketchPhotoUpload,
+  ): Promise<{ itemId: number }>;
+}
+
+export interface IllustrationTicketSummary {
+  id: number;
+  itemId: number;
+  figureDescription: string;
+  status: IllustrationTicketStatus;
+  claimedByUserId: number | null;
+}
+
+export interface CompleteIllustrationInput {
+  svgMarkup: string;
+  altText: string;
+}
+
+/**
+ * The illustrator queue (plan 7.12 step 5): any active reviewer-pool
+ * account may browse and claim, matching the brief board's own "one pool,
+ * no role wall" decision — no `illustrator` role exists in `PANEL_ROLES`.
+ */
+export interface IllustrationBoardService {
+  listOpenTickets(): Promise<IllustrationTicketSummary[]>;
+  claimTicket(ticketId: number, illustratorReviewerId: number): Promise<IllustrationTicketSummary>;
+  completeTicket(
+    ticketId: number,
+    illustratorReviewerId: number,
+    input: CompleteIllustrationInput,
+  ): Promise<{ ok: true }>;
+  loadSketchPhoto(ticketId: number): Promise<SketchPhotoUpload | null>;
 }
