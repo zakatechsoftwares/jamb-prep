@@ -26,3 +26,5 @@ export * from './illustration-lifecycle';
 export * from './illustration-ticket-policy';
 export * from './exam-timer';
 export * from './mock-session-reducer';
+export * from './sync-ids';
+export * from './candidate-sync-policy';

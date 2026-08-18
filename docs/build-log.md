@@ -1758,3 +1758,90 @@ sessions, unchanged.
 **Next:** whatever the user prioritises — the sync layer, a real
 on-device mobile walkthrough, or reviewing the growing `pending_review`
 backlog.
+
+## Progress sync: candidate auth + attempt/session upload (2026-08-19)
+
+Plan §8.3's device-to-server half — closing the gap the Mobile-UI phase's
+own entry named as still open. **Scope confirmed with the user up front,
+across two real forks:** progress sync only, not full content-pack sync
+(signed bundles, manifests, entitlements — its own later session); and
+candidate auth as lightweight phone-based identity, not a hardened
+password/OTP story (both explicitly proportionate for now, not a public
+launch — see CLAUDE.md's new "Progress sync" section for the full
+reasoning behind each).
+
+**The load-bearing finding research surfaced before any code was
+written:** candidates could not authenticate at all. `users` has no
+password column, and `session-tokens.ts`'s payload is hard-typed to a
+reviewer's role. `session-repository.ts`'s `startSession`/`recordAttempt`/
+`endSession`/`loadSessionForResume`/`scoreSession` were already fully
+built, idempotent and exported since session 12 — this session is almost
+entirely a thin, correctly-authenticated route layer around functions
+that already existed, plus the mobile-side queue that had never been
+written.
+
+**Built:**
+
+- `packages/db`: `candidate-tokens.ts` (HMAC-SHA256, mirroring
+  `session-tokens.ts` exactly with a `{ userId }` payload — own
+  `@jamb/db/candidate-tokens` export subpath, dependency-free), tests
+  first. `candidate-repository.ts`'s `findOrCreateCandidate`, idempotent
+  on `phone` via the same conflict-then-lookup pattern `startSession`/
+  `recordAttempt` already use.
+- `packages/shared`: `sync-ids.ts`'s `generateSyncId` (injected-random
+  v4-shaped UUID, tests first), `candidate-sync-policy.ts` (wire types,
+  `CandidateSyncService`, and `buildAttemptUploadPayloads` — the pure
+  mapper deriving `secondsTaken` from event timestamps since the mobile
+  app has no per-question stopwatch, tests first).
+- `apps/api`: `candidate-identity.ts` mirrors `reviewer-identity.ts`
+  (`resolveCandidateId`, its own `CANDIDATE_SESSION_SECRET`). New
+  `routes/candidate.ts`: `/register` (no auth — the entry point itself,
+  signs its own token like `auth.ts`'s `/login` does), `/sessions`,
+  `/sessions/:id/attempts`, `/sessions/:id/end` (bundles `endSession`+
+  `scoreSession` into one response), `/sessions/:clientSessionId/resume`.
+  `index.ts`'s wiring adds an explicit ownership check on resume
+  (`resumed.userId !== candidateUserId` → 404) since
+  `loadSessionForResume` itself has no notion of "whose session" to check
+  against — the one place a mismatched token could otherwise read another
+  candidate's session.
+- `apps/mobile`: `database.ts` gains `local_candidate` (singleton:
+  userId/token/deviceId), `local_sessions` gains `client_session_id`/
+  `exam_config_id`/`mode`/`server_session_id`/`sync_state`,
+  `local_attempts` gains `idempotency_key` — added directly to the
+  `CREATE TABLE IF NOT EXISTS` statements rather than an `ALTER TABLE`
+  migration, since no real installed user's data exists yet to preserve
+  across an upgrade. New `candidate-api-client.ts` (fetch,
+  `EXPO_PUBLIC_API_BASE_URL`), `sync.ts` (`ensureRegistered`,
+  `syncPendingSessions` — retries a session's whole upload sequence from
+  the top on every call, relying on server-side idempotency rather than
+  tracking partial progress), a new optional `register.tsx` screen. Real
+  behavioural tests for `sync.ts` (register-once, full upload, and
+  fails-without-throwing paths) via `vi.mock` — the first real behavioural
+  test this app has had; every prior mobile test only checked "imports
+  cleanly."
+
+**Verification:** tests first for every new `packages/shared`/
+`packages/db` pure/token module. `candidate-repository.integration.test.ts`
+proves registration idempotency and a full register→start→record→end→score
+path against a real database, seeded the same way session 12's own
+`exam-session.fixtures.ts` already does. `apps/api` route tests cover
+auth-missing/malformed-input/happy-path for all five routes plus the
+register→token→authenticated-request round trip. `pnpm typecheck` (6/6),
+`pnpm lint` (clean), `pnpm test` (1098 tests, zero failures, against
+`jamb_prep_test`). `npx expo export --platform android` succeeds (1289
+modules, a real 2.8MB Hermes bundle) — this app has needed that real
+check before to catch what `tsc`/Vitest couldn't see.
+
+**Open at close:** syncing today's demo mock session will fail cleanly
+server-side (fictional item ids, `DEMO_EXAM_CONFIG_ID = 0`) — a disclosed,
+deliberate limitation, not a bug; real content sync is what closes it.
+Registration UI is minimal (one form, no validation beyond non-empty
+fields) since it's optional and never gates the exam itself. A real
+on-device walkthrough (including registering, syncing, and confirming a
+score actually reaches the server) remains unperformed, same as every
+prior mobile phase — no emulator/device in this environment.
+
+**Next:** real content sync (the other half of plan §8.3), a real
+on-device walkthrough, the diagram/illustration follow-up from session 11
+(PR #19, still open as of this entry), or reviewing the growing
+`pending_review` backlog — whatever the user prioritises.

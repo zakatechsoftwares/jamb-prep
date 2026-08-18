@@ -82,6 +82,16 @@ export const DEMO_ITEMS: DemoItem[] = [
 
 export const DEMO_DURATION_MINUTES = 10;
 
+/**
+ * Does not correspond to any real `exam_configs` row -- the same disclosed
+ * limitation as `DEMO_ITEMS`' fictional item ids (see progress-sync's own
+ * build-log entry). A synced demo session's `startSession` call will fail
+ * its foreign-key check server-side; the sync mechanism itself is still
+ * exercised and proven correct against realistically-seeded data in
+ * `packages/db`'s integration tests, just not against this fixture.
+ */
+export const DEMO_EXAM_CONFIG_ID = 0;
+
 export const DEMO_EXAM_CONFIG: ExamConfig = {
   subjects: DEMO_SUBJECTS.map((subject) => ({
     subjectId: subject.subjectId,

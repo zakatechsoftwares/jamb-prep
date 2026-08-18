@@ -4,6 +4,7 @@ import {
   computeEffectiveNow,
   computeRemainingSeconds,
   computeSessionEndAt,
+  generateSyncId,
   hasExpired,
   initMockSession,
   type MockSessionState,
@@ -16,7 +17,8 @@ import {
   startLocalSession,
   updateLastObservedAt,
 } from '../lib/database';
-import { DEMO_DURATION_MINUTES, DEMO_ITEMS } from '../lib/demo-fixture';
+import { DEMO_DURATION_MINUTES, DEMO_EXAM_CONFIG_ID, DEMO_ITEMS } from '../lib/demo-fixture';
+import { syncPendingSessions } from '../lib/sync';
 
 /**
  * The mock-session orchestrator, styled after
@@ -86,6 +88,11 @@ export function useMockSession(): UseMockSessionResult {
     }
     await endLocalSession(id, occurredAt);
     setPhase('finished');
+    // Best-effort, fire-and-forget: rule 1 means the exam itself never
+    // depends on this succeeding. A failed attempt just leaves the
+    // session's sync_state unchanged for the next trigger (app launch, or
+    // this same call next time) to retry -- see sync.ts.
+    void syncPendingSessions();
   }, []);
 
   // Mount: resume an in-progress session if one exists, purely from what's
@@ -179,7 +186,14 @@ export function useMockSession(): UseMockSessionResult {
   const startSession = useCallback(async () => {
     const startedAt = new Date();
     const endAt = computeSessionEndAt(startedAt, DEMO_DURATION_MINUTES);
-    const newSessionId = await startLocalSession(startedAt, endAt);
+    const clientSessionId = generateSyncId(Math.random);
+    const newSessionId = await startLocalSession(
+      startedAt,
+      endAt,
+      clientSessionId,
+      DEMO_EXAM_CONFIG_ID,
+      'mock',
+    );
 
     sessionIdRef.current = newSessionId;
     setSessionId(newSessionId);
@@ -201,7 +215,14 @@ export function useMockSession(): UseMockSessionResult {
     const flagged = current.progress[itemId]?.flagged ?? false;
     // Committed to local storage first; the reducer only advances once that
     // write has actually resolved.
-    await recordLocalProgressEvent(sessionId, itemId, option, flagged, new Date());
+    await recordLocalProgressEvent(
+      sessionId,
+      itemId,
+      option,
+      flagged,
+      new Date(),
+      generateSyncId(Math.random),
+    );
     setSession((latest) =>
       latest ? applyMockSessionEvent(latest, { type: 'select_option', itemId, option }) : latest,
     );
@@ -215,7 +236,14 @@ export function useMockSession(): UseMockSessionResult {
     }
     const chosenOption = current.progress[itemId]?.selectedOption ?? null;
     const nextFlagged = !(current.progress[itemId]?.flagged ?? false);
-    await recordLocalProgressEvent(sessionId, itemId, chosenOption, nextFlagged, new Date());
+    await recordLocalProgressEvent(
+      sessionId,
+      itemId,
+      chosenOption,
+      nextFlagged,
+      new Date(),
+      generateSyncId(Math.random),
+    );
     setSession((latest) =>
       latest ? applyMockSessionEvent(latest, { type: 'toggle_flag', itemId }) : latest,
     );

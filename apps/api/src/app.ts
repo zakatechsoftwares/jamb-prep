@@ -3,6 +3,7 @@ import { MulterError } from 'multer';
 import type {
   AuthService,
   BriefBoardService,
+  CandidateSyncService,
   ContentLeadService,
   HealthStatus,
   IllustrationBoardService,
@@ -17,6 +18,7 @@ import type {
 import { ReviewerNotActiveError } from '@jamb/db/reviewer-errors';
 import { createAuthRouter } from './routes/auth';
 import { createBriefsRouter } from './routes/briefs';
+import { createCandidateRouter } from './routes/candidate';
 import { createContentLeadRouter } from './routes/content-lead';
 import { createIllustrationTicketsRouter } from './routes/illustration-tickets';
 import { createReviewDecisionRouter } from './routes/review-decision';
@@ -36,6 +38,7 @@ export interface AppDependencies {
   contentLead?: ContentLeadService;
   briefBoard?: BriefBoardService;
   illustrationBoard?: IllustrationBoardService;
+  candidateSync?: CandidateSyncService;
 }
 
 export function createApp(dependencies: AppDependencies = {}): Express {
@@ -67,6 +70,9 @@ export function createApp(dependencies: AppDependencies = {}): Express {
   }
   if (dependencies.illustrationBoard) {
     app.use('/illustration-tickets', createIllustrationTicketsRouter(dependencies.illustrationBoard));
+  }
+  if (dependencies.candidateSync) {
+    app.use('/candidate', createCandidateRouter(dependencies.candidateSync));
   }
 
   // The one place `ReviewerNotActiveError` becomes a 401. Every reviewer

@@ -5,6 +5,8 @@ import {
   completeTicket,
   createBrief,
   decideOnItem,
+  endSession,
+  findOrCreateCandidate,
   getAuditSample,
   getContentLeadDashboard,
   getCoverageGaps,
@@ -12,17 +14,25 @@ import {
   getNextItemBatch,
   listOpenBriefs,
   listOpenTickets,
+  loadSessionForResume,
   loadSketchPhoto,
+  recordAttempt,
   recordModeratorAudit,
   resolveEscalation,
   revealItem,
   runWeeklyPayment,
+  scoreSession,
+  startSession,
   submitBlindAnswer,
   submitContributedItem,
   type Brief,
   type IllustrationTicket,
 } from '@jamb/db';
-import type { BriefSummary, IllustrationTicketSummary } from '@jamb/shared';
+import type {
+  BriefSummary,
+  CandidateSessionResumeResult,
+  IllustrationTicketSummary,
+} from '@jamb/shared';
 import { createApp } from './app';
 
 const port = process.env.PORT ?? 3000;
@@ -107,6 +117,59 @@ const app = createApp({
         () => ({ ok: true as const }),
       ),
     loadSketchPhoto: (ticketId) => loadSketchPhoto(ticketId),
+  },
+  candidateSync: {
+    register: (input) => findOrCreateCandidate(input),
+    startSession: (candidateUserId, input) =>
+      startSession({
+        userId: candidateUserId,
+        examConfigId: input.examConfigId,
+        mode: input.mode,
+        deviceId: input.deviceId,
+        clientSessionId: input.clientSessionId,
+        startedAt: new Date(input.startedAt),
+      }).then((sessionId) => ({ sessionId })),
+    recordAttempt: (candidateUserId, sessionId, input) =>
+      recordAttempt({
+        sessionId,
+        itemId: input.itemId,
+        userId: candidateUserId,
+        chosenOption: input.chosenOption,
+        secondsTaken: input.secondsTaken,
+        flagged: input.flagged,
+        answeredAt: new Date(input.answeredAt),
+        idempotencyKey: input.idempotencyKey,
+      }).then((attemptId) => ({ attemptId })),
+    endSession: (_candidateUserId, sessionId, input) =>
+      endSession(sessionId, new Date(input.endedAt)).then(() => scoreSession(sessionId)),
+    // `loadSessionForResume` is keyed on clientSessionId alone, with no
+    // notion of "whose session" -- this ownership check is what stops one
+    // candidate's token from reading another's session by guessing or
+    // reusing a clientSessionId, since the repository layer has nothing to
+    // check that against.
+    resumeSession: (candidateUserId, clientSessionId) =>
+      loadSessionForResume(clientSessionId).then((resumed) => {
+        if (!resumed || resumed.userId !== candidateUserId) {
+          return null;
+        }
+        const result: CandidateSessionResumeResult = {
+          sessionId: resumed.sessionId,
+          startedAt: resumed.startedAt.toISOString(),
+          endedAt: resumed.endedAt ? resumed.endedAt.toISOString() : null,
+          examConfigId: resumed.examConfigId,
+          attempts: resumed.attempts.map((attempt) => ({
+            itemId: attempt.itemId,
+            subjectId: attempt.subjectId,
+            chosenOption: attempt.chosenOption,
+            isCorrect: attempt.isCorrect,
+            secondsTaken: attempt.secondsTaken,
+            flagged: attempt.flagged,
+            answeredAt: attempt.answeredAt.toISOString(),
+            sequence: attempt.sequence,
+          })),
+        };
+        return result;
+      }),
   },
 });
 

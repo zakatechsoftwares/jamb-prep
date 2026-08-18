@@ -625,6 +625,95 @@ Phase 2 runs a small bundled fixture item set entirely offline.
   convention, and only because Expo Router's own file-based routing makes
   colocation actively break the build here.
 
+## Progress sync (candidate track, follow-up to canonical session 12)
+
+Device-to-server upload of a candidate's sessions/attempts (plan §8.3's
+"progress sync" half), with the server as scoring authority (rule 5).
+**Real content sync — versioned subject packs, signed/encrypted bundles,
+manifest/delta downloads, entitlement revalidation (plan §8.3's other
+half) — stays out of scope, its own later session;** the mobile app keeps
+running on `demo-fixture.ts`'s hardcoded 20-item set.
+
+- **Candidates cannot authenticate the way reviewers do, and were never
+  meant to.** `session-tokens.ts`'s `SessionTokenPayload` is hard-typed to
+  a `reviewers.id` and a `PanelRole` — a candidate is a `users` row
+  directly, with no role and no separate active/suspended status to
+  recheck. `candidate-tokens.ts` mirrors the same HMAC-SHA256 scheme
+  (`node:crypto`, injected clock, constant-time compare) with a
+  structurally different `{ userId }` payload, under its own
+  `CANDIDATE_SESSION_SECRET` — deliberately not a shared secret or a
+  reused payload shape, since these are different actors, not one actor
+  wearing two hats.
+- **Registration is lightweight phone-based identity, confirmed with the
+  user, not a security-hardened auth story.** `findOrCreateCandidate`
+  finds-or-creates a `users` row from `{fullName, phone, examYear}` and
+  hands back a long-lived token — no password, no OTP. Anyone who learns a
+  candidate's phone number could mint a token for that account; acceptable
+  for an internal/beta phase, not for a public launch. Real signup,
+  payments and entitlements remain their own later canonical session.
+  Mirrors `auth.ts`'s own pattern for *where* a token gets signed: the
+  `/candidate/register` route signs it itself (via `signCandidateToken`),
+  not `apps/api/src/index.ts`'s service-wiring layer — `register`'s own
+  service method returns only `{ userId }`.
+- **No new Postgres migration was needed.** `sessions.sync_state`,
+  `sessions.client_session_id`, and `attempts.idempotency_key` have
+  existed, unused, since session 12. Candidate registration only reads and
+  writes `users`' existing columns. This mattered for real: this branch
+  was cut from `main` while PR #19 (the illustration-ticket sub-flow) was
+  still open, and needing no new migration number meant no collision to
+  reconcile when both eventually merge.
+- **A disclosed limitation, not silently patched around:**
+  `attempts.item_id REFERENCES items(id)` and `scoreSession`'s
+  `loadExamConfigForUser` both require real rows. `demo-fixture.ts`'s item
+  ids (1–20) and `DEMO_EXAM_CONFIG` match nothing in the database —
+  `DEMO_EXAM_CONFIG_ID = 0` is a sentinel that will never resolve, on
+  purpose. Uploading a demo session fails cleanly (a 400 from the route's
+  own `examConfigId` validation, or a server-side FK violation) rather
+  than corrupting anything. The sync *mechanism* is proven correct against
+  realistically seeded data instead — see
+  `candidate-repository.integration.test.ts`'s end-to-end test, built the
+  same way `exam-session.fixtures.ts` already seeds a real exam world for
+  session 12's own tests. Real content sync is what will eventually close
+  this gap, not a fix folded into this session.
+- **`secondsTaken` is derived, not measured, and says so.** The mobile app
+  has no per-question stopwatch. `buildAttemptUploadPayloads`
+  (`packages/shared/src/candidate-sync-policy.ts`) approximates it as the
+  elapsed time since the previous local progress event (or since the
+  session started, for the first one) — a flag-only event still advances
+  this clock, since time passed either way, but only an event with a real
+  `chosenOption` produces an upload payload, matching what
+  `recordAttempt` accepts. Chosen deliberately as an honest proxy rather
+  than a fabricated-precision measurement, since nothing downstream reads
+  `attempts.seconds_taken` back for scoring today (`ScoringAttempt` omits
+  it entirely) — if that ever changes, this approximation is the first
+  thing to revisit.
+- **Every step of an upload retry is idempotent, so a failed sync retries
+  the *whole* sequence from the top rather than tracking partial
+  progress.** `sync.ts`'s `syncPendingSessions` calls
+  `startSession`→`recordAttempt` (per answer)→`endSession`+`scoreSession`
+  in order for every not-yet-`synced` local session, on every call,
+  relying entirely on `startSession`'s (`client_session_id`) and
+  `recordAttempt`'s (`idempotency_key`) own conflict-then-lookup
+  idempotency — already proven server-side since session 12 — rather than
+  inventing a new "resume from step 3" bookkeeping scheme. A local
+  attempt's `idempotency_key` is generated once, at write time
+  (`recordLocalProgressEvent`), and never regenerated on retry, the same
+  discipline `apps/admin`'s `PendingDecision.idempotencyKey` already
+  established.
+- **No connectivity-detection library was added.** No `NetInfo` package
+  exists anywhere in this repo. Rule 1 already means the exam itself never
+  depends on connectivity; sync is triggered opportunistically (after a
+  session ends, and again on every app launch) and a failed fetch simply
+  leaves `sync_state` unchanged for the next trigger to retry. A live
+  "sync now" indicator can be added later without changing this mechanism.
+- **`generateSyncId`** (`packages/shared/src/sync-ids.ts`) builds a
+  v4-shaped UUID from an injected `random: () => number` rather than
+  `crypto.randomUUID()` — Hermes (this app's JS engine) is not a safe
+  assumption for that global, and the injected-randomness rule applies
+  here exactly as it does to `permuteToRebalance`'s shuffle: the point is
+  reproducibility in a test, not cryptographic unguessability, since a
+  sync id only needs to avoid colliding within one device's own usage.
+
 ## How I want you to work
 
 - Ask before installing a new dependency

@@ -8,6 +8,7 @@
   "exports": {
     ".": "./src/index.ts",
     "./session-tokens": "./src/session-tokens.ts",
+    "./candidate-tokens": "./src/candidate-tokens.ts",
     "./reviewer-errors": "./src/reviewer-errors.ts",
     "./fixtures": "./src/review-queue.fixtures.ts"
   },
