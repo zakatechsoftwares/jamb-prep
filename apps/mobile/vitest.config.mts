@@ -8,6 +8,8 @@ export default defineConfig({
   resolve: {
     alias: {
       'react-native': fileURLToPath(new URL('./test/react-native.stub.ts', import.meta.url)),
+      'expo-router': fileURLToPath(new URL('./test/expo-router.stub.ts', import.meta.url)),
+      'expo-sqlite': fileURLToPath(new URL('./test/expo-sqlite.stub.ts', import.meta.url)),
     },
   },
 });

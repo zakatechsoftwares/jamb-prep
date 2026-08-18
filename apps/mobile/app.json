@@ -5,9 +5,20 @@
     "version": "0.1.0",
     "orientation": "portrait",
     "userInterfaceStyle": "automatic",
-    "platforms": ["android"],
+    "scheme": "jamb-utme-prep",
+    "platforms": [
+      "android"
+    ],
     "android": {
       "package": "com.jambprep.mobile"
+    },
+    "plugins": [
+      "expo-sqlite",
+      "expo-router",
+      "expo-status-bar"
+    ],
+    "experiments": {
+      "typedRoutes": true
     }
   }
 }
