@@ -12,6 +12,9 @@ export default function Home() {
       <Pressable onPress={() => router.push('/mock-session')} style={styles.button}>
         <Text style={styles.buttonText}>Go to mock session</Text>
       </Pressable>
+      <Pressable onPress={() => router.push('/register')} style={styles.secondaryButton}>
+        <Text style={styles.secondaryButtonText}>Register to sync progress</Text>
+      </Pressable>
     </View>
   );
 }
@@ -22,4 +25,6 @@ const styles = StyleSheet.create({
   subtitle: { fontSize: 14, color: '#555', textAlign: 'center' },
   button: { backgroundColor: '#1d4ed8', paddingVertical: 14, paddingHorizontal: 28, borderRadius: 8 },
   buttonText: { color: '#fff', fontWeight: '600', fontSize: 16 },
+  secondaryButton: { paddingVertical: 8, paddingHorizontal: 12 },
+  secondaryButtonText: { color: '#1d4ed8', fontSize: 14, fontWeight: '500' },
 });

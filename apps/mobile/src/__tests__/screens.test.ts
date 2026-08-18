@@ -32,6 +32,11 @@ describe('screens import cleanly and export a component function', () => {
     const { default: ResultsScreen } = await import('../app/results');
     expect(typeof ResultsScreen).toBe('function');
   });
+
+  it('register', async () => {
+    const { default: RegisterScreen } = await import('../app/register');
+    expect(typeof RegisterScreen).toBe('function');
+  });
 });
 
 describe('supporting modules import cleanly', () => {
@@ -48,6 +53,25 @@ describe('supporting modules import cleanly', () => {
     expect(typeof database.loadScoringAttempts).toBe('function');
     expect(typeof database.endLocalSession).toBe('function');
     expect(typeof database.updateLastObservedAt).toBe('function');
+    expect(typeof database.saveLocalCandidate).toBe('function');
+    expect(typeof database.loadLocalCandidate).toBe('function');
+    expect(typeof database.loadSessionsNeedingSync).toBe('function');
+    expect(typeof database.loadLocalProgressEvents).toBe('function');
+    expect(typeof database.markSessionSynced).toBe('function');
+  });
+
+  it('candidate-api-client', async () => {
+    const client = await import('../lib/candidate-api-client');
+    expect(typeof client.registerCandidate).toBe('function');
+    expect(typeof client.startCandidateSession).toBe('function');
+    expect(typeof client.recordCandidateAttempt).toBe('function');
+    expect(typeof client.endCandidateSession).toBe('function');
+  });
+
+  it('sync', async () => {
+    const sync = await import('../lib/sync');
+    expect(typeof sync.ensureRegistered).toBe('function');
+    expect(typeof sync.syncPendingSessions).toBe('function');
   });
 
   it('demo-fixture: 4 subjects x 5 items, matching the demo ExamConfig', async () => {
