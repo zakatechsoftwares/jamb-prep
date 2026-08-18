@@ -207,14 +207,104 @@ async function seed2026ExamConfig(): Promise<void> {
   }
 }
 
+async function upsertSubjectCombination(courseName: string): Promise<number> {
+  const result = await pool.query<{ id: number }>(
+    `INSERT INTO subject_combinations (course_name) VALUES ($1)
+     ON CONFLICT (course_name) DO UPDATE SET course_name = EXCLUDED.course_name
+     RETURNING id`,
+    [courseName],
+  );
+  return firstRow(result).id;
+}
+
+async function upsertSubjectCombinationSubject(
+  subjectCombinationId: number,
+  subjectId: number,
+  role: 'compulsory' | 'elective',
+): Promise<void> {
+  await pool.query(
+    `INSERT INTO subject_combination_subjects (subject_combination_id, subject_id, role)
+     VALUES ($1, $2, $3)
+     ON CONFLICT (subject_combination_id, subject_id) DO UPDATE SET role = EXCLUDED.role`,
+    [subjectCombinationId, subjectId, role],
+  );
+}
+
+interface SubjectCombinationSeed {
+  courseName: string;
+  compulsorySubject: string;
+  electiveSubjects: [string, string, string];
+}
+
+/**
+ * Real, standard JAMB elective sets, using only the 5 subjects this repo
+ * has seeded so far (`Use of English`, `Mathematics`, `Physics`,
+ * `Chemistry`, `Biology`) -- no subject is invented here. This does not,
+ * by itself, make any combination content-complete: only English and
+ * Biology have approved items today (content sync's own finding), so
+ * every combination below is still missing at least one elective's worth
+ * of reviewed content. That is a separate, disclosed gap this seed data
+ * does not attempt to paper over -- see CLAUDE.md's "Subject-combination
+ * onboarding" section.
+ */
+const SUBJECT_COMBINATIONS: SubjectCombinationSeed[] = [
+  {
+    courseName: 'Medicine and Surgery',
+    compulsorySubject: 'Use of English',
+    electiveSubjects: ['Biology', 'Chemistry', 'Physics'],
+  },
+  {
+    courseName: 'Pharmacy',
+    compulsorySubject: 'Use of English',
+    electiveSubjects: ['Biology', 'Chemistry', 'Physics'],
+  },
+  {
+    courseName: 'Nursing Science',
+    compulsorySubject: 'Use of English',
+    electiveSubjects: ['Biology', 'Chemistry', 'Physics'],
+  },
+  {
+    courseName: 'Computer Science',
+    compulsorySubject: 'Use of English',
+    electiveSubjects: ['Mathematics', 'Physics', 'Chemistry'],
+  },
+  {
+    courseName: 'Electrical Electronics Engineering',
+    compulsorySubject: 'Use of English',
+    electiveSubjects: ['Mathematics', 'Physics', 'Chemistry'],
+  },
+  {
+    courseName: 'Mechanical Engineering',
+    compulsorySubject: 'Use of English',
+    electiveSubjects: ['Mathematics', 'Physics', 'Chemistry'],
+  },
+];
+
+async function seedSubjectCombinations(): Promise<void> {
+  for (const combination of SUBJECT_COMBINATIONS) {
+    const combinationId = await upsertSubjectCombination(combination.courseName);
+
+    const compulsorySubjectId = await upsertSubject(combination.compulsorySubject);
+    await upsertSubjectCombinationSubject(combinationId, compulsorySubjectId, 'compulsory');
+
+    for (const subjectName of combination.electiveSubjects) {
+      const subjectId = await upsertSubject(subjectName);
+      await upsertSubjectCombinationSubject(combinationId, subjectId, 'elective');
+    }
+  }
+}
+
 async function main(): Promise<void> {
   const raw = readFileSync(seedItemsPath, 'utf8');
   const data = JSON.parse(raw) as SeedFile;
 
   await seedItems(data.items);
   await seed2026ExamConfig();
+  await seedSubjectCombinations();
 
-  console.log(`seeded ${data.items.length} items and the 2026 exam config`);
+  console.log(
+    `seeded ${data.items.length} items, the 2026 exam config, and ${SUBJECT_COMBINATIONS.length} subject combinations`,
+  );
   await pool.end();
 }
 

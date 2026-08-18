@@ -86,6 +86,14 @@ export {
 } from './exam-config-repository';
 // Candidate identity for progress sync (plan 8.3, follow-up session).
 export { findOrCreateCandidate, type CandidateRegistrationDraft } from './candidate-repository';
+// Subject-combination onboarding -- the structural prerequisite content
+// sync's own build-log entry named as the real blocker to Mock mode.
+export {
+  listSubjectCombinations,
+  setCandidateSubjectCombination,
+  SubjectCombinationNotFoundError,
+  type SubjectCombinationSummary,
+} from './subject-combination-repository';
 // Content sync: server-side subject pack delivery (plan 8.3, follow-up session).
 export {
   listAvailableSubjectPacks,
