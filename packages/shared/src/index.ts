@@ -22,5 +22,7 @@ export * from './brief-lifecycle';
 export * from './gap-detection-policy';
 export * from './brief-policy';
 export * from './brief-board-policy';
+export * from './illustration-lifecycle';
+export * from './illustration-ticket-policy';
 export * from './exam-timer';
 export * from './mock-session-reducer';

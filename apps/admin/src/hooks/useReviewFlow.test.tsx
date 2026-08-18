@@ -23,6 +23,7 @@ const ITEM: ReviewQueueItem = {
   cognitiveLevel: 'recall',
   independentSolveVerdict: 'agreed',
   claimExpiresAt: new Date('2026-08-09T10:00:00.000Z'),
+  diagram: null,
 };
 
 const REVEAL: RevealResult = {

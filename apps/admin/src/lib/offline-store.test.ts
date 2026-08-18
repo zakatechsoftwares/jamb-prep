@@ -38,6 +38,7 @@ function makeItem(itemId: number, claimExpiresAt = new Date('2026-08-09T12:00:00
     cognitiveLevel: 'recall',
     independentSolveVerdict: 'agreed',
     claimExpiresAt,
+    diagram: null,
   };
 }
 

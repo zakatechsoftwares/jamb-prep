@@ -31,8 +31,10 @@ export default function AuthorBriefPage() {
     <div className="flex h-dvh flex-col overflow-y-auto">
       <h1 className="p-6 pb-0 text-xl font-semibold text-gray-900">Author an item for brief #{briefId}</h1>
       <ContributionForm
-        onSubmit={async (draft) => {
-          const outcome = await apiClient.submitContributedItem(session.token, briefId, draft);
+        onSubmit={async (draft, sketchPhoto) => {
+          const outcome = sketchPhoto
+            ? await apiClient.submitContributedItemWithDiagram(session.token, briefId, draft, sketchPhoto)
+            : await apiClient.submitContributedItem(session.token, briefId, draft);
           if (!outcome.ok) {
             if (outcome.reason === 'unauthorized') {
               logout();

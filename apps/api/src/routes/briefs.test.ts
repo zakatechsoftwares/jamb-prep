@@ -52,6 +52,12 @@ interface Recorded {
   listCalls: number;
   claimCalls: { briefId: number; contributorReviewerId: number }[];
   submitCalls: { briefId: number; contributorReviewerId: number; draft: unknown }[];
+  submitWithDiagramCalls: {
+    briefId: number;
+    contributorReviewerId: number;
+    draft: unknown;
+    sketchPhoto: { bytes: Uint8Array; contentType: string };
+  }[];
 }
 
 function startApp(service: Partial<BriefBoardService>): {
@@ -59,7 +65,12 @@ function startApp(service: Partial<BriefBoardService>): {
   close: () => void;
   recorded: Recorded;
 } {
-  const recorded: Recorded = { listCalls: 0, claimCalls: [], submitCalls: [] };
+  const recorded: Recorded = {
+    listCalls: 0,
+    claimCalls: [],
+    submitCalls: [],
+    submitWithDiagramCalls: [],
+  };
 
   const app = createApp({
     briefBoard: {
@@ -75,6 +86,13 @@ function startApp(service: Partial<BriefBoardService>): {
         recorded.submitCalls.push({ briefId, contributorReviewerId, draft });
         return (
           service.submitContributedItem?.(briefId, contributorReviewerId, draft) ??
+          Promise.resolve({ itemId: 1 })
+        );
+      },
+      submitContributedItemWithDiagram: (briefId, contributorReviewerId, draft, sketchPhoto) => {
+        recorded.submitWithDiagramCalls.push({ briefId, contributorReviewerId, draft, sketchPhoto });
+        return (
+          service.submitContributedItemWithDiagram?.(briefId, contributorReviewerId, draft, sketchPhoto) ??
           Promise.resolve({ itemId: 1 })
         );
       },
@@ -244,6 +262,89 @@ describe('POST /briefs/:id/submit', () => {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify(VALID_ITEM),
+    });
+    expect(response.status).toBe(401);
+  });
+
+  it('rejects an item with a diagramRequest, directing it to /submit-with-diagram instead', async () => {
+    const { url } = run({});
+    const response = await fetch(`${url}/briefs/7/submit`, {
+      method: 'POST',
+      headers: { ...authHeader(3), 'content-type': 'application/json' },
+      body: JSON.stringify({ ...VALID_ITEM, diagramRequest: { figureDescription: 'a diagram' } }),
+    });
+    expect(response.status).toBe(400);
+  });
+});
+
+describe('POST /briefs/:id/submit-with-diagram', () => {
+  function multipartBody(itemOverrides: Record<string, unknown> = {}) {
+    const form = new FormData();
+    form.set(
+      'itemJson',
+      JSON.stringify({
+        ...VALID_ITEM,
+        diagramRequest: { figureDescription: 'a free-body diagram' },
+        ...itemOverrides,
+      }),
+    );
+    form.set('sketchPhoto', new Blob([new Uint8Array([1, 2, 3])], { type: 'image/jpeg' }), 'sketch.jpg');
+    return form;
+  }
+
+  it('submits a well-formed item with a sketch photo and returns its id', async () => {
+    const { url, recorded } = run({ submitContributedItemWithDiagram: async () => ({ itemId: 42 }) });
+
+    const response = await fetch(`${url}/briefs/7/submit-with-diagram`, {
+      method: 'POST',
+      headers: authHeader(3),
+      body: multipartBody(),
+    });
+    const body = await readJson<{ itemId: number }>(response);
+
+    expect(response.status).toBe(201);
+    expect(body).toEqual({ itemId: 42 });
+    expect(recorded.submitWithDiagramCalls).toHaveLength(1);
+    expect(recorded.submitWithDiagramCalls[0]).toMatchObject({ briefId: 7, contributorReviewerId: 3 });
+    expect(recorded.submitWithDiagramCalls[0]!.sketchPhoto.contentType).toBe('image/jpeg');
+    expect(Array.from(recorded.submitWithDiagramCalls[0]!.sketchPhoto.bytes)).toEqual([1, 2, 3]);
+  });
+
+  it('rejects a request with no diagramRequest set', async () => {
+    const { url } = run({});
+    const form = new FormData();
+    form.set('itemJson', JSON.stringify(VALID_ITEM));
+    form.set('sketchPhoto', new Blob([new Uint8Array([1])], { type: 'image/jpeg' }), 'sketch.jpg');
+
+    const response = await fetch(`${url}/briefs/7/submit-with-diagram`, {
+      method: 'POST',
+      headers: authHeader(3),
+      body: form,
+    });
+    expect(response.status).toBe(400);
+  });
+
+  it('rejects a request with no sketch photo file', async () => {
+    const { url } = run({});
+    const form = new FormData();
+    form.set(
+      'itemJson',
+      JSON.stringify({ ...VALID_ITEM, diagramRequest: { figureDescription: 'a diagram' } }),
+    );
+
+    const response = await fetch(`${url}/briefs/7/submit-with-diagram`, {
+      method: 'POST',
+      headers: authHeader(3),
+      body: form,
+    });
+    expect(response.status).toBe(400);
+  });
+
+  it('rejects a request with no session', async () => {
+    const { url } = run({});
+    const response = await fetch(`${url}/briefs/7/submit-with-diagram`, {
+      method: 'POST',
+      body: multipartBody(),
     });
     expect(response.status).toBe(401);
   });

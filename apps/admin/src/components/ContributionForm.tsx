@@ -6,7 +6,10 @@ import type { ContributedItemInput, OptionLabel } from '@jamb/shared';
 const OPTION_LABELS: readonly OptionLabel[] = ['A', 'B', 'C', 'D'];
 
 export interface ContributionFormProps {
-  onSubmit: (draft: ContributedItemInput) => Promise<{ ok: true } | { ok: false; message: string }>;
+  onSubmit: (
+    draft: ContributedItemInput,
+    sketchPhoto: File | null,
+  ) => Promise<{ ok: true } | { ok: false; message: string }>;
 }
 
 interface OptionDraft {
@@ -35,6 +38,9 @@ export function ContributionForm({ onSubmit }: ContributionFormProps) {
   const [cognitiveLevel, setCognitiveLevel] = useState('recall');
   const [authorDifficulty, setAuthorDifficulty] = useState('0.5');
   const [expectedTimeSeconds, setExpectedTimeSeconds] = useState('60');
+  const [needsDiagram, setNeedsDiagram] = useState(false);
+  const [figureDescription, setFigureDescription] = useState('');
+  const [sketchPhoto, setSketchPhoto] = useState<File | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [succeeded, setSucceeded] = useState(false);
@@ -75,25 +81,37 @@ export function ContributionForm({ onSubmit }: ContributionFormProps) {
       setError('Expected time (seconds) must be a positive integer.');
       return;
     }
+    if (needsDiagram && figureDescription.trim() === '') {
+      setError('Figure description is required when this item needs a diagram.');
+      return;
+    }
+    if (needsDiagram && sketchPhoto === null) {
+      setError('A sketch photo is required when this item needs a diagram.');
+      return;
+    }
 
     setSubmitting(true);
-    const result = await onSubmit({
-      stem,
-      explanation,
-      methodSteps: methodStepsText
-        .split('\n')
-        .map((step) => step.trim())
-        .filter((step) => step !== ''),
-      cognitiveLevel,
-      authorDifficulty: difficultyNum,
-      expectedTimeSeconds: expectedTimeNum,
-      options: OPTION_LABELS.map((label) => ({
-        label,
-        text: options[label].text,
-        isCorrect: label === correctLabel,
-        distractorRationale: label === correctLabel ? null : options[label].distractorRationale,
-      })),
-    });
+    const result = await onSubmit(
+      {
+        stem,
+        explanation,
+        methodSteps: methodStepsText
+          .split('\n')
+          .map((step) => step.trim())
+          .filter((step) => step !== ''),
+        cognitiveLevel,
+        authorDifficulty: difficultyNum,
+        expectedTimeSeconds: expectedTimeNum,
+        options: OPTION_LABELS.map((label) => ({
+          label,
+          text: options[label].text,
+          isCorrect: label === correctLabel,
+          distractorRationale: label === correctLabel ? null : options[label].distractorRationale,
+        })),
+        diagramRequest: needsDiagram ? { figureDescription } : null,
+      },
+      needsDiagram ? sketchPhoto : null,
+    );
     setSubmitting(false);
 
     if (!result.ok) {
@@ -203,6 +221,46 @@ export function ContributionForm({ onSubmit }: ContributionFormProps) {
           className="h-touch rounded-lg border-2 border-gray-200 px-3 text-base text-gray-900"
         />
       </label>
+
+      <label className="flex items-center gap-2 text-sm">
+        <input
+          type="checkbox"
+          aria-label="This item needs a diagram"
+          checked={needsDiagram}
+          onChange={(event) => setNeedsDiagram(event.target.checked)}
+        />
+        <span className="font-semibold uppercase tracking-wide text-gray-500">
+          This item needs a diagram
+        </span>
+      </label>
+
+      {needsDiagram && (
+        <>
+          <label className="flex flex-col gap-1 text-sm">
+            <span className="font-semibold uppercase tracking-wide text-gray-500">
+              Figure description
+            </span>
+            <textarea
+              aria-label="Figure description"
+              value={figureDescription}
+              onChange={(event) => setFigureDescription(event.target.value)}
+              className="rounded-lg border-2 border-gray-200 p-3 text-base text-gray-900"
+            />
+          </label>
+
+          <label className="flex flex-col gap-1 text-sm">
+            <span className="font-semibold uppercase tracking-wide text-gray-500">
+              Sketch photo
+            </span>
+            <input
+              type="file"
+              accept="image/*"
+              aria-label="Sketch photo"
+              onChange={(event) => setSketchPhoto(event.target.files?.[0] ?? null)}
+            />
+          </label>
+        </>
+      )}
 
       {error && (
         <p role="alert" className="text-sm font-medium text-reject">

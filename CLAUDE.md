@@ -442,7 +442,7 @@ answer intact. Write tests for this scenario early and keep them green.
   workspace.
 - **The contributor brief board** (`packages/db/src/brief-repository.ts`,
   canonical session 11, Phase 1 — text items; the diagram/illustration
-  sub-flow is a deferred follow-up) reuses `insertGeneratedItem`/
+  sub-flow followed as its own session, see below) reuses `insertGeneratedItem`/
   `promoteGeneratedItem` unchanged for a contributor-authored item —
   `contributor_id`/`brief_id` set, `risk_tier: 'not_generated'`, entry event
   `gates_passed`. The self-review exclusion
@@ -471,6 +471,28 @@ answer intact. Write tests for this scenario early and keep them green.
   item exactly equals the fee regardless of payment order. `itemCount`
   alone (mirroring `apportionAuthoringCost`'s shape) is not enough once
   payments happen individually rather than all at once.
+- **The diagram-request / illustration-ticket / illustrator queue sub-flow**
+  (`packages/db/src/illustration-repository.ts`) is discovered per item, not
+  known from the brief or objective — `objectives.requires_human_authorship`
+  is one undifferentiated boolean covering three different reasons
+  (diagram-dependent, reading-text, policy/current-affairs), so a
+  contributor only learns "this item needs a diagram" while authoring that
+  specific item. `submitContributedItem` branches on
+  `draft.diagramRequest`: a diagram-needing item is inserted but left in
+  `generated` status, never promoted, until `completeTicket` calls the same
+  unmodified `promoteGeneratedItem`/`gates_passed` a non-diagram item
+  already gets — a later trigger for an identical transition, not a new
+  one. Illustrators are not a new role: `claimTicket`/`completeTicket`
+  accept any active reviewer-pool account, matching the brief board's own
+  "one pool, no role wall" decision — nothing was added to `PANEL_ROLES`.
+  Storage is Postgres `bytea` for the contributor's sketch photo and `TEXT`
+  for the illustrator's finished SVG (plain XML, not binary at all) —
+  `multer` (memory storage) is the only new dependency, confined to
+  `apps/api`. A completed diagram renders via `svg-data-uri.ts`'s
+  `svgToImageSrc` as an `<img src="data:image/svg+xml,...">`, never an
+  inline `<svg>`/`dangerouslySetInnerHTML` — a browser does not execute a
+  `<script>` embedded in an `<img>`-loaded SVG the way it can in an inline
+  render, worth the one extra step even for internally-vetted content.
 
 ### Approval routes
 
