@@ -2,6 +2,7 @@ import express, { type Express } from 'express';
 import type {
   AuthService,
   BriefBoardService,
+  CandidateSyncService,
   ContentLeadService,
   HealthStatus,
   ReviewDecisionService,
@@ -15,6 +16,7 @@ import type {
 import { ReviewerNotActiveError } from '@jamb/db/reviewer-errors';
 import { createAuthRouter } from './routes/auth';
 import { createBriefsRouter } from './routes/briefs';
+import { createCandidateRouter } from './routes/candidate';
 import { createContentLeadRouter } from './routes/content-lead';
 import { createReviewDecisionRouter } from './routes/review-decision';
 import { createReviewEscalationRouter } from './routes/review-escalation';
@@ -32,6 +34,7 @@ export interface AppDependencies {
   auth?: AuthService;
   contentLead?: ContentLeadService;
   briefBoard?: BriefBoardService;
+  candidateSync?: CandidateSyncService;
 }
 
 export function createApp(dependencies: AppDependencies = {}): Express {
@@ -60,6 +63,9 @@ export function createApp(dependencies: AppDependencies = {}): Express {
   }
   if (dependencies.briefBoard) {
     app.use('/briefs', createBriefsRouter(dependencies.briefBoard));
+  }
+  if (dependencies.candidateSync) {
+    app.use('/candidate', createCandidateRouter(dependencies.candidateSync));
   }
 
   // The one place `ReviewerNotActiveError` becomes a 401. Every reviewer
