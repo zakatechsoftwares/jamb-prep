@@ -17,7 +17,7 @@ import {
   startLocalSession,
   updateLastObservedAt,
 } from '../lib/database';
-import { DEMO_DURATION_MINUTES, DEMO_EXAM_CONFIG_ID, DEMO_ITEMS } from '../lib/demo-fixture';
+import { DEMO_DURATION_MINUTES, DEMO_EXAM_CONFIG_ID, DEMO_ITEMS, findDemoItem } from '../lib/demo-fixture';
 import { syncPendingSessions } from '../lib/sync';
 
 /**
@@ -213,12 +213,16 @@ export function useMockSession(): UseMockSessionResult {
       return;
     }
     const flagged = current.progress[itemId]?.flagged ?? false;
+    const item = findDemoItem(itemId);
+    const isCorrect = option === item.options.find((candidate) => candidate.isCorrect)?.label;
     // Committed to local storage first; the reducer only advances once that
     // write has actually resolved.
     await recordLocalProgressEvent(
       sessionId,
       itemId,
+      item.subjectId,
       option,
+      isCorrect,
       flagged,
       new Date(),
       generateSyncId(Math.random),
@@ -236,10 +240,15 @@ export function useMockSession(): UseMockSessionResult {
     }
     const chosenOption = current.progress[itemId]?.selectedOption ?? null;
     const nextFlagged = !(current.progress[itemId]?.flagged ?? false);
+    const item = findDemoItem(itemId);
+    const isCorrect =
+      chosenOption === null ? null : chosenOption === item.options.find((candidate) => candidate.isCorrect)?.label;
     await recordLocalProgressEvent(
       sessionId,
       itemId,
+      item.subjectId,
       chosenOption,
+      isCorrect,
       nextFlagged,
       new Date(),
       generateSyncId(Math.random),
