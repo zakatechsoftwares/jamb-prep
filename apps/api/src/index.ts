@@ -15,6 +15,7 @@ import {
   listAvailableSubjectPacks,
   listOpenBriefs,
   listOpenTickets,
+  listSubjectCombinations,
   loadActiveExamConfigId,
   loadSessionForResume,
   loadSketchPhoto,
@@ -25,6 +26,7 @@ import {
   revealItem,
   runWeeklyPayment,
   scoreSession,
+  setCandidateSubjectCombination,
   startSession,
   submitBlindAnswer,
   submitContributedItem,
@@ -182,6 +184,11 @@ const app = createApp({
         ([activeExamConfigId, packs]) => ({ activeExamConfigId, packs }),
       ),
     downloadPack: (subjectId) => loadSubjectPack(subjectId),
+  },
+  subjectCombination: {
+    listSubjectCombinations: () => listSubjectCombinations(),
+    selectSubjectCombination: (candidateUserId, input) =>
+      setCandidateSubjectCombination(candidateUserId, input.subjectCombinationId),
   },
 });
 

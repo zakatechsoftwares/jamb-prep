@@ -800,6 +800,48 @@ and said so explicitly; this one does the same.
   `subject_combinations` seeded and a subject-selection/onboarding step —
   neither exists, and neither is a sync problem to fix here.
 
+## Subject-combination onboarding (candidate track, follow-up to content sync)
+
+The structural prerequisite content sync's own build-log entry named as
+the real blocker to Mock mode for a real candidate — `subject_combinations`
+had zero rows, and `loadExamConfigForUser` throws without a
+`users.subject_combination_id` that nothing before this ever set.
+
+- **Seed data uses only the 5 subjects already seeded** (`Use of English`,
+  `Mathematics`, `Physics`, `Chemistry`, `Biology`, confirmed by a live
+  database read) — no subject invented to make a combination "work."
+  `seed.ts`'s `seedSubjectCombinations()` (idempotent upserts, the same
+  `ON CONFLICT ... DO UPDATE` style every other seed function in that file
+  already uses) seeds six real, standard JAMB course names across two real
+  elective sets. **This does not make any combination content-complete**:
+  every one still needs at least one elective subject with zero approved
+  items today (content sync's own finding). That gap is unaffected by
+  this work on purpose — this session fixes the structural prerequisite
+  only, which is what lets Mock mode start working automatically the
+  moment enough subjects have approved content, with no further
+  onboarding/sync code needed then.
+- **Freely reassignable, deliberately.** `setCandidateSubjectCombination`
+  has no "already chosen" guard — a candidate changing their mind about
+  their course before ever sitting a real exam isn't a scenario worth
+  defending against, matching how every other candidate-facing write in
+  this app stays simple rather than guarding against a problem that
+  doesn't exist here.
+- **An unknown combination id is a domain error like any other in this
+  codebase, not a specially-mapped status code.** `SubjectCombinationNotFoundError`
+  propagates through `next(error)` to Express's default 500, the same as
+  `BriefNotClaimableError`/`IllustrationTicketNotClaimableError` already
+  do — only `ReviewerNotActiveError` and `MulterError` get the one-place
+  treatment in `app.ts`'s error middleware, because those two are genuine
+  cross-cutting concerns touching every route of their kind. A
+  single-route domain error doesn't earn that treatment just because it
+  would be nicer as a 400.
+- **`local_candidate.subject_combination_id`/`course_name` are
+  denormalized locally purely for display** ("your course: X" on Home,
+  without a round trip) — the server's `users.subject_combination_id`
+  stays the one authoritative copy that `loadExamConfigForUser` actually
+  reads; nothing client-side is ever trusted to decide what a candidate
+  may do.
+
 ## How I want you to work
 
 - Ask before installing a new dependency

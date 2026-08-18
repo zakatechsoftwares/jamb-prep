@@ -1961,3 +1961,84 @@ would actually unlock Mock mode for a real candidate), more content
 generation for Chemistry/Mathematics/Physics, a real on-device
 walkthrough, or reviewing the growing `pending_review` backlog — whatever
 the user prioritises.
+
+## Subject-combination seeding + a real onboarding step (2026-08-19)
+
+Closes the structural gap content sync's own entry named as the actual
+blocker to Mock mode — not more sync work, but the missing piece that
+lets a real candidate have a real four-subject blueprint at all.
+Recommended over generating more content for the empty subjects: content
+generation would just grow an already-outpacing-review backlog without
+unlocking anything sooner, while this is bounded, purely technical work
+with no dependency on reviewer throughput.
+
+**Seed data uses only the 5 subjects already seeded**, confirmed by a
+live database read before writing any code — no subject invented to make
+a combination "work." Six real, standard JAMB course names across two
+real elective sets (Medicine/Pharmacy/Nursing on English+Biology+Chemistry+Physics;
+Computer Science/Electrical Electronics Engineering/Mechanical Engineering
+on English+Mathematics+Physics+Chemistry). **This does not make any
+combination content-complete** — every one still needs at least one
+elective subject with zero approved items today. That gap is unaffected
+on purpose: this closes the structural prerequisite only, which is what
+lets Mock mode start working automatically once enough subjects have
+approved content, with no further onboarding/sync code needed then.
+
+**Built:**
+
+- `packages/db`: `seed.ts` gains `seedSubjectCombinations()` (idempotent
+  upserts, the same `ON CONFLICT ... DO UPDATE` style every other seed
+  function in that file already uses), called from `main()` alongside the
+  existing `seed2026ExamConfig()`. New `subject-combination-repository.ts`:
+  `listSubjectCombinations` (the picker's data) and
+  `setCandidateSubjectCombination` (freely reassignable, no "already
+  chosen" guard — a candidate changing their mind before ever sitting a
+  real exam isn't a scenario worth defending against here).
+- `packages/shared`: `subject-combination-policy.ts` — wire types and
+  `SubjectCombinationService`, the same declared-here-for-both-sides
+  pattern every other candidate feature already uses.
+- `apps/api`: `routes/subject-combinations.ts`, mounted at `/candidate`
+  alongside every other candidate route — `GET /subject-combinations`
+  (the picker) and `POST /subject-combination`. An unknown combination id
+  propagates as a plain 500 via `next(error)`, deliberately not given the
+  one-place `app.ts` treatment `ReviewerNotActiveError`/`MulterError` get
+  — those two are genuine cross-cutting concerns across every route of
+  their kind; a single-route domain error doesn't earn that treatment
+  just because a 400 would read nicer, matching how
+  `BriefNotClaimableError`/`IllustrationTicketNotClaimableError` already
+  behave identically.
+- `apps/mobile`: `register.tsx`'s success path now continues straight to
+  a new `choose-course.tsx` (plan 6.1: "intended course selection,
+  automatic derivation of the four-subject combination") instead of
+  returning home. `local_candidate` gains nullable
+  `subject_combination_id`/`course_name`, denormalized locally purely for
+  display ("your course: X" on Home) — the server's
+  `users.subject_combination_id` stays the one authoritative copy.
+  `index.tsx` now shows "Register" / "Choose your course" / "Your course:
+  X" depending on what's actually known locally. New
+  `subject-combination-api-client.ts`.
+
+**Verification:** `subject-combination-repository.integration.test.ts`
+against a real database (`review-queue.fixtures.ts`'s `seedQueueWorld`,
+same as every other content-facing integration test in this package),
+covering the manifest shape, a successful assignment, free reassignment,
+and the not-found error. `apps/api` route tests for both endpoints,
+including the not-found-propagates-as-500 case. Ran `seed.ts` for real
+against `jamb_prep_test` and confirmed via direct query: 6 combinations,
+correct subjects and roles, unchanged row count on a second run (proving
+the upserts are genuinely idempotent, not just idempotent-looking).
+`pnpm typecheck` (6/6), `pnpm lint` (clean), `pnpm test` (1187 tests,
+zero failures, against `jamb_prep_test`). `npx expo export --platform
+android` succeeds (1300 modules, a real Hermes bundle).
+
+**Open at close:** every seeded combination is still missing at least one
+elective subject's approved content — Mock mode remains unusable for a
+real candidate until Chemistry, Mathematics and/or Physics get real
+reviewed items, unchanged from content sync's own disclosed gap. A real
+on-device walkthrough (including a real registration → course-selection →
+practice flow) remains unperformed, same as every prior mobile phase.
+
+**Next:** more content generation for Chemistry/Mathematics/Physics (now
+that the structural blueprint exists to actually use it), a real
+on-device walkthrough, or reviewing the growing `pending_review` backlog
+— whatever the user prioritises.

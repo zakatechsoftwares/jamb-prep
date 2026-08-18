@@ -37,6 +37,8 @@ describe('ensureRegistered', () => {
       userId: 1,
       token: 'tok',
       deviceId: 'device-1',
+      subjectCombinationId: null,
+      courseName: null,
     });
 
     const { ensureRegistered } = await import('../lib/sync');
@@ -84,6 +86,8 @@ describe('syncPendingSessions', () => {
       userId: 1,
       token: 'tok',
       deviceId: 'device-1',
+      subjectCombinationId: null,
+      courseName: null,
     });
     const startedAt = new Date('2026-08-19T08:00:00.000Z');
     const endedAt = new Date('2026-08-19T08:10:00.000Z');
@@ -142,6 +146,8 @@ describe('syncPendingSessions', () => {
       userId: 1,
       token: 'tok',
       deviceId: 'device-1',
+      subjectCombinationId: null,
+      courseName: null,
     });
     vi.mocked(database.loadSessionsNeedingSync).mockResolvedValue([
       {

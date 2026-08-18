@@ -31,6 +31,13 @@ import type { OptionLabel, ScoringAttempt } from '@jamb/shared';
  * fixture; see content-sync.ts's own doc comment for why). `local_items.id`
  * is the real server item id, not autoincrement, so a redownload is a
  * plain delete-and-reinsert keyed on it rather than needing an id mapping.
+ *
+ * `local_candidate.subject_combination_id`/`course_name` (nullable) were
+ * added for subject-combination onboarding -- denormalized locally, same
+ * convention as `token`/`deviceId`, purely so the app can show "your
+ * course: X" without a round trip. The server's `users.subject_combination_id`
+ * stays the one authoritative copy; nothing here is read back to decide
+ * whether a candidate *may* do anything.
  */
 
 let db: SQLite.SQLiteDatabase | null = null;
@@ -43,7 +50,9 @@ async function getDb(): Promise<SQLite.SQLiteDatabase> {
         id INTEGER PRIMARY KEY CHECK (id = 1),
         user_id INTEGER NOT NULL,
         token TEXT NOT NULL,
-        device_id TEXT NOT NULL
+        device_id TEXT NOT NULL,
+        subject_combination_id INTEGER,
+        course_name TEXT
       );
       CREATE TABLE IF NOT EXISTS local_sessions (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -106,6 +115,8 @@ export interface LocalCandidate {
   userId: number;
   token: string;
   deviceId: string;
+  subjectCombinationId: number | null;
+  courseName: string | null;
 }
 
 /** Singleton row -- one registered candidate identity per installed app. */
@@ -118,15 +129,34 @@ export async function saveLocalCandidate(userId: number, token: string, deviceId
   );
 }
 
+/** Denormalized locally purely for display ("your course: X") -- the server's users.subject_combination_id is the one authoritative copy. */
+export async function saveLocalSubjectCombination(subjectCombinationId: number, courseName: string): Promise<void> {
+  const database = await getDb();
+  await database.runAsync(
+    `UPDATE local_candidate SET subject_combination_id = ?, course_name = ? WHERE id = 1`,
+    [subjectCombinationId, courseName],
+  );
+}
+
 export async function loadLocalCandidate(): Promise<LocalCandidate | null> {
   const database = await getDb();
-  const row = await database.getFirstAsync<{ user_id: number; token: string; device_id: string }>(
-    `SELECT user_id, token, device_id FROM local_candidate WHERE id = 1`,
-  );
+  const row = await database.getFirstAsync<{
+    user_id: number;
+    token: string;
+    device_id: string;
+    subject_combination_id: number | null;
+    course_name: string | null;
+  }>(`SELECT user_id, token, device_id, subject_combination_id, course_name FROM local_candidate WHERE id = 1`);
   if (!row) {
     return null;
   }
-  return { userId: row.user_id, token: row.token, deviceId: row.device_id };
+  return {
+    userId: row.user_id,
+    token: row.token,
+    deviceId: row.device_id,
+    subjectCombinationId: row.subject_combination_id,
+    courseName: row.course_name,
+  };
 }
 
 export async function startLocalSession(

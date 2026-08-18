@@ -36,7 +36,7 @@ export default function RegisterScreen() {
     setSubmitting(true);
     try {
       await ensureRegistered(fullName, phone, examYearNum);
-      router.replace('/');
+      router.replace('/choose-course');
     } catch {
       setError('Could not reach the server. Check your connection and try again.');
     } finally {

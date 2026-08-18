@@ -23,7 +23,13 @@ afterEach(() => {
   vi.clearAllMocks();
 });
 
-const CANDIDATE = { userId: 1, token: 'tok', deviceId: 'device-1' };
+const CANDIDATE = {
+  userId: 1,
+  token: 'tok',
+  deviceId: 'device-1',
+  subjectCombinationId: null,
+  courseName: null,
+};
 
 describe('downloadAvailablePacks', () => {
   it('does nothing when no candidate is registered yet', async () => {
