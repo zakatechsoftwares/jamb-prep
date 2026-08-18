@@ -79,9 +79,20 @@ export {
 } from './illustration-repository';
 // The candidate exam-session engine (plan 8.3/8.4, canonical session 12,
 // Phase 1 — logic and persistence only; no mobile UI yet).
-export { loadExamConfigForUser, type ResolvedExamConfig } from './exam-config-repository';
+export {
+  loadActiveExamConfigId,
+  loadExamConfigForUser,
+  type ResolvedExamConfig,
+} from './exam-config-repository';
 // Candidate identity for progress sync (plan 8.3, follow-up session).
 export { findOrCreateCandidate, type CandidateRegistrationDraft } from './candidate-repository';
+// Content sync: server-side subject pack delivery (plan 8.3, follow-up session).
+export {
+  listAvailableSubjectPacks,
+  loadSubjectPack,
+  type SubjectPackData,
+  type SubjectPackItemData,
+} from './content-pack-repository';
 export {
   endSession,
   loadSessionForResume,

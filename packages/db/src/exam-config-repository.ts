@@ -28,6 +28,20 @@ interface SubjectRuleRow {
   marks_per_subject: number;
 }
 
+/**
+ * The active `exam_configs.id` alone, with no candidate/blueprint
+ * resolution — content sync's manifest (plan 8.3, follow-up session) needs
+ * this so a Practice session (single subject, no `subject_combination`)
+ * still has a real row to satisfy `sessions.exam_config_id`'s `NOT NULL`
+ * foreign key, without needing `loadExamConfigForUser`'s full blueprint
+ * resolution at all. Null when no `exam_configs` row is marked active.
+ */
+export async function loadActiveExamConfigId(client?: PoolClient): Promise<number | null> {
+  const runner: Pool | PoolClient = client ?? pool;
+  const result = await runner.query<{ id: number }>(`SELECT id FROM exam_configs WHERE is_active LIMIT 1`);
+  return result.rows[0]?.id ?? null;
+}
+
 export async function loadExamConfigForUser(
   userId: number,
   client?: PoolClient,
