@@ -5,6 +5,7 @@ import type {
   BriefBoardService,
   CandidateSyncService,
   ContentLeadService,
+  ContentPackService,
   HealthStatus,
   IllustrationBoardService,
   ReviewDecisionService,
@@ -20,6 +21,7 @@ import { createAuthRouter } from './routes/auth';
 import { createBriefsRouter } from './routes/briefs';
 import { createCandidateRouter } from './routes/candidate';
 import { createContentLeadRouter } from './routes/content-lead';
+import { createContentPacksRouter } from './routes/content-packs';
 import { createIllustrationTicketsRouter } from './routes/illustration-tickets';
 import { createReviewDecisionRouter } from './routes/review-decision';
 import { createReviewEscalationRouter } from './routes/review-escalation';
@@ -39,6 +41,7 @@ export interface AppDependencies {
   briefBoard?: BriefBoardService;
   illustrationBoard?: IllustrationBoardService;
   candidateSync?: CandidateSyncService;
+  contentPack?: ContentPackService;
 }
 
 export function createApp(dependencies: AppDependencies = {}): Express {
@@ -73,6 +76,9 @@ export function createApp(dependencies: AppDependencies = {}): Express {
   }
   if (dependencies.candidateSync) {
     app.use('/candidate', createCandidateRouter(dependencies.candidateSync));
+  }
+  if (dependencies.contentPack) {
+    app.use('/candidate', createContentPacksRouter(dependencies.contentPack));
   }
 
   // The one place `ReviewerNotActiveError` becomes a 401. Every reviewer

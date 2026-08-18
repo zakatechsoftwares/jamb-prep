@@ -53,10 +53,11 @@ export function recordCandidateAttempt(
   return postJson(`/candidate/sessions/${sessionId}/attempts`, token, input);
 }
 
+/** `null` for a practice session — see `CandidateSyncService.endSession`'s own doc comment. */
 export function endCandidateSession(
   token: string,
   sessionId: number,
   input: EndCandidateSessionInput,
-): Promise<ScoreResult> {
+): Promise<ScoreResult | null> {
   return postJson(`/candidate/sessions/${sessionId}/end`, token, input);
 }

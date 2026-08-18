@@ -1845,3 +1845,119 @@ prior mobile phase — no emulator/device in this environment.
 on-device walkthrough, the diagram/illustration follow-up from session 11
 (PR #19, still open as of this entry), or reviewing the growing
 `pending_review` backlog — whatever the user prioritises.
+
+## Real content sync: subject packs, server to device (2026-08-19)
+
+Plan §8.3's other half — closing the gap progress sync's own entry named
+as still open. Both PR #19 (illustration tickets) and PR #20 (progress
+sync) merged to `main` first; this branch was cut from the resulting
+`main`.
+
+**Scoped down from the plan's own vision on purpose, and said so up
+front:** §8.2/§8.3/§11 describe Redis, S3+CDN, OTP auth, a payments
+gateway, and device-bound DRM encryption — none of which this session
+builds. Confirmed with the user as its own scope fork (build the sync
+mechanism only, vs. also build a real Practice screen that uses it) — the
+user chose to build the screen too, matching every prior session's
+pattern of shipping something end-to-end rather than plumbing alone.
+
+**Two real findings from direct database inspection, before any code was
+written, that reshaped the plan:**
+1. A live count of the dev database found only 94 approved items total —
+   52 Biology, 42 English, **zero** in Chemistry/Mathematics/Physics
+   (every row there is still `generated`, never reviewed). A full
+   4-subject Mock blueprint cannot be assembled from real content yet.
+2. `subject_combinations` has zero rows, and every `users` row is a
+   reviewer/contributor identity — no real candidate exists, and
+   `loadExamConfigForUser` would throw for one today regardless of content.
+
+Given both, this session targets **Practice mode** (plan §6.1: one
+subject, immediate feedback, no timer/blueprint), not Mock — the existing
+Mock CBT demo stays exactly as it was, untouched.
+
+**A real security flaw caught and removed during implementation, not
+shipped.** The original design signed each pack with HMAC for the mobile
+client to verify — realized mid-build that HMAC is symmetric, so a
+client-side verifier needs the same secret embedded in the app bundle,
+which is not an integrity check at all (anyone can extract it and forge a
+pack as easily as the server signs one). Deleted the signing module
+entirely rather than ship it; the honest integrity story is HTTPS
+transport plus an authenticated download, stated as what it is. See
+CLAUDE.md's "Content sync" section for the full reasoning.
+
+**A second real gap, found while wiring Practice's own sync path:**
+`scoreSession` unconditionally required the same missing
+`subject_combination_id`, so a real Practice session would hit the
+identical wall the Mock demo already does. Fixed by making `endSession`
+return the session's own `mode` and only scoring `mock` sessions —
+`practice` sessions have no aggregate score to compute server-side for a
+single subject, and get `null` back instead.
+
+**Built:**
+
+- `packages/shared`: `content-pack-policy.ts` — wire types,
+  `ContentPackService`, and `computePackVersion` (tests first): a
+  deterministic fingerprint over sorted `itemId:version` pairs, not a
+  cryptographic hash (Hermes has no `node:crypto`) and not a manually
+  incremented counter (changes automatically on any add/remove/edit, no
+  call site has to remember to bump anything).
+- `packages/db`: `content-pack-repository.ts` — `listAvailableSubjectPacks`
+  (the manifest) and `loadSubjectPack` (full item content, key included —
+  a practising candidate is not adversarial the way a reviewer being
+  scored is), reusing `APPROVED_STATUSES` and the same
+  `LEFT JOIN illustration_tickets ... AND status = 'completed'` pattern
+  `review-queue-repository.ts` already established for a completed
+  diagram. `exam-config-repository.ts` gains `loadActiveExamConfigId` — no
+  candidate/blueprint resolution, just the active `exam_configs.id`, which
+  is what lets a Practice session (no subject_combination) still satisfy
+  `sessions.exam_config_id`'s `NOT NULL` foreign key.
+  `session-repository.ts`'s `endSession` now `RETURNING mode`.
+- `apps/api`: `routes/content-packs.ts`, mounted at `/candidate` alongside
+  `routes/candidate.ts` (Express already stacks several routers on one
+  prefix — `/review` has four) — `GET /content-packs` (manifest, now
+  including `activeExamConfigId`) and `GET /content-packs/:subjectId`.
+- `apps/mobile`: `database.ts` gains `local_items`/`local_item_options`/
+  `local_content_versions`/`local_exam_config`, added directly to the
+  `CREATE TABLE` statements as before. `recordLocalProgressEvent` no
+  longer calls `findDemoItem` internally — the caller now supplies
+  `subjectId`/`isCorrect`, so the same table serves both Mock
+  (`useMockSession.ts`, still against `demo-fixture.ts`) and the new
+  Practice mode (`usePractice.ts`, against real downloaded content)
+  without the storage layer knowing which source is in play. New
+  `content-pack-api-client.ts`, `content-sync.ts` (`downloadAvailablePacks`
+  — per-subject best-effort, a version match skips the redownload, a
+  version change replaces the subject's items wholesale, never a merge),
+  `usePractice.ts` (no timer, no palette — genuinely simpler than the Mock
+  engine, matching plan 6.1), and two new screens (`practice.tsx` subject
+  picker, `practice-session.tsx` item-by-item practice).
+
+**Verification:** tests first for `computePackVersion`.
+`content-pack-repository.integration.test.ts` and
+`exam-config-repository.integration.test.ts` against a real database
+(reusing `review-queue.fixtures.ts`'s `seedQueueWorld`/`insertQueueItem`),
+covering the manifest, item content, diagram inclusion, and that the
+version changes on every add/edit/retire. `apps/api` route tests for both
+new endpoints plus the practice-mode-returns-null case on `/end`.
+`apps/mobile`: real behavioural tests for `content-sync.ts` via `vi.mock`
+(download-if-changed, skip-if-unchanged, one-subject-failing-does-not-stop-others,
+manifest-fetch-failure-does-not-throw) — the second real behavioural test
+suite this app has had, after progress sync's `sync.test.ts`. `pnpm typecheck`
+(6/6), `pnpm lint` (clean), `pnpm test` (1173 tests, zero failures, against
+`jamb_prep_test`). `npx expo export --platform android` succeeds (1297
+modules, a real 2.9MB Hermes bundle).
+
+**Open at close:** a real Mock session for a real candidate still needs
+`subject_combinations` seeded and a subject-selection/onboarding step —
+neither exists, and neither is a sync problem. Chemistry, Mathematics and
+Physics need real approved content before a real 4-subject Mock is
+assemblable at all. Real client-verifiable pack signing (asymmetric keys)
+and device-bound encryption-at-rest remain deliberately unbuilt. A real
+on-device walkthrough (including a real Practice session and a real
+content download) remains unperformed, same as every prior mobile phase —
+no emulator/device in this environment.
+
+**Next:** subject-combination seeding plus a real onboarding step (what
+would actually unlock Mock mode for a real candidate), more content
+generation for Chemistry/Mathematics/Physics, a real on-device
+walkthrough, or reviewing the growing `pending_review` backlog — whatever
+the user prioritises.

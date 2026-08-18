@@ -8,20 +8,36 @@ describe.runIf(hasDatabase)('exam-config-repository', () => {
       client: import('pg').PoolClient;
       world: import('./exam-session.fixtures').ExamWorld;
       loadExamConfigForUser: typeof import('./exam-config-repository').loadExamConfigForUser;
+      loadActiveExamConfigId: typeof import('./exam-config-repository').loadActiveExamConfigId;
     }) => Promise<T>,
   ): Promise<T> {
     const { pool } = await import('./client');
     const { seedExamWorld } = await import('./exam-session.fixtures');
-    const { loadExamConfigForUser } = await import('./exam-config-repository');
+    const { loadExamConfigForUser, loadActiveExamConfigId } = await import('./exam-config-repository');
     const client = await pool.connect();
 
     try {
       const world = await seedExamWorld(client);
-      return await run({ client, world, loadExamConfigForUser });
+      return await run({ client, world, loadExamConfigForUser, loadActiveExamConfigId });
     } finally {
       client.release();
     }
   }
+
+  describe('loadActiveExamConfigId', () => {
+    it('returns the active exam_configs id, with no candidate/blueprint resolution needed', async () => {
+      await withWorld(async ({ client, world, loadActiveExamConfigId }) => {
+        expect(await loadActiveExamConfigId(client)).toBe(world.examConfigId);
+      });
+    });
+
+    it('returns null when nothing is active', async () => {
+      await withWorld(async ({ client, loadActiveExamConfigId }) => {
+        await client.query(`UPDATE exam_configs SET is_active = false`);
+        expect(await loadActiveExamConfigId(client)).toBeNull();
+      });
+    });
+  });
 
   beforeEach(async () => {
     const { pool } = await import('./client');

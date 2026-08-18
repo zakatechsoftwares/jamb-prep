@@ -12,10 +12,13 @@ import {
   getCoverageGaps,
   getNextItem,
   getNextItemBatch,
+  listAvailableSubjectPacks,
   listOpenBriefs,
   listOpenTickets,
+  loadActiveExamConfigId,
   loadSessionForResume,
   loadSketchPhoto,
+  loadSubjectPack,
   recordAttempt,
   recordModeratorAudit,
   resolveEscalation,
@@ -141,7 +144,9 @@ const app = createApp({
         idempotencyKey: input.idempotencyKey,
       }).then((attemptId) => ({ attemptId })),
     endSession: (_candidateUserId, sessionId, input) =>
-      endSession(sessionId, new Date(input.endedAt)).then(() => scoreSession(sessionId)),
+      endSession(sessionId, new Date(input.endedAt)).then(({ mode }) =>
+        mode === 'mock' ? scoreSession(sessionId) : null,
+      ),
     // `loadSessionForResume` is keyed on clientSessionId alone, with no
     // notion of "whose session" -- this ownership check is what stops one
     // candidate's token from reading another's session by guessing or
@@ -170,6 +175,13 @@ const app = createApp({
         };
         return result;
       }),
+  },
+  contentPack: {
+    listAvailablePacks: () =>
+      Promise.all([loadActiveExamConfigId(), listAvailableSubjectPacks()]).then(
+        ([activeExamConfigId, packs]) => ({ activeExamConfigId, packs }),
+      ),
+    downloadPack: (subjectId) => loadSubjectPack(subjectId),
   },
 });
 

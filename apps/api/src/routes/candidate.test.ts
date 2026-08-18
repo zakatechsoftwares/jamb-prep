@@ -284,6 +284,20 @@ describe('POST /candidate/sessions/:sessionId/end', () => {
     });
     expect(response.status).toBe(400);
   });
+
+  it('returns null for a practice session, which has no aggregate score to compute', async () => {
+    const { url } = run({ endSession: async () => null });
+
+    const response = await fetch(`${url}/candidate/sessions/9/end`, {
+      method: 'POST',
+      headers: { ...authHeader(5), 'content-type': 'application/json' },
+      body: JSON.stringify({ endedAt: '2026-08-19T09:00:00.000Z' }),
+    });
+    const body = await readJson<null>(response);
+
+    expect(response.status).toBe(200);
+    expect(body).toBeNull();
+  });
 });
 
 describe('GET /candidate/sessions/:clientSessionId/resume', () => {

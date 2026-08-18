@@ -12,6 +12,9 @@ export default function Home() {
       <Pressable onPress={() => router.push('/mock-session')} style={styles.button}>
         <Text style={styles.buttonText}>Go to mock session</Text>
       </Pressable>
+      <Pressable onPress={() => router.push('/practice')} style={styles.button}>
+        <Text style={styles.buttonText}>Practice with real questions</Text>
+      </Pressable>
       <Pressable onPress={() => router.push('/register')} style={styles.secondaryButton}>
         <Text style={styles.secondaryButtonText}>Register to sync progress</Text>
       </Pressable>

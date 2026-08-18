@@ -71,6 +71,42 @@ describe.runIf(hasDatabase)('session-repository', () => {
     });
   });
 
+  describe('endSession', () => {
+    it('returns the session\'s own mode, so a caller can decide whether scoreSession even applies', async () => {
+      await withWorld(async ({ client, world, repo }) => {
+        const mockSessionId = await repo.startSession(
+          {
+            userId: world.userId,
+            examConfigId: world.examConfigId,
+            mode: 'mock',
+            deviceId: 'device-1',
+            clientSessionId: 'client-session-mock',
+            startedAt: new Date('2026-05-01T09:00:00.000Z'),
+          },
+          client,
+        );
+        const practiceSessionId = await repo.startSession(
+          {
+            userId: world.userId,
+            examConfigId: world.examConfigId,
+            mode: 'practice',
+            deviceId: 'device-1',
+            clientSessionId: 'client-session-practice',
+            startedAt: new Date('2026-05-01T09:00:00.000Z'),
+          },
+          client,
+        );
+
+        await expect(repo.endSession(mockSessionId, new Date(), client)).resolves.toEqual({
+          mode: 'mock',
+        });
+        await expect(repo.endSession(practiceSessionId, new Date(), client)).resolves.toEqual({
+          mode: 'practice',
+        });
+      });
+    });
+  });
+
   describe('recordAttempt', () => {
     it('DECISION: recomputes correctness server-side, never trusting the caller', async () => {
       await withWorld(async ({ client, world, repo }) => {

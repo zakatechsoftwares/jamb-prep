@@ -1,6 +1,5 @@
 import * as SQLite from 'expo-sqlite';
 import type { OptionLabel, ScoringAttempt } from '@jamb/shared';
-import { findDemoItem } from './demo-fixture';
 
 /**
  * The only place this app touches SQL. `local_attempts` mirrors the real
@@ -24,6 +23,14 @@ import { findDemoItem } from './demo-fixture';
  * directly to the `CREATE TABLE IF NOT EXISTS` statements rather than an
  * `ALTER TABLE` migration path; that becomes necessary once a real release
  * exists with data worth preserving across an upgrade.
+ *
+ * `local_items`/`local_item_options`/`local_content_versions` were added
+ * for content sync (plan 8.3's server-to-device half, follow-up to
+ * progress sync) -- a downloaded subject pack's real content, replacing
+ * `demo-fixture.ts` for Practice mode specifically (Mock mode stays on the
+ * fixture; see content-sync.ts's own doc comment for why). `local_items.id`
+ * is the real server item id, not autoincrement, so a redownload is a
+ * plain delete-and-reinsert keyed on it rather than needing an id mapping.
  */
 
 let db: SQLite.SQLiteDatabase | null = null;
@@ -61,6 +68,35 @@ async function getDb(): Promise<SQLite.SQLiteDatabase> {
         occurred_at TEXT NOT NULL,
         idempotency_key TEXT NOT NULL
       );
+      CREATE TABLE IF NOT EXISTS local_exam_config (
+        id INTEGER PRIMARY KEY CHECK (id = 1),
+        exam_config_id INTEGER NOT NULL
+      );
+      CREATE TABLE IF NOT EXISTS local_content_versions (
+        subject_id INTEGER PRIMARY KEY,
+        subject_name TEXT NOT NULL,
+        version TEXT NOT NULL
+      );
+      CREATE TABLE IF NOT EXISTS local_items (
+        id INTEGER PRIMARY KEY,
+        subject_id INTEGER NOT NULL,
+        stem TEXT NOT NULL,
+        explanation TEXT NOT NULL,
+        method_steps TEXT NOT NULL,
+        cognitive_level TEXT NOT NULL,
+        expected_time_seconds INTEGER NOT NULL,
+        diagram_svg TEXT,
+        diagram_alt_text TEXT
+      );
+      CREATE TABLE IF NOT EXISTS local_item_options (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        item_id INTEGER NOT NULL,
+        label TEXT NOT NULL,
+        option_text TEXT NOT NULL,
+        is_correct INTEGER NOT NULL,
+        distractor_rationale TEXT
+      );
+      CREATE INDEX IF NOT EXISTS local_item_options_item_id_idx ON local_item_options (item_id);
     `);
   }
   return db;
@@ -134,21 +170,25 @@ export async function endLocalSession(sessionId: number, endedAt: Date): Promise
   ]);
 }
 
+/**
+ * `subjectId`/`isCorrect` are supplied by the caller rather than looked up
+ * here, so this table stays agnostic to *which* item source is in play --
+ * `useMockSession.ts` resolves both from `demo-fixture.ts` (Mock mode);
+ * `usePractice.ts` resolves both from `local_items`/`local_item_options`
+ * (Practice mode, real downloaded content). Local scoring is provisional
+ * either way (rule 5) -- correctness computed here is never what a synced
+ * session is ultimately scored by.
+ */
 export async function recordLocalProgressEvent(
   sessionId: number,
   itemId: number,
+  subjectId: number,
   chosenOption: OptionLabel | null,
+  isCorrect: boolean | null,
   flagged: boolean,
   occurredAt: Date,
   idempotencyKey: string,
 ): Promise<void> {
-  const item = findDemoItem(itemId);
-  let isCorrect: boolean | null = null;
-  if (chosenOption !== null) {
-    const correctOption = item.options.find((option) => option.isCorrect)?.label;
-    isCorrect = chosenOption === correctOption;
-  }
-
   const database = await getDb();
   await database.withExclusiveTransactionAsync(async () => {
     await database.runAsync(
@@ -158,7 +198,7 @@ export async function recordLocalProgressEvent(
       [
         sessionId,
         itemId,
-        item.subjectId,
+        subjectId,
         chosenOption,
         isCorrect === null ? null : isCorrect ? 1 : 0,
         flagged ? 1 : 0,
@@ -335,4 +375,212 @@ export async function markSessionSynced(sessionId: number, serverSessionId: numb
     `UPDATE local_sessions SET sync_state = 'synced', server_session_id = ? WHERE id = ?`,
     [serverSessionId, sessionId],
   );
+}
+
+/** Learned from content sync's manifest (`SubjectPackManifest.activeExamConfigId`) -- see content-sync.ts. */
+export async function saveActiveExamConfigId(examConfigId: number): Promise<void> {
+  const database = await getDb();
+  await database.runAsync(
+    `INSERT INTO local_exam_config (id, exam_config_id) VALUES (1, ?)
+     ON CONFLICT (id) DO UPDATE SET exam_config_id = excluded.exam_config_id`,
+    [examConfigId],
+  );
+}
+
+export async function loadActiveExamConfigId(): Promise<number | null> {
+  const database = await getDb();
+  const row = await database.getFirstAsync<{ exam_config_id: number }>(
+    `SELECT exam_config_id FROM local_exam_config WHERE id = 1`,
+  );
+  return row?.exam_config_id ?? null;
+}
+
+export interface LocalItemOption {
+  label: OptionLabel;
+  text: string;
+  isCorrect: boolean;
+}
+
+export interface LocalItemForPractice {
+  itemId: number;
+  subjectId: number;
+  stem: string;
+  explanation: string;
+  methodSteps: string[];
+  options: LocalItemOption[];
+  diagram: { svgMarkup: string; altText: string } | null;
+}
+
+export async function loadLocalContentVersion(subjectId: number): Promise<string | null> {
+  const database = await getDb();
+  const row = await database.getFirstAsync<{ version: string }>(
+    `SELECT version FROM local_content_versions WHERE subject_id = ?`,
+    [subjectId],
+  );
+  return row?.version ?? null;
+}
+
+export interface SubjectPackToSave {
+  subjectId: number;
+  subjectName: string;
+  version: string;
+  items: {
+    itemId: number;
+    stem: string;
+    explanation: string;
+    methodSteps: string[];
+    cognitiveLevel: string;
+    expectedTimeSeconds: number;
+    options: { label: OptionLabel; text: string; isCorrect: boolean; distractorRationale: string | null }[];
+    diagram: { svgMarkup: string; altText: string } | null;
+  }[];
+}
+
+/** Replaces this subject's entire local item set -- a redownload is always a full replace, never a merge (plan 8.3's simplified, non-delta content sync). */
+export async function saveSubjectPack(pack: SubjectPackToSave): Promise<void> {
+  const database = await getDb();
+  await database.withExclusiveTransactionAsync(async () => {
+    const existing = await database.getAllAsync<{ id: number }>(
+      `SELECT id FROM local_items WHERE subject_id = ?`,
+      [pack.subjectId],
+    );
+    for (const row of existing) {
+      await database.runAsync(`DELETE FROM local_item_options WHERE item_id = ?`, [row.id]);
+    }
+    await database.runAsync(`DELETE FROM local_items WHERE subject_id = ?`, [pack.subjectId]);
+
+    for (const item of pack.items) {
+      await database.runAsync(
+        `INSERT INTO local_items (
+           id, subject_id, stem, explanation, method_steps, cognitive_level,
+           expected_time_seconds, diagram_svg, diagram_alt_text
+         ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        [
+          item.itemId,
+          pack.subjectId,
+          item.stem,
+          item.explanation,
+          JSON.stringify(item.methodSteps),
+          item.cognitiveLevel,
+          item.expectedTimeSeconds,
+          item.diagram?.svgMarkup ?? null,
+          item.diagram?.altText ?? null,
+        ],
+      );
+      for (const option of item.options) {
+        await database.runAsync(
+          `INSERT INTO local_item_options (item_id, label, option_text, is_correct, distractor_rationale)
+           VALUES (?, ?, ?, ?, ?)`,
+          [item.itemId, option.label, option.text, option.isCorrect ? 1 : 0, option.distractorRationale],
+        );
+      }
+    }
+
+    await database.runAsync(
+      `INSERT INTO local_content_versions (subject_id, subject_name, version) VALUES (?, ?, ?)
+       ON CONFLICT (subject_id) DO UPDATE SET subject_name = excluded.subject_name, version = excluded.version`,
+      [pack.subjectId, pack.subjectName, pack.version],
+    );
+  });
+}
+
+export interface DownloadedSubject {
+  subjectId: number;
+  subjectName: string;
+  itemCount: number;
+}
+
+export async function loadDownloadedSubjects(): Promise<DownloadedSubject[]> {
+  const database = await getDb();
+  const rows = await database.getAllAsync<{ subject_id: number; subject_name: string; item_count: number }>(
+    `SELECT v.subject_id, v.subject_name, count(i.id) AS item_count
+       FROM local_content_versions v
+       LEFT JOIN local_items i ON i.subject_id = v.subject_id
+      GROUP BY v.subject_id, v.subject_name
+      HAVING count(i.id) > 0
+      ORDER BY v.subject_name`,
+  );
+  return rows.map((row) => ({
+    subjectId: row.subject_id,
+    subjectName: row.subject_name,
+    itemCount: row.item_count,
+  }));
+}
+
+export async function loadLocalItems(subjectId: number): Promise<LocalItemForPractice[]> {
+  const database = await getDb();
+  const items = await database.getAllAsync<{
+    id: number;
+    subject_id: number;
+    stem: string;
+    explanation: string;
+    method_steps: string;
+    diagram_svg: string | null;
+    diagram_alt_text: string | null;
+  }>(`SELECT id, subject_id, stem, explanation, method_steps, diagram_svg, diagram_alt_text FROM local_items WHERE subject_id = ? ORDER BY id`, [
+    subjectId,
+  ]);
+
+  const result: LocalItemForPractice[] = [];
+  for (const item of items) {
+    const options = await database.getAllAsync<{ label: OptionLabel; option_text: string; is_correct: number }>(
+      `SELECT label, option_text, is_correct FROM local_item_options WHERE item_id = ? ORDER BY label`,
+      [item.id],
+    );
+    result.push({
+      itemId: item.id,
+      subjectId: item.subject_id,
+      stem: item.stem,
+      explanation: item.explanation,
+      methodSteps: JSON.parse(item.method_steps) as string[],
+      options: options.map((option) => ({
+        label: option.label,
+        text: option.option_text,
+        isCorrect: option.is_correct === 1,
+      })),
+      diagram:
+        item.diagram_svg !== null && item.diagram_alt_text !== null
+          ? { svgMarkup: item.diagram_svg, altText: item.diagram_alt_text }
+          : null,
+    });
+  }
+  return result;
+}
+
+export async function findLocalItem(itemId: number): Promise<LocalItemForPractice | null> {
+  const database = await getDb();
+  const item = await database.getFirstAsync<{
+    id: number;
+    subject_id: number;
+    stem: string;
+    explanation: string;
+    method_steps: string;
+    diagram_svg: string | null;
+    diagram_alt_text: string | null;
+  }>(`SELECT id, subject_id, stem, explanation, method_steps, diagram_svg, diagram_alt_text FROM local_items WHERE id = ?`, [
+    itemId,
+  ]);
+  if (!item) {
+    return null;
+  }
+  const options = await database.getAllAsync<{ label: OptionLabel; option_text: string; is_correct: number }>(
+    `SELECT label, option_text, is_correct FROM local_item_options WHERE item_id = ? ORDER BY label`,
+    [item.id],
+  );
+  return {
+    itemId: item.id,
+    subjectId: item.subject_id,
+    stem: item.stem,
+    explanation: item.explanation,
+    methodSteps: JSON.parse(item.method_steps) as string[],
+    options: options.map((option) => ({
+      label: option.label,
+      text: option.option_text,
+      isCorrect: option.is_correct === 1,
+    })),
+    diagram:
+      item.diagram_svg !== null && item.diagram_alt_text !== null
+        ? { svgMarkup: item.diagram_svg, altText: item.diagram_alt_text }
+        : null,
+  };
 }

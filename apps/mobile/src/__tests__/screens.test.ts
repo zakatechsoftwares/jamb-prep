@@ -37,12 +37,27 @@ describe('screens import cleanly and export a component function', () => {
     const { default: RegisterScreen } = await import('../app/register');
     expect(typeof RegisterScreen).toBe('function');
   });
+
+  it('practice (subject picker)', async () => {
+    const { default: PracticeSubjectsScreen } = await import('../app/practice');
+    expect(typeof PracticeSubjectsScreen).toBe('function');
+  });
+
+  it('practice-session', async () => {
+    const { default: PracticeSessionScreen } = await import('../app/practice-session');
+    expect(typeof PracticeSessionScreen).toBe('function');
+  });
 });
 
 describe('supporting modules import cleanly', () => {
   it('useMockSession', async () => {
     const { useMockSession } = await import('../hooks/useMockSession');
     expect(typeof useMockSession).toBe('function');
+  });
+
+  it('usePractice', async () => {
+    const { usePractice } = await import('../hooks/usePractice');
+    expect(typeof usePractice).toBe('function');
   });
 
   it('database', async () => {
@@ -58,6 +73,13 @@ describe('supporting modules import cleanly', () => {
     expect(typeof database.loadSessionsNeedingSync).toBe('function');
     expect(typeof database.loadLocalProgressEvents).toBe('function');
     expect(typeof database.markSessionSynced).toBe('function');
+    expect(typeof database.saveActiveExamConfigId).toBe('function');
+    expect(typeof database.loadActiveExamConfigId).toBe('function');
+    expect(typeof database.loadLocalContentVersion).toBe('function');
+    expect(typeof database.saveSubjectPack).toBe('function');
+    expect(typeof database.loadDownloadedSubjects).toBe('function');
+    expect(typeof database.loadLocalItems).toBe('function');
+    expect(typeof database.findLocalItem).toBe('function');
   });
 
   it('candidate-api-client', async () => {
@@ -68,10 +90,21 @@ describe('supporting modules import cleanly', () => {
     expect(typeof client.endCandidateSession).toBe('function');
   });
 
+  it('content-pack-api-client', async () => {
+    const client = await import('../lib/content-pack-api-client');
+    expect(typeof client.listAvailablePacks).toBe('function');
+    expect(typeof client.downloadPack).toBe('function');
+  });
+
   it('sync', async () => {
     const sync = await import('../lib/sync');
     expect(typeof sync.ensureRegistered).toBe('function');
     expect(typeof sync.syncPendingSessions).toBe('function');
+  });
+
+  it('content-sync', async () => {
+    const contentSync = await import('../lib/content-sync');
+    expect(typeof contentSync.downloadAvailablePacks).toBe('function');
   });
 
   it('demo-fixture: 4 subjects x 5 items, matching the demo ExamConfig', async () => {

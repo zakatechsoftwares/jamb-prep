@@ -43,9 +43,27 @@ export async function startSession(input: StartSessionInput, client?: PoolClient
   ).id;
 }
 
-export async function endSession(sessionId: number, endedAt: Date, client?: PoolClient): Promise<void> {
+/**
+ * Returns the session's own `mode` so a caller can decide whether
+ * `scoreSession` even applies — `scoreSession` requires
+ * `loadExamConfigForUser` to succeed, which needs a `subject_combination_id`
+ * a practice session's single subject was never meant to have (content
+ * sync, plan 8.3, follow-up session: a real candidate has no subject
+ * combination assigned at all today, so this distinction is load-bearing,
+ * not cosmetic).
+ */
+export async function endSession(
+  sessionId: number,
+  endedAt: Date,
+  client?: PoolClient,
+): Promise<{ mode: 'practice' | 'mock' }> {
   const runner: Pool | PoolClient = client ?? pool;
-  await runner.query(`UPDATE sessions SET ended_at = $2 WHERE id = $1`, [sessionId, endedAt]);
+  return firstRow(
+    await runner.query<{ mode: 'practice' | 'mock' }>(
+      `UPDATE sessions SET ended_at = $2 WHERE id = $1 RETURNING mode`,
+      [sessionId, endedAt],
+    ),
+  );
 }
 
 export interface RecordAttemptInput {

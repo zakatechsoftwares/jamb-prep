@@ -28,3 +28,4 @@ export * from './exam-timer';
 export * from './mock-session-reducer';
 export * from './sync-ids';
 export * from './candidate-sync-policy';
+export * from './content-pack-policy';

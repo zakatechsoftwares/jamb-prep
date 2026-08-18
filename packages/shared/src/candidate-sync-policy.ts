@@ -146,11 +146,19 @@ export interface CandidateSyncService {
     sessionId: number,
     input: RecordCandidateAttemptInput,
   ): Promise<{ attemptId: number }>;
+  /**
+   * `null` for a `practice` session — `scoreSession` requires a full
+   * exam-config blueprint (via `loadExamConfigForUser`'s
+   * `subject_combination_id`) that a single-subject practice session was
+   * never meant to have. Practice mode's "immediate feedback after each
+   * item" (plan 6.1) is already local and per-item; there is no aggregate
+   * score to compute server-side for it the way there is for `mock`.
+   */
   endSession(
     candidateUserId: number,
     sessionId: number,
     input: EndCandidateSessionInput,
-  ): Promise<ScoreResult>;
+  ): Promise<ScoreResult | null>;
   resumeSession(
     candidateUserId: number,
     clientSessionId: string,

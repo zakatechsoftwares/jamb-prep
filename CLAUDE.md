@@ -714,6 +714,92 @@ running on `demo-fixture.ts`'s hardcoded 20-item set.
   reproducibility in a test, not cryptographic unguessability, since a
   sync id only needs to avoid colliding within one device's own usage.
 
+## Content sync (candidate track, follow-up to progress sync)
+
+Plan §8.3's server-to-device half — subject packs delivered from the
+approved item bank to the mobile app. **The plan's own vision for this
+(§8.2, §8.3, §11) describes infrastructure this repo doesn't have and
+shouldn't build in one session:** Redis, S3-compatible storage with a CDN,
+OTP auth, a payments gateway, device-bound DRM encryption. Every session
+touching plan §8 has scaled that ambition down to something proportionate
+and said so explicitly; this one does the same.
+
+- **Two real findings from direct database inspection, not assumption,
+  that shaped the whole scope.** (1) Only English and Biology have any
+  approved content — a live count found 94 approved items total, zero in
+  Chemistry, Mathematics or Physics (every row there is still `generated`,
+  never reviewed). A full 4-subject Mock blueprint cannot be assembled
+  from real content yet, regardless of what sync delivers. (2)
+  `subject_combinations` has zero rows in the dev database, and every
+  `users` row is a reviewer/contributor identity, not a real candidate —
+  so `loadExamConfigForUser` (session 12) would throw for any real
+  candidate today; there is no assignable blueprint at all, separate from
+  the content gap. **Given both, this work targets Practice mode
+  (plan §6.1: one subject, immediate feedback, no timer/blueprint), not
+  Mock mode** — the existing Mock CBT demo (`useMockSession.ts`,
+  `mock-session.tsx`) is untouched and still runs on `demo-fixture.ts`.
+- **A security flaw caught during implementation, not shipped:** the
+  original design signed each pack with HMAC (mirroring
+  `session-tokens.ts`) for the mobile client to verify. HMAC is symmetric
+  — a client-side verifier needs the same secret the server signs with,
+  which means embedding it in the app bundle, which anyone can extract
+  and use to forge a pack exactly as easily as the server signs one. That
+  is not an integrity check, it is the appearance of one. Removed
+  entirely rather than shipped as security theater — see
+  `content-pack-policy.ts`'s `SubjectPack` doc comment for the full
+  reasoning and what real client-verifiable signing would actually need
+  (asymmetric keys, a Hermes-compatible verify path). The honest integrity
+  story for now is HTTPS transport plus an authenticated download, stated
+  as what it is rather than dressed up as more.
+- **`scoreSession` unconditionally required a `subject_combination_id`
+  that no real candidate has — a second real gap, found while wiring
+  Practice mode's own sync path, not specific to Mock.** Bundling
+  `endSession`+`scoreSession` on every `/candidate/sessions/:id/end` call
+  (progress sync's own design) meant a Practice session would hit the
+  identical wall the Mock demo already does. Fixed by making `endSession`
+  return the session's own `mode` (`RETURNING mode`), so
+  `apps/api/src/index.ts`'s wiring only calls `scoreSession` for `mock`;
+  a `practice` session's `/end` returns `null` — there is no aggregate
+  score to compute server-side for a single subject the way there is for
+  a full blueprint, and Practice's "immediate feedback" (plan 6.1) is
+  already local and per-item. `CandidateSyncService.endSession`'s return
+  type is `ScoreResult | null` accordingly.
+- **A subject pack's version is a deterministic fingerprint, not a
+  manually-incremented counter, and deliberately not a cryptographic
+  hash either.** `computePackVersion` (`packages/shared/src/content-pack-policy.ts`)
+  joins `itemId:version` pairs (sorted, so query order never matters) —
+  changes automatically whenever an item is added, removed, or edited
+  (`items.version` already bumps on `edit_and_approve`), so no call site
+  anywhere has to remember to bump a separate counter, the same class of
+  bug the "column existing is not a column being written" entry above
+  already warns about. Not a hash: `packages/shared` is imported by
+  `apps/mobile`'s Hermes runtime, where `node:crypto` isn't available —
+  the same constraint `sync-ids.ts`'s `generateSyncId` already works
+  around.
+- **A redownload is always a full replace, never a merge or a diff** —
+  `saveSubjectPack` (`apps/mobile/src/lib/database.ts`) deletes a
+  subject's entire local item set and reinserts it whenever the version
+  changes. A deliberate simplification of plan 8.3's "requests deltas"
+  language, proportionate at today's item counts (under 100 total); worth
+  revisiting only if the bank grows enough for it to matter.
+- **`recordLocalProgressEvent` no longer looks up correctness itself** —
+  it used to call `findDemoItem` internally, which only knows
+  `demo-fixture.ts`'s fictional items. Now the caller supplies
+  `subjectId`/`isCorrect` directly, so the same append-only local-attempts
+  table serves both Mock mode (`useMockSession.ts`, still resolving
+  against `demo-fixture.ts`) and Practice mode (`usePractice.ts`,
+  resolving against the newly downloaded `local_items`/`local_item_options`)
+  without the storage layer needing to know which content source is in
+  play.
+- **Deferred, explicitly, same as the signature above:** real
+  gzip/brotli compression (today's total payload is under 100KB, nowhere
+  near the 25MB/subject budget the plan worries about at real scale),
+  encryption-at-rest/device-bound keys, and entitlement gating
+  (`users.entitlement_status` stays completely unused, exactly as before).
+  A real Mock session for a real candidate still needs
+  `subject_combinations` seeded and a subject-selection/onboarding step —
+  neither exists, and neither is a sync problem to fix here.
+
 ## How I want you to work
 
 - Ask before installing a new dependency
