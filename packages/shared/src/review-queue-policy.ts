@@ -72,6 +72,13 @@ export interface ReviewQueueItem {
   cognitiveLevel: string;
   independentSolveVerdict: IndependentSolveVerdict;
   claimExpiresAt: Date;
+  /**
+   * Present only for a contributed item whose illustration ticket has
+   * completed (plan 7.12 step 4-5). `svgMarkup` is raw SVG text — the
+   * consuming UI renders it via an `<img src="data:image/svg+xml;base64,...">`
+   * rather than inline, so an embedded script in the asset never executes.
+   */
+  diagram: { svgMarkup: string; altText: string } | null;
 }
 
 /**

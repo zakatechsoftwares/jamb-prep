@@ -20,6 +20,7 @@ const DRAFT = {
   authorDifficulty: 0.3,
   expectedTimeSeconds: 40,
   options: OPTIONS,
+  diagramRequest: null,
 };
 
 /**

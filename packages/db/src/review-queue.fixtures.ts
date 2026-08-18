@@ -30,6 +30,12 @@ import { firstRow } from './first-row';
 // the same reason payment_batches does — otherwise a leftover row survives
 // truncation and a hardcoded unique value (exam_year+version, course_name)
 // in a later test run collides with it.
+// illustration_tickets is not listed here: unlike payment_batches (which has
+// no FK into subjects/users, only tables that point *at* it), it has a
+// straightforward child FK into items (item_id REFERENCES items), so
+// TRUNCATE subjects CASCADE already reaches it transitively via items --
+// the same reachable-child relationship item_options/review_decisions/etc.
+// already rely on without being listed explicitly.
 const TRUNCATED_TABLES = ['subjects', 'users', 'payment_batches', 'exam_configs', 'subject_combinations'];
 
 /**

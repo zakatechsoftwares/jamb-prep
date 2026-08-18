@@ -96,6 +96,7 @@ describe('getNextItem', () => {
     cognitiveLevel: 'recall',
     independentSolveVerdict: 'agreed',
     claimExpiresAt: '2026-08-09T10:00:00.000Z',
+    diagram: null,
   };
 
   it('sends the bearer token and parses claimExpiresAt into a real Date', async () => {
@@ -149,6 +150,7 @@ describe('getNextItemBatch', () => {
     cognitiveLevel: 'recall',
     independentSolveVerdict: 'agreed',
     claimExpiresAt: '2026-08-09T10:00:00.000Z',
+    diagram: null,
   };
 
   it('requests the given count and parses claimExpiresAt for every item', async () => {

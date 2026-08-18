@@ -1,4 +1,5 @@
 import type { ReviewQueueItem, RevealResult } from '@jamb/shared';
+import { svgToImageSrc } from '../lib/svg-data-uri';
 
 export interface DecideStepProps {
   item: ReviewQueueItem;
@@ -43,6 +44,14 @@ export function DecideStep({
       )}
 
       <p className="text-lg font-medium text-gray-900">{item.stem}</p>
+
+      {item.diagram && (
+        <img
+          src={svgToImageSrc(item.diagram.svgMarkup)}
+          alt={item.diagram.altText}
+          className="max-w-full rounded-lg border-2 border-gray-200"
+        />
+      )}
 
       <div className="flex flex-col gap-2">
         {item.options.map((option) => {

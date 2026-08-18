@@ -1,11 +1,13 @@
 import type {
   ApprovalRoute,
   BriefSummary,
+  CompleteIllustrationInput,
   ContentDashboard,
   ContributedItemInput,
   CoverageGap,
   CreateBriefInput,
   DecisionContext,
+  IllustrationTicketSummary,
   ItemEditPatch,
   ItemStatus,
   OptionLabel,
@@ -102,6 +104,37 @@ function errorReason(response: RawResponse, fallback: string): string {
   return typeof reason === 'string' ? reason : fallback;
 }
 
+/**
+ * Like `call`, but for the one route that accepts a file: no `Content-Type`
+ * header is set, so the browser fills in the multipart boundary itself.
+ */
+async function callMultipart(
+  fetchImpl: FetchImpl,
+  url: string,
+  token: string,
+  form: FormData,
+): Promise<RawResponse> {
+  let response: Response;
+  try {
+    response = await fetchImpl(url, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${token}` },
+      body: form,
+    });
+  } catch {
+    return NETWORK_ERROR;
+  }
+
+  let body: Record<string, unknown> | null;
+  try {
+    body = (await response.json()) as Record<string, unknown>;
+  } catch {
+    body = null;
+  }
+
+  return { status: response.status, body };
+}
+
 export type LoginOutcome =
   | { ok: true; token: string; reviewerId: number; role: PanelRole }
   | { ok: false; reason: 'invalid_credentials' }
@@ -184,6 +217,28 @@ export type SubmitContributedItemOutcome =
   | { ok: false; reason: 'invalid_input'; message: string }
   | { ok: false; reason: 'request_failed'; message: string };
 
+export type ListOpenIllustrationTicketsOutcome =
+  | { ok: true; tickets: IllustrationTicketSummary[] }
+  | { ok: false; reason: 'unauthorized' }
+  | { ok: false; reason: 'request_failed'; message: string };
+
+export type ClaimIllustrationTicketOutcome =
+  | { ok: true; ticket: IllustrationTicketSummary }
+  | { ok: false; reason: 'unauthorized' }
+  | { ok: false; reason: 'not_claimable'; message: string }
+  | { ok: false; reason: 'request_failed'; message: string };
+
+export type CompleteIllustrationTicketOutcome =
+  | { ok: true }
+  | { ok: false; reason: 'unauthorized' }
+  | { ok: false; reason: 'invalid_input'; message: string }
+  | { ok: false; reason: 'request_failed'; message: string };
+
+export type FetchSketchPhotoOutcome =
+  | { ok: true; blob: Blob }
+  | { ok: false; reason: 'unauthorized' }
+  | { ok: false; reason: 'request_failed'; message: string };
+
 export interface ApiClient {
   login(emailOrPhone: string, password: string): Promise<LoginOutcome>;
   getNextItem(token: string): Promise<GetNextItemOutcome>;
@@ -215,6 +270,22 @@ export interface ApiClient {
     briefId: number,
     draft: ContributedItemInput,
   ): Promise<SubmitContributedItemOutcome>;
+  /** Used instead of `submitContributedItem` when the contributor attached a sketch photo (plan 7.12 step 4). */
+  submitContributedItemWithDiagram(
+    token: string,
+    briefId: number,
+    draft: ContributedItemInput,
+    sketchPhoto: File,
+  ): Promise<SubmitContributedItemOutcome>;
+  /** The illustrator queue (plan 7.12 step 5) — any active session, no role gate. */
+  listOpenIllustrationTickets(token: string): Promise<ListOpenIllustrationTicketsOutcome>;
+  claimIllustrationTicket(token: string, ticketId: number): Promise<ClaimIllustrationTicketOutcome>;
+  completeIllustrationTicket(
+    token: string,
+    ticketId: number,
+    input: CompleteIllustrationInput,
+  ): Promise<CompleteIllustrationTicketOutcome>;
+  fetchSketchPhoto(token: string, ticketId: number): Promise<FetchSketchPhotoOutcome>;
 }
 
 /** `baseUrl` defaults to the same-origin proxy path — see next.config.mjs's rewrite. */
@@ -434,6 +505,109 @@ export function createApiClient(fetchImpl: FetchImpl, baseUrl = '/api/review'): 
         return { ok: true, itemId: response.body?.itemId as number };
       }
       return { ok: false, reason: 'invalid_input', message: errorReason(response, 'invalid input') };
+    },
+
+    async submitContributedItemWithDiagram(token, briefId, draft, sketchPhoto) {
+      if (draft.diagramRequest === null) {
+        throw new Error(
+          'submitContributedItemWithDiagram: draft.diagramRequest must be set — use submitContributedItem otherwise',
+        );
+      }
+      const form = new FormData();
+      form.set('itemJson', JSON.stringify(draft));
+      form.set('figureDescription', draft.diagramRequest.figureDescription);
+      form.set('sketchPhoto', sketchPhoto);
+
+      const response = await callMultipart(
+        fetchImpl,
+        `/api/briefs/${briefId}/submit-with-diagram`,
+        token,
+        form,
+      );
+
+      if (response.status === 0) {
+        return { ok: false, reason: 'request_failed', message: 'could not reach the server' };
+      }
+      if (response.status === 401) {
+        return { ok: false, reason: 'unauthorized' };
+      }
+      if (response.status === 201) {
+        return { ok: true, itemId: response.body?.itemId as number };
+      }
+      return { ok: false, reason: 'invalid_input', message: errorReason(response, 'invalid input') };
+    },
+
+    async listOpenIllustrationTickets(token) {
+      const response = await call(fetchImpl, 'GET', '/api/illustration-tickets', token);
+
+      if (response.status === 0) {
+        return { ok: false, reason: 'request_failed', message: 'could not reach the server' };
+      }
+      if (response.status === 401) {
+        return { ok: false, reason: 'unauthorized' };
+      }
+      return {
+        ok: true,
+        tickets: (response.body?.tickets as unknown as IllustrationTicketSummary[] | undefined) ?? [],
+      };
+    },
+
+    async claimIllustrationTicket(token, ticketId) {
+      const response = await call(fetchImpl, 'POST', `/api/illustration-tickets/${ticketId}/claim`, token);
+
+      if (response.status === 0) {
+        return { ok: false, reason: 'request_failed', message: 'could not reach the server' };
+      }
+      if (response.status === 401) {
+        return { ok: false, reason: 'unauthorized' };
+      }
+      if (response.status === 200) {
+        return { ok: true, ticket: response.body as unknown as IllustrationTicketSummary };
+      }
+      return {
+        ok: false,
+        reason: 'not_claimable',
+        message: errorReason(response, 'illustration ticket not claimable'),
+      };
+    },
+
+    async completeIllustrationTicket(token, ticketId, input) {
+      const response = await call(
+        fetchImpl,
+        'POST',
+        `/api/illustration-tickets/${ticketId}/complete`,
+        token,
+        input,
+      );
+
+      if (response.status === 0) {
+        return { ok: false, reason: 'request_failed', message: 'could not reach the server' };
+      }
+      if (response.status === 401) {
+        return { ok: false, reason: 'unauthorized' };
+      }
+      if (response.status === 200) {
+        return { ok: true };
+      }
+      return { ok: false, reason: 'invalid_input', message: errorReason(response, 'invalid input') };
+    },
+
+    async fetchSketchPhoto(token, ticketId) {
+      let response: Response;
+      try {
+        response = await fetchImpl(`/api/illustration-tickets/${ticketId}/sketch-photo`, {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+      } catch {
+        return { ok: false, reason: 'request_failed', message: 'could not reach the server' };
+      }
+      if (response.status === 401) {
+        return { ok: false, reason: 'unauthorized' };
+      }
+      if (response.status !== 200) {
+        return { ok: false, reason: 'request_failed', message: 'could not load the sketch photo' };
+      }
+      return { ok: true, blob: await response.blob() };
     },
   };
 }

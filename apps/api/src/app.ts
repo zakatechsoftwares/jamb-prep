@@ -1,10 +1,12 @@
 import express, { type Express } from 'express';
+import { MulterError } from 'multer';
 import type {
   AuthService,
   BriefBoardService,
   CandidateSyncService,
   ContentLeadService,
   HealthStatus,
+  IllustrationBoardService,
   ReviewDecisionService,
   ReviewEscalationService,
   ReviewQueueService,
@@ -18,6 +20,7 @@ import { createAuthRouter } from './routes/auth';
 import { createBriefsRouter } from './routes/briefs';
 import { createCandidateRouter } from './routes/candidate';
 import { createContentLeadRouter } from './routes/content-lead';
+import { createIllustrationTicketsRouter } from './routes/illustration-tickets';
 import { createReviewDecisionRouter } from './routes/review-decision';
 import { createReviewEscalationRouter } from './routes/review-escalation';
 import { createReviewQueueRouter } from './routes/review-queue';
@@ -34,6 +37,7 @@ export interface AppDependencies {
   auth?: AuthService;
   contentLead?: ContentLeadService;
   briefBoard?: BriefBoardService;
+  illustrationBoard?: IllustrationBoardService;
   candidateSync?: CandidateSyncService;
 }
 
@@ -64,6 +68,9 @@ export function createApp(dependencies: AppDependencies = {}): Express {
   if (dependencies.briefBoard) {
     app.use('/briefs', createBriefsRouter(dependencies.briefBoard));
   }
+  if (dependencies.illustrationBoard) {
+    app.use('/illustration-tickets', createIllustrationTicketsRouter(dependencies.illustrationBoard));
+  }
   if (dependencies.candidateSync) {
     app.use('/candidate', createCandidateRouter(dependencies.candidateSync));
   }
@@ -77,6 +84,13 @@ export function createApp(dependencies: AppDependencies = {}): Express {
     (error: unknown, _req: express.Request, res: express.Response, next: express.NextFunction) => {
       if (error instanceof ReviewerNotActiveError) {
         res.status(401).json({ error: 'reviewer is not active' });
+        return;
+      }
+      // multer rejects an oversized sketch photo (routes/briefs.ts's
+      // `/submit-with-diagram`) by throwing rather than by a normal
+      // service-layer error, so it needs the same one-place treatment.
+      if (error instanceof MulterError) {
+        res.status(400).json({ error: error.message });
         return;
       }
       next(error);

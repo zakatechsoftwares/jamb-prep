@@ -1,6 +1,8 @@
 import {
   authenticateReviewer,
   claimBrief,
+  claimTicket,
+  completeTicket,
   createBrief,
   decideOnItem,
   endSession,
@@ -11,7 +13,9 @@ import {
   getNextItem,
   getNextItemBatch,
   listOpenBriefs,
+  listOpenTickets,
   loadSessionForResume,
+  loadSketchPhoto,
   recordAttempt,
   recordModeratorAudit,
   resolveEscalation,
@@ -22,8 +26,13 @@ import {
   submitBlindAnswer,
   submitContributedItem,
   type Brief,
+  type IllustrationTicket,
 } from '@jamb/db';
-import type { BriefSummary, CandidateSessionResumeResult } from '@jamb/shared';
+import type {
+  BriefSummary,
+  CandidateSessionResumeResult,
+  IllustrationTicketSummary,
+} from '@jamb/shared';
 import { createApp } from './app';
 
 const port = process.env.PORT ?? 3000;
@@ -41,6 +50,16 @@ function toBriefSummary(brief: Brief): BriefSummary {
     deadline: brief.deadline.toISOString(),
     status: brief.status,
     claimedByUserId: brief.claimedByUserId,
+  };
+}
+
+function toIllustrationTicketSummary(ticket: IllustrationTicket): IllustrationTicketSummary {
+  return {
+    id: ticket.id,
+    itemId: ticket.itemId,
+    figureDescription: ticket.figureDescription,
+    status: ticket.status,
+    claimedByUserId: ticket.claimedByUserId,
   };
 }
 
@@ -83,6 +102,21 @@ const app = createApp({
       submitContributedItem(briefId, contributorReviewerId, draft, new Date()).then((itemId) => ({
         itemId,
       })),
+    submitContributedItemWithDiagram: (briefId, contributorReviewerId, draft, sketchPhoto) =>
+      submitContributedItem(briefId, contributorReviewerId, draft, new Date(), {
+        bytes: Buffer.from(sketchPhoto.bytes),
+        contentType: sketchPhoto.contentType,
+      }).then((itemId) => ({ itemId })),
+  },
+  illustrationBoard: {
+    listOpenTickets: () => listOpenTickets().then((tickets) => tickets.map(toIllustrationTicketSummary)),
+    claimTicket: (ticketId, illustratorReviewerId) =>
+      claimTicket(ticketId, illustratorReviewerId).then(toIllustrationTicketSummary),
+    completeTicket: (ticketId, illustratorReviewerId, input) =>
+      completeTicket(ticketId, illustratorReviewerId, input.svgMarkup, input.altText, new Date()).then(
+        () => ({ ok: true as const }),
+      ),
+    loadSketchPhoto: (ticketId) => loadSketchPhoto(ticketId),
   },
   candidateSync: {
     register: (input) => findOrCreateCandidate(input),

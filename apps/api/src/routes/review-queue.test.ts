@@ -32,6 +32,7 @@ function item(itemId: number): ReviewQueueItem {
     cognitiveLevel: 'recall',
     independentSolveVerdict: 'agreed',
     claimExpiresAt: CLAIM_EXPIRY,
+    diagram: null,
   };
 }
 

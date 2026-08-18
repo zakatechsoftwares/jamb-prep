@@ -1639,6 +1639,126 @@ added — actually bundles for Android.
 the diagram/illustration follow-up from session 11, or review the growing
 `pending_review` backlog — whatever the user prioritises.
 
+## Diagram request / illustration ticket / illustrator queue (2026-08-18)
+
+The sub-flow deferred at the top of session 11: plan 7.12 steps 4-5,
+closing the brief board's own "DONE WHEN" — a brief created from a gap,
+claimed, authored, **illustrated**, **reviewed** and paid, end to end.
+
+**Storage decision, confirmed with the user before writing code:** no new
+external service. The contributor's reference photo of a hand sketch is
+`bytea`; the illustrator's finished asset is an SVG — plain text/XML, not
+binary at all — so `TEXT`. `multer` (memory storage) is the one new
+dependency, added to `apps/api` only, for parsing the one multipart route.
+Real S3-compatible storage stays available as a later migration if volume
+ever demands it.
+
+**A real finding from research, not an assumption, that shaped the whole
+design:** whether a specific item needs a diagram is not knowable in
+advance from the objective or the brief. `objectives.requires_human_authorship`
+is one undifferentiated boolean covering three different reasons
+(diagram-dependent, reading-text, policy/current-affairs) — confirmed by
+reading the 0021 migration and every consumer of that column. A
+contributor only discovers "this item needs a diagram" while authoring
+that specific item. So the diagram-request branch lives inside the
+per-item authoring step (`ContributionForm.tsx`), never as a brief-level
+property, and a ticket is created per item, not per brief.
+
+**Illustrators are not a new role.** Matching session 11's "one pool, no
+role wall" decision, `claimTicket`/`completeTicket` accept any active
+reviewer-pool account — no `illustrator` value was added to `PANEL_ROLES`.
+
+**Built:**
+
+- `packages/db/migrations/0022_illustration_tickets`: one new table,
+  `open`/`claimed`/`completed` status mirroring `brief-lifecycle.ts`'s
+  pattern exactly, a claim-consistency CHECK and a completion-consistency
+  CHECK (`num_nulls(svg_asset, alt_text, completed_at) IN (0, 3)` — all
+  three arrive together or not at all). `item_id UNIQUE` — one ticket per
+  item, matching "the illustrator produces THE asset," singular. Proven
+  reversible (up/down/up) against `jamb_prep_test`.
+- `packages/shared`: `illustration-lifecycle.ts`
+  (`ILLUSTRATION_TICKET_STATUSES`, drift-tested against the migration the
+  same way `brief-lifecycle-vocabulary.test.ts` already does),
+  `illustration-ticket-policy.ts` (`isIllustrationTicketClaimable`, tests
+  first, mirroring `isBriefClaimable`). `brief-board-policy.ts` gains
+  `RequestDiagramInput`, `IllustrationTicketSummary`,
+  `CompleteIllustrationInput`, `SketchPhotoUpload` (bytes typed as
+  `Uint8Array`, not Node's `Buffer` — this package is imported by
+  `apps/mobile`'s React Native runtime too, so no Node-only global belongs
+  in it) and `IllustrationBoardService`. `ContributedItemInput` gains
+  `diagramRequest: RequestDiagramInput | null`. `ReviewQueueItem` gains
+  `diagram: { svgMarkup; altText } | null` — required, not optional, so
+  every existing construction site had to be touched explicitly rather
+  than silently defaulting, the same "column existing is not a column
+  being written" discipline session 06 already learned the hard way.
+- `packages/db`: new `illustration-repository.ts` — `requestDiagram`
+  (called from inside `submitContributedItem`'s own transaction),
+  `listOpenTickets`, `claimTicket` (`FOR UPDATE SKIP LOCKED`, identical
+  concurrency shape to `claimBrief`), `completeTicket` (calls the
+  **existing, unmodified** `promoteGeneratedItem` — the same
+  `gates_passed` transition a non-diagram item already gets, just fired
+  later), `loadSketchPhoto`. `submitContributedItem` gains a branch: a
+  `diagramRequest`-bearing draft is inserted but left in `generated`
+  status instead of being promoted immediately — brief-completion
+  counting still fires regardless, since the contributor's authoring work
+  is done either way. `review-queue-repository.ts`'s item-serving query
+  gains a `LEFT JOIN illustration_tickets ... AND status = 'completed'`.
+- `apps/api`: `routes/briefs.ts` gains `POST /:id/submit-with-diagram`
+  (multer, memory storage, 10MB limit) — the client sends the whole item
+  as one `itemJson` form field (JSON-serialized) alongside the file, so
+  the existing `parseContributedItemInput` validates it unchanged rather
+  than forking validation logic against flattened form fields. The
+  existing JSON `/submit` route now 400s if `diagramRequest` is set
+  (nowhere for a photo to travel in JSON). New `routes/illustration-tickets.ts`:
+  list/claim/complete plus a `GET /:id/sketch-photo` that streams the
+  stored bytes back with the stored content type. `app.ts`'s error
+  middleware gains a `MulterError` → 400 mapping, the same one-place
+  treatment `ReviewerNotActiveError` already gets.
+- `apps/admin`: `ContributionForm.tsx` gains a "this item needs a diagram"
+  checkbox revealing a figure-description field and a photo file input;
+  branches its submit call between the existing JSON path and a new
+  multipart path. New `/illustration-tickets` (list + claim, mirroring
+  `/briefs` closely) and `/illustration-tickets/[id]` (the sketch photo,
+  fetched as an authenticated blob and shown via `URL.createObjectURL` —
+  a bearer-token route can't be a plain `<img src>`; an SVG/alt-text form
+  accepting either pasted markup or an uploaded `.svg` file read via
+  `File.text()`). `SolveStep.tsx`/`DecideStep.tsx` render a completed
+  diagram via `svg-data-uri.ts`'s `svgToImageSrc` — an `<img src="data:image/svg+xml,...">`,
+  deliberately never an inline `<svg>`/`dangerouslySetInnerHTML`, since a
+  browser never executes a `<script>` embedded in an `<img>`-loaded SVG
+  the way it can in an inline one. Percent-encoding (`encodeURIComponent`),
+  not base64/`btoa` — `btoa` only handles Latin-1 and throws on a
+  non-Latin-1 character that could appear in a label or alt text.
+
+**Verification:** tests written first for both new `packages/shared` pure
+logic modules. Migration proven reversible (up/down/up). A full
+integration test in `illustration-repository.integration.test.ts` walks
+the plan's own "DONE WHEN" end to end against a real database: brief
+created, claimed, authored with a diagram request (item stays `generated`,
+not servable), illustrated (ticket claimed and completed, item promoted to
+`pending_review`, diagram now present on the served `ReviewQueueItem`),
+reviewed by two independent reviewers (`not_generated` risk_tier still
+always triggers `requiresSecondOpinion`, same as any contributed item) to
+`approved_uncalibrated`, and the contributor's fee recorded exactly as it
+already is for a text-only item — no new code needed for that step, since
+`decideOnItem` already keys the fee path on `item.brief_id`, not on
+whether the item needed a diagram. `pnpm typecheck` (6/6), `pnpm lint`
+(clean), `pnpm test` (1080 tests, zero failures, run against
+`jamb_prep_test` — never the dev database).
+
+**Open at close:** the illustrator-queue and ticket-detail admin pages are
+untested against a running Next.js dev server (component tests only, per
+this repo's existing `apps/admin` testing ceiling); a real illustrator
+would need a vector editor to produce the SVG externally before pasting or
+uploading it here, which is outside this session's scope to simulate. The
+sync layer and a real on-device mobile walkthrough remain open from prior
+sessions, unchanged.
+
+**Next:** whatever the user prioritises — the sync layer, a real
+on-device mobile walkthrough, or reviewing the growing `pending_review`
+backlog.
+
 ## Progress sync: candidate auth + attempt/session upload (2026-08-19)
 
 Plan §8.3's device-to-server half — closing the gap the Mobile-UI phase's

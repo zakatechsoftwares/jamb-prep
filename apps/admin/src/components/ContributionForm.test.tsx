@@ -92,6 +92,85 @@ describe('ContributionForm', () => {
     });
   });
 
+  it('submits diagramRequest: null and no sketch photo when the diagram checkbox is unchecked', async () => {
+    let submittedDraft: ContributedItemInput | null = null;
+    let submittedPhoto: File | null | undefined;
+    render(
+      <ContributionForm
+        onSubmit={async (draft, sketchPhoto) => {
+          submittedDraft = draft;
+          submittedPhoto = sketchPhoto;
+          return { ok: true };
+        }}
+      />,
+    );
+    fillValidForm();
+    fireEvent.click(screen.getByRole('button', { name: 'Submit item' }));
+
+    await screen.findByText('Item submitted.');
+    expect(submittedDraft!.diagramRequest).toBeNull();
+    expect(submittedPhoto).toBeNull();
+  });
+
+  it('reveals the figure description and sketch photo fields once the diagram checkbox is checked', () => {
+    render(<ContributionForm onSubmit={async () => ({ ok: true })} />);
+    expect(screen.queryByLabelText('Figure description')).toBeNull();
+
+    fireEvent.click(screen.getByLabelText('This item needs a diagram'));
+
+    expect(screen.getByLabelText('Figure description')).toBeTruthy();
+    expect(screen.getByLabelText('Sketch photo')).toBeTruthy();
+  });
+
+  it('rejects a diagram request with no figure description', async () => {
+    render(<ContributionForm onSubmit={async () => ({ ok: true })} />);
+    fillValidForm();
+    fireEvent.click(screen.getByLabelText('This item needs a diagram'));
+    fireEvent.click(screen.getByRole('button', { name: 'Submit item' }));
+
+    const alert = await screen.findByRole('alert');
+    expect(alert.textContent).toMatch(/figure description/i);
+  });
+
+  it('rejects a diagram request with no sketch photo', async () => {
+    render(<ContributionForm onSubmit={async () => ({ ok: true })} />);
+    fillValidForm();
+    fireEvent.click(screen.getByLabelText('This item needs a diagram'));
+    fireEvent.change(screen.getByLabelText('Figure description'), {
+      target: { value: 'A free-body diagram.' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Submit item' }));
+
+    const alert = await screen.findByRole('alert');
+    expect(alert.textContent).toMatch(/sketch photo/i);
+  });
+
+  it('submits the figure description and sketch photo when the diagram checkbox is checked', async () => {
+    let submittedDraft: ContributedItemInput | null = null;
+    let submittedPhoto: File | null | undefined;
+    render(
+      <ContributionForm
+        onSubmit={async (draft, sketchPhoto) => {
+          submittedDraft = draft;
+          submittedPhoto = sketchPhoto;
+          return { ok: true };
+        }}
+      />,
+    );
+    fillValidForm();
+    fireEvent.click(screen.getByLabelText('This item needs a diagram'));
+    fireEvent.change(screen.getByLabelText('Figure description'), {
+      target: { value: 'A free-body diagram.' },
+    });
+    const file = new File(['fake bytes'], 'sketch.jpg', { type: 'image/jpeg' });
+    fireEvent.change(screen.getByLabelText('Sketch photo'), { target: { files: [file] } });
+    fireEvent.click(screen.getByRole('button', { name: 'Submit item' }));
+
+    await screen.findByText('Item submitted.');
+    expect(submittedDraft!.diagramRequest).toEqual({ figureDescription: 'A free-body diagram.' });
+    expect(submittedPhoto).toBe(file);
+  });
+
   it('shows the server-reported error rather than a fabricated success', async () => {
     render(<ContributionForm onSubmit={async () => ({ ok: false, message: 'brief already completed' })} />);
     fillValidForm();

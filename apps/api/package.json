@@ -12,10 +12,12 @@
   "dependencies": {
     "@jamb/db": "workspace:*",
     "@jamb/shared": "workspace:*",
-    "express": "^5.2.1"
+    "express": "^5.2.1",
+    "multer": "^2.2.0"
   },
   "devDependencies": {
     "@types/express": "^5.0.6",
+    "@types/multer": "^2.2.0",
     "tsx": "^4.23.5"
   }
 }
