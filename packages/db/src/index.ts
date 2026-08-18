@@ -64,6 +64,19 @@ export {
   type BriefInsert,
   type ContributedItemDraft,
 } from './brief-repository';
+// The diagram-request / illustration-ticket / illustrator queue sub-flow
+// (plan 7.12 steps 4-5), a follow-up to session 11's text-only brief board.
+export {
+  claimTicket,
+  completeTicket,
+  listOpenTickets,
+  loadSketchPhoto,
+  requestDiagram,
+  IllustrationTicketNotClaimableError,
+  IllustrationTicketNotClaimedByIllustratorError,
+  IllustrationTicketNotFoundError,
+  type IllustrationTicket,
+} from './illustration-repository';
 // The candidate exam-session engine (plan 8.3/8.4, canonical session 12,
 // Phase 1 — logic and persistence only; no mobile UI yet).
 export { loadExamConfigForUser, type ResolvedExamConfig } from './exam-config-repository';

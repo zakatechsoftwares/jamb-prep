@@ -307,6 +307,7 @@ describe.runIf(hasDatabase)('brief-repository', () => {
             authorDifficulty: 0.3,
             expectedTimeSeconds: 40,
             options: OPTIONS,
+            diagramRequest: null,
           },
           new Date('2026-08-17T00:00:00.000Z'),
         );
@@ -340,6 +341,7 @@ describe.runIf(hasDatabase)('brief-repository', () => {
           authorDifficulty: 0.3,
           expectedTimeSeconds: 40,
           options: OPTIONS,
+          diagramRequest: null,
         };
 
         await repo.submitContributedItem(briefId, contributorReviewerId, draft, new Date());
@@ -377,6 +379,7 @@ describe.runIf(hasDatabase)('brief-repository', () => {
               authorDifficulty: 0.3,
               expectedTimeSeconds: 40,
               options: OPTIONS,
+              diagramRequest: null,
             },
             new Date(),
           ),
@@ -400,6 +403,7 @@ describe.runIf(hasDatabase)('brief-repository', () => {
             authorDifficulty: 0.3,
             expectedTimeSeconds: 40,
             options: OPTIONS,
+            diagramRequest: null,
           },
           new Date(),
         );

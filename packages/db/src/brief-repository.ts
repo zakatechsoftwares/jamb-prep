@@ -17,6 +17,7 @@ import {
   promoteGeneratedItem,
   type GeneratedOptionInsert,
 } from './item-generation-repository';
+import { requestDiagram } from './illustration-repository';
 
 /**
  * The contributor brief board's own database access (plan 7.12, canonical
@@ -243,6 +244,7 @@ export interface ContributedItemDraft {
   authorDifficulty: number;
   expectedTimeSeconds: number;
   options: GeneratedOptionInsert[];
+  diagramRequest: { figureDescription: string } | null;
 }
 
 /**
@@ -253,16 +255,26 @@ export interface ContributedItemDraft {
  * carries the self-review exclusion (`assertNotOwnContribution`,
  * `isEligibleForReviewer`) into the ordinary review queue automatically.
  *
+ * When `draft.diagramRequest` is set, the item is inserted but *not*
+ * promoted here — `sketchPhoto` is required in that case, and an
+ * illustration ticket is opened instead via `requestDiagram` (plan 7.12
+ * step 4-5). The item stays in `generated` status until that ticket
+ * completes and fires the same `gates_passed` promotion later
+ * (`illustration-repository.ts`'s `completeTicket`).
+ *
  * Marks the brief `completed` once submissions reach `item_count` — this
  * only tracks submission progress, not payment; a contributor's fee is
  * recorded separately, per item, at that item's approval (see
- * `review-decision-repository.ts`).
+ * `review-decision-repository.ts`). This fires regardless of whether the
+ * item needed a diagram — the contributor's authoring work is done either
+ * way; the diagram is a separate downstream task for a different actor.
  */
 export async function submitContributedItem(
   briefId: number,
   contributorReviewerId: number,
   draft: ContributedItemDraft,
   occurredAt: Date,
+  sketchPhoto?: { bytes: Buffer; contentType: string },
 ): Promise<number> {
   return withTransaction(async (client) => {
     const reviewer = await loadReviewer(client, contributorReviewerId);
@@ -303,13 +315,29 @@ export async function submitContributedItem(
       briefId,
     });
 
-    const itemFacts: ItemFacts = {
-      contributorUserId,
-      riskTier: 'not_generated',
-      independentSolveVerdict: 'not_run',
-      sampledForReview: false,
-    };
-    await promoteGeneratedItem(client, itemId, itemFacts, { type: 'gates_passed' }, occurredAt);
+    if (draft.diagramRequest) {
+      if (!sketchPhoto) {
+        throw new Error(
+          `submitContributedItem: draft.diagramRequest is set but no sketchPhoto was provided for item ${itemId}`,
+        );
+      }
+      await requestDiagram(
+        client,
+        itemId,
+        contributorUserId,
+        draft.diagramRequest.figureDescription,
+        sketchPhoto.bytes,
+        sketchPhoto.contentType,
+      );
+    } else {
+      const itemFacts: ItemFacts = {
+        contributorUserId,
+        riskTier: 'not_generated',
+        independentSolveVerdict: 'not_run',
+        sampledForReview: false,
+      };
+      await promoteGeneratedItem(client, itemId, itemFacts, { type: 'gates_passed' }, occurredAt);
+    }
 
     const submittedCountResult = await client.query<{ count: string }>(
       `SELECT count(*) AS count FROM items WHERE brief_id = $1`,

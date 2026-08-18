@@ -363,6 +363,8 @@ async function loadItemPayloads(
     cognitive_level: string;
     independent_solve_verdict: IndependentSolveVerdict;
     options: { label: string; text: string }[];
+    svg_asset: string | null;
+    alt_text: string | null;
   }>(
     `SELECT i.id, i.subject_id, i.objective_id, i.stem, i.cognitive_level,
             i.independent_solve_verdict,
@@ -371,8 +373,11 @@ async function loadItemPayloads(
                                ORDER BY o.label)
                  FROM item_options o WHERE o.item_id = i.id),
               '[]'::json
-            ) AS options
+            ) AS options,
+            it.svg_asset, it.alt_text
        FROM items i
+       LEFT JOIN illustration_tickets it
+         ON it.item_id = i.id AND it.status = 'completed'
       WHERE i.id = ANY($1::bigint[])`,
     [itemIds],
   );
@@ -388,6 +393,10 @@ async function loadItemPayloads(
         options: row.options,
         cognitiveLevel: row.cognitive_level,
         independentSolveVerdict: row.independent_solve_verdict,
+        diagram:
+          row.svg_asset !== null && row.alt_text !== null
+            ? { svgMarkup: row.svg_asset, altText: row.alt_text }
+            : null,
       },
     ]),
   );
