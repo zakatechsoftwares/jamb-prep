@@ -47,6 +47,11 @@ describe('screens import cleanly and export a component function', () => {
     const { default: PracticeSessionScreen } = await import('../app/practice-session');
     expect(typeof PracticeSessionScreen).toBe('function');
   });
+
+  it('choose-course', async () => {
+    const { default: ChooseCourseScreen } = await import('../app/choose-course');
+    expect(typeof ChooseCourseScreen).toBe('function');
+  });
 });
 
 describe('supporting modules import cleanly', () => {
@@ -80,6 +85,7 @@ describe('supporting modules import cleanly', () => {
     expect(typeof database.loadDownloadedSubjects).toBe('function');
     expect(typeof database.loadLocalItems).toBe('function');
     expect(typeof database.findLocalItem).toBe('function');
+    expect(typeof database.saveLocalSubjectCombination).toBe('function');
   });
 
   it('candidate-api-client', async () => {
@@ -105,6 +111,12 @@ describe('supporting modules import cleanly', () => {
   it('content-sync', async () => {
     const contentSync = await import('../lib/content-sync');
     expect(typeof contentSync.downloadAvailablePacks).toBe('function');
+  });
+
+  it('subject-combination-api-client', async () => {
+    const client = await import('../lib/subject-combination-api-client');
+    expect(typeof client.listSubjectCombinations).toBe('function');
+    expect(typeof client.selectSubjectCombination).toBe('function');
   });
 
   it('demo-fixture: 4 subjects x 5 items, matching the demo ExamConfig', async () => {
