@@ -1434,3 +1434,96 @@ HTTP round trip above against `jamb_prep`.
 
 **Next:** the diagram/illustration follow-up session; or review the
 growing `pending_review` backlog; or whatever the user prioritises.
+
+## Session 12 — Mock CBT engine, Phase 1: timer, navigation, and persistence logic (2026-08-17)
+
+`docs/claude-code-prompt-playbook.md`'s "Session 4" (this repo's canonical
+12; see the session-order table) — the first work on the candidate-facing
+track, after eleven sessions on the content machine. The playbook calls
+this "the highest-risk component... the component that must never fail"
+and asks for a proposed timer-persistence approach before coding; that
+proposal, confirmed with the user, is now in CLAUDE.md's own "Mock CBT
+engine" section rather than repeated here.
+
+**Scope split, agreed before starting:** the playbook's prompt describes
+building this directly in the mobile app (timer UI, palette, keyboard
+shortcuts). `apps/mobile` is a genuinely empty Expo scaffold today — no
+SQLite library, no navigation library, nothing past a placeholder screen
+and a hand-rolled react-native stub its one existing test runs against —
+and CLAUDE.md rule 7 already means almost none of this should be mobile-side
+logic regardless. **This session builds and fully tests the logic and
+persistence layer only.** The mobile-UI phase (new dependencies: a local
+SQLite library, a navigation library) is a deliberate follow-up.
+
+**Built:**
+
+- `packages/shared`: `exam-timer.ts` (`computeSessionEndAt`,
+  `computeEffectiveNow` — the monotonic clock-rollback ratchet,
+  `computeRemainingSeconds`, `hasExpired`) and `mock-session-reducer.ts`
+  (free navigation, independent `answered`/`flagged` booleans, idempotent
+  `expire`) — both tests-first, shown before implementing.
+- `packages/db`: `exam-config-repository.ts` (`loadExamConfigForUser` —
+  the first code ever to read `exam_configs`/`exam_config_subject_rules`,
+  written in migration 0006 and seeded since session 01 but never queried
+  until now; resolves a real candidate's compulsory-plus-three-elective
+  subjects by joining the config's rules against their
+  `subject_combination_subjects`) and `session-repository.ts`
+  (`startSession`/`recordAttempt` — both idempotent on the same
+  conflict-then-lookup pattern `decideOnItem` established,
+  `loadSessionForResume`, `scoreSession` composing the above with the
+  existing, untouched `scoreExam`).
+- **The release-gating scenario proven at the logic level**: a real
+  Postgres integration test starts a session, records two answers,
+  computes `endAt`/`lastObservedAt` "as of minute 70," discards all
+  in-memory state, reloads purely from `loadSessionForResume`, and asserts
+  both the recomputed remaining time and every prior answer survive
+  intact — including a clock-rolled-back-after-relaunch case proving the
+  ratchet holds. The mobile app doesn't exist yet to run this scenario for
+  real, but the logic it will depend on is already proven against it.
+
+**Two real, pre-existing gaps found and fixed while building this, neither
+about this session's own new code:**
+
+1. `packages/shared/src/scoring.ts` (session 03) had never been added to
+   `packages/shared/src/index.ts`'s barrel export — nothing outside the
+   package had ever needed it directly until `session-repository.ts` did.
+   Fixed by adding `export * from './scoring'`.
+2. `exam_configs`/`subject_combinations` are the same "referenced from,
+   never pointed at" shape as the `payment_batches` gap from session 11 —
+   `TRUNCATE subjects, users CASCADE` alone can't reach either, so a
+   leftover row from one test file's run would collide with the next
+   file's hardcoded unique value (`exam_year`+`version`, `course_name`).
+   Fixed the same way: named explicitly in `review-queue.fixtures.ts`'s
+   `TRUNCATED_TABLES`, verified by re-running the full existing suite
+   before adding any new tests that depend on it.
+
+**A real design decision made and recorded, not left implicit:**
+`recordAttempt` has no field anywhere for a caller to supply `isCorrect` —
+correctness is looked up from the item's actual key server-side on every
+call, matching CLAUDE.md rule 5 exactly and closing off the possibility of
+a client claiming a wrong answer was right.
+
+**Verification:** `pnpm typecheck` (6/6), `pnpm lint` (clean), `pnpm test`
+(1036 tests, zero failures, run against `jamb_prep_test`). No new
+migration — every table this session reads or writes already existed.
+
+**Open at close:**
+
+- The mobile-UI phase itself: real Expo screens (timer display, question
+  palette, keyboard shortcuts A–D and navigation keys, auto-submit),
+  local SQLite persistence, and the sync layer that uploads queued
+  attempts with their idempotency keys. Needs a local-storage library and
+  a navigation library chosen deliberately, not defaulted into.
+- `scoring.ts`'s rounding rule is still explicitly flagged (in its own
+  README section, unchanged by this session) as "pending verification
+  against a real UTME result slip" — worth resolving before this ever
+  scores something a real candidate sees.
+- No route/API layer yet for starting a session or submitting an attempt
+  from outside `packages/db` directly — `apps/api` has no session/attempt
+  endpoints, deliberately deferred until the mobile client actually needs
+  to call them (adding routes with no real caller yet would be exactly the
+  kind of unrequested surface this repo avoids building ahead of need).
+
+**Next:** the mobile-UI follow-up session; or the diagram/illustration
+follow-up from session 11; or review the growing `pending_review`
+backlog; or whatever the user prioritises.

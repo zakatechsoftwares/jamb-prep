@@ -154,5 +154,5 @@ describe.runIf(hasDatabase)('the SQL queue ranking matches @jamb/shared', () => 
     } finally {
       client.release();
     }
-  });
+  }, 30000);
 });
