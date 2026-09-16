@@ -2042,3 +2042,143 @@ practice flow) remains unperformed, same as every prior mobile phase.
 that the structural blueprint exists to actually use it), a real
 on-device walkthrough, or reviewing the growing `pending_review` backlog
 — whatever the user prioritises.
+
+## Real batch run: Chemistry, Mathematics, Physics (2026-08-19)
+
+The first real `tools/item-gen` batches against the three subjects that
+have had zero approved content since the project began — all 8 existing
+objectives per subject (the same syllabus paths `docs/jamb-seed-items.json`
+already seeded), 10 items each, 24 objectives total. ~$1.05 total spend.
+
+| Subject | requested | → `pending_review` | `gate_failed` | other |
+| --- | --- | --- | --- | --- |
+| Chemistry | 80 | 63 | 17 | — |
+| Mathematics | 80 | 56 | 14 | 10 (objective 295, see below) |
+| Physics | 80 | 69 | 11 | — |
+
+Every item landed at `risk_tier: 'high'` without exception — expected,
+since `deriveRiskTier` (`packages/db/src/risk-tier.ts`) already treats
+Mathematics/Physics/Chemistry as high risk as a category regardless of
+whether a given item contains a calculation. None auto-gated; all 188
+successful items need two independent reviewers each
+(`requiresSecondOpinion`'s `risk_tier !== 'low'` guard) before they can
+reach a candidate.
+
+**Two real findings, not just a clean cost/count report:**
+
+1. **`duplicate_option_text` was the dominant `gate_failed` reason across
+   all three subjects** — a real, recurring tendency in gpt-4.1's option
+   generation for these subjects specifically, distinct from the
+   English/Biology batches' "clusters the key onto one letter" finding.
+   One Chemistry objective (307) lost all 10/10 items to it in a single
+   run. Worth watching across future batches; if this rate holds, the
+   gate is doing real, load-bearing work here, not catching an edge case.
+2. **Mathematics objective 295 (`mth-sta-0012`, "Determine an unknown
+   value given the mean of a data set") produced zero items from a
+   10-item request, and it's not accounted for as `gate_failed` either** —
+   the run's own summary line shows `0 auto-gated, 0 to human review, 0
+   gate-failed, 0 discarded before insert` despite a real $0.0356 charged
+   for the authoring + solve calls. Every other objective's three
+   counters summed cleanly to 10; this one didn't. Not yet root-caused —
+   the raw gate-report JSON is on disk
+   (`generated-items-raw/2026-08-18T22-39-25-371Z-objective-295-gate-report.json`)
+   for whoever looks at it next. Flagged here rather than silently
+   absorbed into "24 objectives ran fine."
+
+Several objectives also had unusually high independent-solve disagreement
+rates (Mathematics 289: 6/10, Physics 299: 6/10) — a real signal, not
+noise, that calculation-heavy content from this model needs the scrutiny
+the review queue already gives disagreed items priority for (plan 7.9).
+
+**Open at close:** this is content, not code — nothing here needed a
+migration, a route, or a test. The 188 new `pending_review` items now sit
+on top of the pre-existing English/Biology backlog, still waiting on
+reviewer staffing for these three subjects specifically, which remains
+entirely the user's own task. Objective 295's silent zero-output run is
+unexplained and could recur on a future batch.
+
+**Next:** staff reviewers for Chemistry/Mathematics/Physics (the actual
+throughput bottleneck now, not more generation or more code), investigate
+objective 295's gate report, a real on-device walkthrough, or reviewing
+the growing `pending_review` backlog — whatever the user prioritises.
+
+## Real device testing, then a move to hosted Postgres (2026-08-20 to 2026-09-16)
+
+On-device testing (Android, via a real EAS development build after the
+public Expo Go app's Android/iOS SDK support diverged from this
+project's — see below) surfaced a real bug and led to migrating the dev
+database from local Postgres to a hosted Supabase project.
+
+**A real concurrency bug, not an Expo Go/SDK issue.** "Force-close a mock
+session mid-exam and resume" (this repo's own release-gating scenario)
+produced a genuine `NativeDatabase.prepareAsync` /
+`NullPointerException` on Android. Root cause: `apps/mobile/src/lib/database.ts`'s
+`getDb()` cached the *resolved* connection behind a `let db = null; if
+(!db) { ... }` guard — check-then-open, not atomic. A cold start fires
+several `getDb()`-touching calls concurrently by design (`_layout.tsx`'s
+`syncPendingSessions`/`downloadAvailablePacks`, plus whatever screen is
+current), so multiple callers could all see "not open yet," each open
+their own native connection, and stomp the shared variable. Fixed by
+caching the in-flight *promise* instead (every concurrent caller now
+awaits the same open+init), with a `catch` that clears the cached promise
+on failure so a transient open error doesn't reject every future call
+forever. `database.test.ts` is a real regression test — confirmed by
+temporarily reverting the fix, which reproduces 2 opens against a
+concurrent pair of calls instead of 1.
+
+**Separately, `demo-fixture.ts`'s 20 placeholder items were replaced with
+genuinely UTME-difficulty questions** (multi-step algebra, log/percentage-
+profit/kinematics calculations, vocabulary-in-context and grammar-inversion
+traps, application/discrimination biology questions) after on-device
+testing flagged the originals as too simple — they were single-fact-recall
+level, fine for proving the runtime mechanics work but not representative
+of the real exam. Item ids, subject grouping and the 5-per-subject blueprint
+are unchanged; only the content is.
+
+**Local dev data moved to a hosted Supabase Postgres project** — motivated
+by wanting real persisted data reachable beyond this one machine, not by
+any problem with local Postgres itself. `packages/db/.env`'s `DATABASE_URL`
+now points there; local Postgres is untouched and still serves as the
+`jamb_prep_test` / CI database exclusively (nothing about the test suite
+changed). Three real, non-obvious findings from actually doing this migration:
+
+1. **Node's `--env-file` never overrides an already-set environment
+   variable.** A stale Windows User-level `DATABASE_URL` (pointed at local
+   Postgres, left over from earlier ad-hoc tooling use) silently shadowed
+   `packages/db/.env` for every `node --env-file=... ` invocation this
+   whole session — including, in hindsight, likely the very first
+   Supabase connectivity attempts, which is why they failed with a
+   confusing "server does not support SSL" error (local Postgres has no
+   SSL listener) rather than a clean network-reachability error. It never
+   surfaced before because the ambient value and `.env`'s value happened
+   to be identical until this session. Removed the User-level variable;
+   any command in this same already-running shell session still needed an
+   explicit override, since removing a registry-level env var doesn't
+   retroactively affect an already-running process's own inherited copy.
+2. **Supabase's "Direct connection" host is IPv6-only without the paid
+   IPv4 add-on**, and this network has no outbound IPv6 route at all
+   (confirmed via `Get-NetRoute -AddressFamily IPv6`). The fix is the
+   **Session pooler** connection string, not the Transaction pooler on
+   port 6543 — this app holds one long-lived connection pool and uses
+   `SELECT ... FOR UPDATE` in a few places (the review-claim flow), which
+   doesn't mix well with PgBouncer transaction-mode pooling; the Session
+   pooler stays session-like. `client.ts` gained an explicit `PGSSL=true`
+   opt-in (never inferred from the connection string's host) since local
+   Postgres has no SSL listener at all.
+3. **Supabase's managed `postgres` role is not a true superuser.**
+   `pg_restore --disable-triggers` (needed to bypass FK-enforcement
+   triggers during a data-only restore) requires superuser to toggle
+   system triggers, and every `ALTER TABLE ... DISABLE/ENABLE TRIGGER
+   ALL` failed with "permission denied" — 74 errors, all ignorable in
+   practice. The restore still succeeded completely (verified row-for-row
+   against local counts across every table, including
+   `item_state_transitions`: 415, `review_decisions`: 11,
+   `reviewer_earnings`: 11) because the migrations already created tables
+   in FK-dependency order, and `pg_dump`/`pg_restore` preserve that same
+   order for a data-only dump by default — disabling the triggers was
+   never actually load-bearing here.
+
+Moving `users`/`reviewers` data (real names, phone numbers) to a
+third-party host is a real decision, not a default — surfaced explicitly
+and confirmed before the restore ran, rather than bundled silently into
+"move the database."
