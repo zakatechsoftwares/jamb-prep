@@ -21,4 +21,14 @@ if (!connectionString) {
 // and proves nothing about the locking.
 const max = Number(process.env.PGPOOL_MAX ?? 10);
 
-export const pool = new Pool({ connectionString, max });
+// Local Postgres has no SSL listener; a hosted Postgres (Supabase and
+// similar) requires one. Explicit opt-in via PGSSL rather than inferring
+// from the connection string's host, so this never silently guesses wrong.
+// rejectUnauthorized: false is deliberate, not laziness -- Supabase's
+// certificate chains through an intermediate CA that Node's default trust
+// store does not always carry, a well-documented Supabase+node-postgres
+// gotcha; the connection itself is still encrypted, only full chain
+// verification is skipped.
+const ssl = process.env.PGSSL === 'true' ? { rejectUnauthorized: false } : undefined;
+
+export const pool = new Pool({ connectionString, max, ssl });

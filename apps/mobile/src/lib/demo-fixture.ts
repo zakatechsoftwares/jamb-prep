@@ -54,30 +54,30 @@ function item(
 }
 
 export const DEMO_ITEMS: DemoItem[] = [
-  // Use of English
-  item(1, 1, 'Use of English', 'Choose the word nearest in meaning to "candid".', ['Frank', 'Careful', 'Angry', 'Shy'], 0),
-  item(2, 1, 'Use of English', 'Choose the word opposite in meaning to "scarce".', ['Rare', 'Plentiful', 'Costly', 'Hidden'], 1),
-  item(3, 1, 'Use of English', 'Select the correct preposition: "He is good ___ mathematics."', ['in', 'on', 'at', 'for'], 2),
-  item(4, 1, 'Use of English', 'Identify the correctly spelled word.', ['Recieve', 'Receive', 'Receeve', 'Receve'], 1),
-  item(5, 1, 'Use of English', 'Choose the option that best completes: "Neither the teacher nor the students ___ ready."', ['is', 'was', 'were', 'be'], 2),
-  // Mathematics
-  item(6, 2, 'Mathematics', 'What is 15% of 200?', ['20', '30', '25', '35'], 1),
-  item(7, 2, 'Mathematics', 'Simplify: 3x + 5x.', ['8x', '15x', '2x', '8x^2'], 0),
-  item(8, 2, 'Mathematics', 'What is the value of x if 2x = 10?', ['3', '4', '5', '6'], 2),
-  item(9, 2, 'Mathematics', 'Find the next number: 2, 4, 8, 16, ?', ['20', '24', '32', '18'], 2),
-  item(10, 2, 'Mathematics', 'What is the perimeter of a square with side 4cm?', ['12cm', '16cm', '8cm', '20cm'], 1),
-  // Biology
-  item(11, 3, 'Biology', 'The functional unit of the kidney is the:', ['Neuron', 'Nephron', 'Alveolus', 'Villus'], 1),
-  item(12, 3, 'Biology', 'Photosynthesis mainly occurs in the:', ['Root', 'Stem', 'Leaf', 'Flower'], 2),
-  item(13, 3, 'Biology', 'Which blood cell fights infection?', ['Red blood cell', 'White blood cell', 'Platelet', 'Plasma'], 1),
-  item(14, 3, 'Biology', 'The powerhouse of the cell is the:', ['Nucleus', 'Ribosome', 'Mitochondrion', 'Golgi body'], 2),
-  item(15, 3, 'Biology', 'DNA is found mainly in the:', ['Cytoplasm', 'Nucleus', 'Cell wall', 'Vacuole'], 1),
-  // Physics
-  item(16, 4, 'Physics', 'The SI unit of force is the:', ['Joule', 'Newton', 'Watt', 'Pascal'], 1),
-  item(17, 4, 'Physics', 'Sound cannot travel through:', ['Air', 'Water', 'Vacuum', 'Steel'], 2),
-  item(18, 4, 'Physics', 'The speed of light is fastest in:', ['Water', 'Glass', 'Vacuum', 'Air'], 2),
-  item(19, 4, 'Physics', 'Ohm’s law relates voltage, current and:', ['Power', 'Resistance', 'Energy', 'Frequency'], 1),
-  item(20, 4, 'Physics', 'A freely falling body accelerates at approximately:', ['5 m/s²', '8 m/s²', '9.8 m/s²', '12 m/s²'], 2),
+  // Use of English -- lexis/structure at UTME difficulty, not primary-school recall
+  item(1, 1, 'Use of English', 'The word "ubiquitous" most nearly means:', ['Rare', 'Everywhere', 'Ancient', 'Hidden'], 1),
+  item(2, 1, 'Use of English', 'Choose the word opposite in meaning to "obstinate".', ['Stubborn', 'Yielding', 'Proud', 'Silent'], 1),
+  item(3, 1, 'Use of English', 'Select the option that best completes the sentence: "Hardly ___ the meeting begun when the fire alarm rang."', ['had', 'has', 'did', 'was'], 0),
+  item(4, 1, 'Use of English', 'Identify the correctly spelt word.', ['Occassion', 'Occasion', 'Ocassion', 'Occacion'], 1),
+  item(5, 1, 'Use of English', 'Identify the figure of speech in: "The wind whispered through the trees."', ['Simile', 'Metaphor', 'Personification', 'Hyperbole'], 2),
+  // Mathematics -- worked calculation items, not single-step arithmetic
+  item(6, 2, 'Mathematics', 'If 2x - 3y = 7 and x + y = 6, find the value of x.', ['5', '4', '3', '6'], 0),
+  item(7, 2, 'Mathematics', 'Simplify: (2^3 × 2^4) ÷ 2^5.', ['2', '4', '8', '16'], 1),
+  item(8, 2, 'Mathematics', 'The nth term of a sequence is given by 3n - 2. Find the 10th term.', ['28', '25', '30', '32'], 0),
+  item(9, 2, 'Mathematics', 'A trader bought an article for ₦8,000 and sold it for ₦9,600. Find the percentage profit.', ['15%', '20%', '18%', '25%'], 1),
+  item(10, 2, 'Mathematics', 'Find the value of x if log₂x = 5.', ['10', '16', '25', '32'], 3),
+  // Biology -- application/discrimination, not single-fact recall
+  item(11, 3, 'Biology', 'Which of the following is a function of the liver?', ['Production of insulin', 'Detoxification of harmful substances', 'Filtration of blood in nephrons', 'Absorption of digested food'], 1),
+  item(12, 3, 'Biology', 'The process by which plants lose water vapour through their leaves is called:', ['Osmosis', 'Transpiration', 'Diffusion', 'Guttation'], 1),
+  item(13, 3, 'Biology', 'Which of these is NOT a characteristic of living things?', ['Respiration', 'Excretion', 'Crystallization', 'Growth'], 2),
+  item(14, 3, 'Biology', 'In genetics, an organism with two identical alleles for a trait is said to be:', ['Heterozygous', 'Homozygous', 'Hybrid', 'Recessive'], 1),
+  item(15, 3, 'Biology', 'The exchange of gases in the lungs occurs in the:', ['Bronchus', 'Trachea', 'Alveoli', 'Larynx'], 2),
+  // Physics -- calculation and applied-concept items
+  item(16, 4, 'Physics', 'A car accelerates uniformly from rest to 20 m/s in 4 seconds. Calculate its acceleration.', ['4 m/s²', '5 m/s²', '8 m/s²', '10 m/s²'], 1),
+  item(17, 4, 'Physics', 'Calculate the work done when a force of 10N moves an object through a distance of 5m in the direction of the force.', ['2J', '15J', '50J', '500J'], 2),
+  item(18, 4, 'Physics', 'Which of the following is a vector quantity?', ['Mass', 'Speed', 'Displacement', 'Energy'], 2),
+  item(19, 4, 'Physics', 'A wave has a frequency of 50Hz and a wavelength of 4m. Calculate its speed.', ['12.5 m/s', '54 m/s', '200 m/s', '0.08 m/s'], 2),
+  item(20, 4, 'Physics', 'Which law states that the pressure of a fixed mass of gas is inversely proportional to its volume at constant temperature?', ["Charles' Law", "Boyle's Law", "Gay-Lussac's Law", "Avogadro's Law"], 1),
 ];
 
 export const DEMO_DURATION_MINUTES = 10;

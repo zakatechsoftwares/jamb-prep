@@ -40,12 +40,36 @@ import type { OptionLabel, ScoringAttempt } from '@jamb/shared';
  * whether a candidate *may* do anything.
  */
 
-let db: SQLite.SQLiteDatabase | null = null;
+// A promise, not the resolved connection -- app launch fires several
+// concurrent getDb() consumers unconditionally (_layout.tsx's
+// syncPendingSessions/downloadAvailablePacks, plus whatever screen is
+// current, e.g. useMockSession's own resume check). Caching only the
+// resolved value left a check-then-open race: two callers could both see
+// no connection yet, each open their own, and the shared variable would
+// end up holding whichever resolved last while the other's in-flight
+// execAsync ran against a connection no longer referenced by anyone --
+// this is what produced the NativeDatabase.prepareAsync NullPointerException
+// on a real cold-start resume. Caching the in-flight promise itself means
+// every concurrent caller awaits the exact same open+init, however many
+// fire at once.
+let dbPromise: Promise<SQLite.SQLiteDatabase> | null = null;
 
 async function getDb(): Promise<SQLite.SQLiteDatabase> {
-  if (!db) {
-    db = await SQLite.openDatabaseAsync('jamb-mobile.db');
-    await db.execAsync(`
+  if (!dbPromise) {
+    // If opening fails, forget the cached promise so the next call gets a
+    // fresh attempt instead of every future call rejecting forever against
+    // one bad attempt.
+    dbPromise = openDb().catch((error: unknown) => {
+      dbPromise = null;
+      throw error;
+    });
+  }
+  return dbPromise;
+}
+
+async function openDb(): Promise<SQLite.SQLiteDatabase> {
+  const database = await SQLite.openDatabaseAsync('jamb-mobile.db');
+  await database.execAsync(`
       CREATE TABLE IF NOT EXISTS local_candidate (
         id INTEGER PRIMARY KEY CHECK (id = 1),
         user_id INTEGER NOT NULL,
@@ -107,8 +131,7 @@ async function getDb(): Promise<SQLite.SQLiteDatabase> {
       );
       CREATE INDEX IF NOT EXISTS local_item_options_item_id_idx ON local_item_options (item_id);
     `);
-  }
-  return db;
+  return database;
 }
 
 export interface LocalCandidate {
