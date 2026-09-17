@@ -80,6 +80,31 @@ describe('parseAuthoringResponse', () => {
     );
     expect(result.drafts[0]?.modelReportedContainsCalculation).toBe(true);
   });
+
+  it('recovers a batch that would otherwise be silently lost to a LaTeX-style backslash escape', () => {
+    // Reproduces a real production failure: objective 295's authoring call
+    // returned ten well-formed items, but one explanation field contained
+    // `\(5^2 × 5^{10}\)` -- `\(`/`\)` are not valid JSON escapes, so strict
+    // JSON.parse failed for the whole response and both items and the
+    // authoring spend vanished with drafts=0, discardedCount=0.
+    const withLatexEscape = JSON.stringify([VALID_ITEM]).replace(
+      'The newton is the SI unit of force.',
+      String.raw`Using \(F = ma\) gives the answer.`,
+    );
+    // JSON.stringify already escapes the backslash correctly; corrupt it
+    // back to the invalid raw-backslash form the model actually produced.
+    const corrupted = withLatexEscape.replace(/\\\\\(/g, '\\(').replace(/\\\\\)/g, '\\)');
+    expect(() => JSON.parse(corrupted)).toThrow();
+
+    const result = parseAuthoringResponse(corrupted);
+    expect(result.drafts).toHaveLength(1);
+    expect(result.discardedCount).toBe(0);
+    expect(result.drafts[0]?.explanation).toBe('Using \\(F = ma\\) gives the answer.');
+  });
+
+  it('still returns nothing for text with no valid JSON structure to repair', () => {
+    expect(parseAuthoringResponse('not json at all')).toEqual({ drafts: [], discardedCount: 0 });
+  });
 });
 
 describe('parseSolveResponse', () => {

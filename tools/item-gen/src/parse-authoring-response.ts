@@ -25,6 +25,31 @@ function stripCodeFences(text: string): string {
   return fenceMatch ? fenceMatch[1]!.trim() : trimmed;
 }
 
+/**
+ * The model occasionally writes LaTeX-style escaped delimiters inside a
+ * JSON string value (observed for real: `\(5^2 × 5^{10}\)` in a
+ * Mathematics explanation), which is not a valid JSON escape sequence and
+ * fails strict `JSON.parse` for the *entire* response even though the
+ * content itself is otherwise well-formed -- ten good items and the
+ * authoring spend silently discarded over two stray characters. A narrow
+ * repair (escape any backslash not already followed by a valid JSON
+ * escape character) recovers this specific, real, recurring case without
+ * turning this into a general-purpose lenient parser: genuinely malformed
+ * text (prose, truncated output) has no such backslashes to fix and still
+ * falls through to the empty-result fallback below.
+ */
+function repairInvalidBackslashEscapes(text: string): string {
+  return text.replace(/\\(?!["\\/bfnrtu])/g, '\\\\');
+}
+
+function parseJsonWithBackslashRepair(text: string): unknown {
+  try {
+    return JSON.parse(text);
+  } catch {
+    return JSON.parse(repairInvalidBackslashEscapes(text));
+  }
+}
+
 function tryParseDraft(raw: unknown): ItemDraft | null {
   if (!isRecord(raw)) {
     return null;
@@ -85,7 +110,7 @@ function tryParseDraft(raw: unknown): ItemDraft | null {
 export function parseAuthoringResponse(rawText: string): ParsedAuthoringResponse {
   let parsed: unknown;
   try {
-    parsed = JSON.parse(stripCodeFences(rawText));
+    parsed = parseJsonWithBackslashRepair(stripCodeFences(rawText));
   } catch {
     return { drafts: [], discardedCount: 0 };
   }
@@ -112,7 +137,7 @@ export function parseAuthoringResponse(rawText: string): ParsedAuthoringResponse
 export function parseSolveResponse(rawText: string): { answer: OptionLabel } | null {
   let parsed: unknown;
   try {
-    parsed = JSON.parse(stripCodeFences(rawText));
+    parsed = parseJsonWithBackslashRepair(stripCodeFences(rawText));
   } catch {
     return null;
   }
