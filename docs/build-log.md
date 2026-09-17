@@ -2182,3 +2182,47 @@ Moving `users`/`reviewers` data (real names, phone numbers) to a
 third-party host is a real decision, not a default — surfaced explicitly
 and confirmed before the restore ran, rather than bundled silently into
 "move the database."
+
+## Objective 295's silent zero-output run, root-caused and fixed (2026-09-17)
+
+The prior entry flagged objective 295's `0 auto-gated, 0 to human review,
+0 gate-failed, 0 discarded` result — a real $0.0356 charged, nothing to
+show for it — as unexplained. It also misdescribed the objective itself
+("determine an unknown value given the mean of a data set"); the database
+says otherwise, and that description should not have been trusted without
+checking it — objective 295 is actually "Simplify expressions involving
+the laws of indices," and the model's authored content was correctly
+on-topic the whole time.
+
+**Root cause:** the model wrote a LaTeX-style expression inside an
+explanation field — `\(5^2 × 5^{10}\)`. `\(`/`\)` are not valid JSON
+escape sequences, so `JSON.parse` failed for the *entire* ten-item
+response. `parseAuthoringResponse`'s catch-all fallback
+(`tools/item-gen/src/parse-authoring-response.ts`) returns `{ drafts: [],
+discardedCount: 0 }` for any parse failure, whether the response was
+genuine prose or, as here, ten well-formed items sunk by two stray
+characters — indistinguishable from "nothing was there," and so nothing
+downstream ever counted the loss. Reproduced directly against the actual
+captured raw response before touching any code, confirming the exact
+failure (`Bad escaped character in JSON at position 9816`) and that it
+really was the sole defect — no other invalid escapes in the response,
+and no other malformation.
+
+**Fix:** `parseAuthoringResponse`/`parseSolveResponse` retry once with a
+narrow repair (escape any backslash not already followed by a valid JSON
+escape character) before giving up. Verified end to end: the real captured
+response now parses to all 10 original items; a fresh re-run of objective
+295 against Supabase (`--subject Mathematics --objective-id 295 --count
+10`, ~$0.033) processed normally — 7 `pending_review`, 3 `gate_failed` for
+real reasons (`duplicate_option_text`, `option_length_outlier`), 0
+discarded, no repeat of the silent-loss signature. Confirmed landed on
+Supabase directly (`objective_id = 295`: 7 pending_review + 3 gate_failed
++ the 1 pre-existing hand-authored seed item = 11 total).
+
+**Not investigated further:** whether this same failure mode struck
+silently in an earlier batch that never got flagged (only visible when
+authoring cost is nonzero but every outcome counter reads zero — the
+exact signature that caught this one). Worth a quick grep of
+`generated-items-raw/*-gate-report.json` for `"items": []` alongside a
+nonzero `totalAuthoringCostUsd` if this is ever worth checking
+retroactively; not done here since only objective 295 was ever flagged.
