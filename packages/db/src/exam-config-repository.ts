@@ -28,6 +28,19 @@ interface SubjectRuleRow {
   marks_per_subject: number;
 }
 
+export interface ActiveExamConfigRule {
+  role: 'compulsory' | 'elective';
+  slotCount: number;
+  itemsPerSubject: number;
+  marksPerSubject: number;
+}
+
+export interface ActiveExamConfigRules {
+  examConfigId: number;
+  totalMarks: number;
+  rules: ActiveExamConfigRule[];
+}
+
 /**
  * The active `exam_configs.id` alone, with no candidate/blueprint
  * resolution — content sync's manifest (plan 8.3, follow-up session) needs
@@ -42,10 +55,16 @@ export async function loadActiveExamConfigId(client?: PoolClient): Promise<numbe
   return result.rows[0]?.id ?? null;
 }
 
-export async function loadExamConfigForUser(
-  userId: number,
-  client?: PoolClient,
-): Promise<ResolvedExamConfig> {
+/**
+ * The active `exam_configs` row and its `exam_config_subject_rules`, with
+ * no candidate/blueprint resolution — shared by `loadExamConfigForUser`
+ * (candidate-scoped) and the subject-combination readiness feature (every
+ * combination at once). Throws via `firstRow` when no `exam_configs` row is
+ * active. A caller that needs a graceful "nothing active yet" path should
+ * call `loadActiveExamConfigId` first and short-circuit on `null`, rather
+ * than catching this function's throw.
+ */
+export async function loadActiveExamConfigRules(client?: PoolClient): Promise<ActiveExamConfigRules> {
   const runner: Pool | PoolClient = client ?? pool;
 
   const examConfig = firstRow(
@@ -62,6 +81,26 @@ export async function loadExamConfigForUser(
       [examConfig.id],
     )
   ).rows;
+
+  return {
+    examConfigId: examConfig.id,
+    totalMarks: examConfig.total_marks,
+    rules: rules.map((rule) => ({
+      role: rule.role,
+      slotCount: rule.slot_count,
+      itemsPerSubject: rule.items_per_subject,
+      marksPerSubject: rule.marks_per_subject,
+    })),
+  };
+}
+
+export async function loadExamConfigForUser(
+  userId: number,
+  client?: PoolClient,
+): Promise<ResolvedExamConfig> {
+  const runner: Pool | PoolClient = client ?? pool;
+
+  const { examConfigId, totalMarks, rules } = await loadActiveExamConfigRules(client);
 
   const user = firstRow(
     await runner.query<{ subject_combination_id: number | null }>(
@@ -85,22 +124,22 @@ export async function loadExamConfigForUser(
   const subjects: ExamSubjectConfig[] = [];
   for (const rule of rules) {
     const matchingSubjects = candidateSubjects.filter((row) => row.role === rule.role);
-    if (matchingSubjects.length !== rule.slot_count) {
+    if (matchingSubjects.length !== rule.slotCount) {
       throw new Error(
-        `loadExamConfigForUser: subject combination ${user.subject_combination_id} has ${matchingSubjects.length} '${rule.role}' subject(s), but exam config ${examConfig.id} requires exactly ${rule.slot_count}`,
+        `loadExamConfigForUser: subject combination ${user.subject_combination_id} has ${matchingSubjects.length} '${rule.role}' subject(s), but exam config ${examConfigId} requires exactly ${rule.slotCount}`,
       );
     }
     for (const subject of matchingSubjects) {
       subjects.push({
         subjectId: subject.subject_id,
-        itemsPerSubject: rule.items_per_subject,
-        marksPerSubject: rule.marks_per_subject,
+        itemsPerSubject: rule.itemsPerSubject,
+        marksPerSubject: rule.marksPerSubject,
       });
     }
   }
 
   return {
-    examConfigId: examConfig.id,
-    config: { subjects, totalMarks: examConfig.total_marks },
+    examConfigId,
+    config: { subjects, totalMarks },
   };
 }

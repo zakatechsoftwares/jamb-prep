@@ -9,6 +9,7 @@ import {
   rejectionReasonsBySubjectAndWeek,
 } from './content-dashboard-repository';
 import { interRaterAgreementBySubject } from './inter-rater-agreement-repository';
+import { subjectCombinationReadiness } from './content-readiness-repository';
 import { generatePaymentRun } from './payment-run-repository';
 import {
   generateModeratorAuditSample,
@@ -33,6 +34,7 @@ export async function getContentLeadDashboard(since: Date): Promise<ContentDashb
       itemsByState: await itemsByState(client),
       costPerApprovedItem: await costPerApprovedItem(client),
       interRaterAgreement: await interRaterAgreementBySubject(client),
+      subjectCombinationReadiness: await subjectCombinationReadiness(client),
     };
   } finally {
     client.release();

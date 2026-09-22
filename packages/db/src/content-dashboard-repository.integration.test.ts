@@ -146,6 +146,29 @@ describe.runIf(hasDatabase)('content-dashboard-repository', () => {
     });
   });
 
+  describe('approvedItemCountBySubject', () => {
+    it('counts both approved statuses, per subject, and excludes everything else', async () => {
+      await withWorld(async ({ client, world, fixtures, dashboard }) => {
+        await fixtures.insertQueueItem(client, world, { status: 'approved_uncalibrated' });
+        await fixtures.insertQueueItem(client, world, { status: 'approved_calibrated' });
+        await fixtures.insertQueueItem(client, world, { status: 'pending_review' });
+
+        const rows = await dashboard.approvedItemCountBySubject(client);
+        const forSubject = rows.find((r) => r.subjectId === world.subjectId);
+        expect(forSubject?.approvedCount).toBe(2);
+      });
+    });
+
+    it('omits a subject with zero approved items entirely, rather than a zero row', async () => {
+      await withWorld(async ({ client, world, fixtures, dashboard }) => {
+        await fixtures.insertQueueItem(client, world, { status: 'pending_review' });
+
+        const rows = await dashboard.approvedItemCountBySubject(client);
+        expect(rows.find((r) => r.subjectId === world.subjectId)).toBeUndefined();
+      });
+    });
+  });
+
   describe('costPerApprovedItem', () => {
     it('reports inference cost and reviewer fees separately, never blended (different currencies)', async () => {
       await withWorld(async ({ client, world, fixtures, dashboard }) => {

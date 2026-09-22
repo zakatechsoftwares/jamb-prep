@@ -9,16 +9,19 @@ describe.runIf(hasDatabase)('exam-config-repository', () => {
       world: import('./exam-session.fixtures').ExamWorld;
       loadExamConfigForUser: typeof import('./exam-config-repository').loadExamConfigForUser;
       loadActiveExamConfigId: typeof import('./exam-config-repository').loadActiveExamConfigId;
+      loadActiveExamConfigRules: typeof import('./exam-config-repository').loadActiveExamConfigRules;
     }) => Promise<T>,
   ): Promise<T> {
     const { pool } = await import('./client');
     const { seedExamWorld } = await import('./exam-session.fixtures');
-    const { loadExamConfigForUser, loadActiveExamConfigId } = await import('./exam-config-repository');
+    const { loadExamConfigForUser, loadActiveExamConfigId, loadActiveExamConfigRules } = await import(
+      './exam-config-repository'
+    );
     const client = await pool.connect();
 
     try {
       const world = await seedExamWorld(client);
-      return await run({ client, world, loadExamConfigForUser, loadActiveExamConfigId });
+      return await run({ client, world, loadExamConfigForUser, loadActiveExamConfigId, loadActiveExamConfigRules });
     } finally {
       client.release();
     }
@@ -35,6 +38,31 @@ describe.runIf(hasDatabase)('exam-config-repository', () => {
       await withWorld(async ({ client, loadActiveExamConfigId }) => {
         await client.query(`UPDATE exam_configs SET is_active = false`);
         expect(await loadActiveExamConfigId(client)).toBeNull();
+      });
+    });
+  });
+
+  describe('loadActiveExamConfigRules', () => {
+    it('returns the active exam config and its role-level rules, with no candidate resolution', async () => {
+      await withWorld(async ({ client, world, loadActiveExamConfigRules }) => {
+        const resolved = await loadActiveExamConfigRules(client);
+
+        expect(resolved.examConfigId).toBe(world.examConfigId);
+        expect(resolved.totalMarks).toBe(400);
+        expect(resolved.rules).toHaveLength(2);
+
+        const compulsory = resolved.rules.find((rule) => rule.role === 'compulsory');
+        expect(compulsory).toEqual({ role: 'compulsory', slotCount: 1, itemsPerSubject: 60, marksPerSubject: 100 });
+
+        const elective = resolved.rules.find((rule) => rule.role === 'elective');
+        expect(elective).toEqual({ role: 'elective', slotCount: 3, itemsPerSubject: 40, marksPerSubject: 100 });
+      });
+    });
+
+    it('throws when no exam_configs row is active', async () => {
+      await withWorld(async ({ client, loadActiveExamConfigRules }) => {
+        await client.query(`UPDATE exam_configs SET is_active = false`);
+        await expect(loadActiveExamConfigRules(client)).rejects.toThrow();
       });
     });
   });

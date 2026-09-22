@@ -443,6 +443,7 @@ describe('getContentDashboard', () => {
           itemsByState: [{ status: 'pending_review', count: 12 }],
           costPerApprovedItem: { approvedCount: 10, avgInferenceCostUsd: 0.02, avgReviewerFeesKobo: 5000 },
           interRaterAgreement: [{ subjectId: 1, pairCount: 4, agreementRate: 0.75 }],
+          subjectCombinationReadiness: [],
         },
       },
     ]);
@@ -464,6 +465,7 @@ describe('getContentDashboard', () => {
         itemsByState: [{ status: 'pending_review', count: 12 }],
         costPerApprovedItem: { approvedCount: 10, avgInferenceCostUsd: 0.02, avgReviewerFeesKobo: 5000 },
         interRaterAgreement: [{ subjectId: 1, pairCount: 4, agreementRate: 0.75 }],
+        subjectCombinationReadiness: [],
       },
     });
   });

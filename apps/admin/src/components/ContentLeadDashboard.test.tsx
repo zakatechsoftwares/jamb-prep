@@ -15,6 +15,26 @@ const DASHBOARD: ContentDashboard = {
   itemsByState: [{ status: 'pending_review', count: 12 }],
   costPerApprovedItem: { approvedCount: 40, avgInferenceCostUsd: 0.0234, avgReviewerFeesKobo: 5250 },
   interRaterAgreement: [{ subjectId: 1, pairCount: 8, agreementRate: 0.625 }],
+  subjectCombinationReadiness: [
+    {
+      subjectCombinationId: 100,
+      courseName: 'Electrical Engineering',
+      ready: true,
+      subjects: [
+        { subjectId: 1, subjectName: 'Use of English', role: 'compulsory', approvedCount: 60, requiredCount: 60, ready: true },
+        { subjectId: 2, subjectName: 'Mathematics', role: 'elective', approvedCount: 40, requiredCount: 40, ready: true },
+      ],
+    },
+    {
+      subjectCombinationId: 200,
+      courseName: 'Medicine and Surgery',
+      ready: false,
+      subjects: [
+        { subjectId: 1, subjectName: 'Use of English', role: 'compulsory', approvedCount: 60, requiredCount: 60, ready: true },
+        { subjectId: 3, subjectName: 'Biology', role: 'elective', approvedCount: 15, requiredCount: 40, ready: false },
+      ],
+    },
+  ],
 };
 
 describe('ContentLeadDashboard', () => {
@@ -51,5 +71,26 @@ describe('ContentLeadDashboard', () => {
     expect(screen.getByText(/subject #1: 12/i)).toBeTruthy();
     expect(screen.getByText(/pending_review: 12/i)).toBeTruthy();
     expect(screen.getByText(/subject #1: 63% \(8 pairs\)/i)).toBeTruthy();
+  });
+
+  it("renders each course's ready/not-ready state", () => {
+    render(<ContentLeadDashboard dashboard={DASHBOARD} />);
+
+    const ready = screen.getByTestId('readiness-100');
+    expect(ready.textContent).toContain('Electrical Engineering');
+    expect(ready.textContent).toContain('Ready');
+
+    const notReady = screen.getByTestId('readiness-200');
+    expect(notReady.textContent).toContain('Medicine and Surgery');
+    expect(notReady.textContent).toContain('Not ready');
+  });
+
+  it('shows the per-subject shortfall only for subjects below their required count', () => {
+    render(<ContentLeadDashboard dashboard={DASHBOARD} />);
+
+    const notReady = screen.getByTestId('readiness-200');
+    expect(notReady.textContent).toContain('Biology (elective): 15/40');
+    expect(notReady.textContent).toContain('Biology (elective): 15/40 — short');
+    expect(notReady.textContent).not.toContain('Use of English (compulsory): 60/60 — short');
   });
 });

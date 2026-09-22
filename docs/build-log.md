@@ -2226,3 +2226,53 @@ exact signature that caught this one). Worth a quick grep of
 `generated-items-raw/*-gate-report.json` for `"items": []` alongside a
 nonzero `totalAuthoringCostUsd` if this is ever worth checking
 retroactively; not done here since only objective 295 was ever flagged.
+
+## Mock-exam readiness by subject combination (2026-09-22)
+
+With engineering caught up and the real bottleneck now reviewer
+throughput on the ~195-item pending_review backlog, the highest-value
+next step wasn't more code against that backlog — it was visibility.
+The content-lead dashboard already showed queue depth and item counts
+per subject, but nothing tied that back to the actual open product
+question (only English/Biology have approved content; every seeded
+subject combination needs an elective that doesn't yet): can a real
+candidate in a given course sit a full Mock exam today?
+
+Added `dashboard.subjectCombinationReadiness` — per subject combination,
+whether every subject has enough *approved* items to fill the active
+exam blueprint's role-level requirement (60 for compulsory, 40 per
+elective), with a per-subject shortfall when not. Deliberately
+subject-level, not objective-level — that finer-grained question is
+`gap-detection-policy.ts`'s job for the brief board. This is a
+prioritization aid, not a throughput fix; it doesn't move a single item
+through review faster.
+
+Three real findings from building it, all now documented in CLAUDE.md's
+own new section:
+1. `packages/shared`'s zero-dependency boundary would have been violated
+   by the natural function signature — caught before writing any code by
+   checking `packages/shared/package.json` directly, not assumed.
+2. `exam-config-repository.ts`'s `loadExamConfigForUser` had an
+   un-extracted, reusable "fetch the active config + its rules" step —
+   extracted into `loadActiveExamConfigRules` rather than duplicating the
+   query, with a new test closing a real pre-existing gap (its "throws
+   when nothing is active" behavior was never actually tested before).
+3. A composed dashboard metric that can throw needs to fail gracefully
+   into "nothing to report," not take the whole dashboard down —
+   `subjectCombinationReadiness` checks `loadActiveExamConfigId()` first
+   and returns `[]` rather than calling the throwing function
+   unconditionally.
+
+Full verification: `packages/shared` tests written first (8 cases,
+including validation and "two combinations sharing a subject computed
+independently"), `packages/db` integration tests reusing
+`exam-session.fixtures.ts`'s existing world (not-ready-by-default,
+ready-once-threshold-lowered, empty-when-no-active-config, multiple
+combinations independent), new `ContentLeadDashboard` component tests,
+and the five-file ripple fix for `ContentDashboard` gaining a required
+field. `pnpm typecheck && pnpm lint` clean; full suite 1,209 tests
+passing against `jamb_prep_test` (never dev data).
+
+**Next:** reviewer staffing for the pending_review backlog and the
+on-device verification of the SQLite race-condition fix both remain
+open, outside engineering's own critical path.
