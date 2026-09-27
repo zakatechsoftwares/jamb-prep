@@ -59,6 +59,7 @@ function startApp(service: Partial<ContentLeadService>): {
             itemsByState: [],
             costPerApprovedItem: { approvedCount: 0, avgInferenceCostUsd: 0, avgReviewerFeesKobo: 0 },
             interRaterAgreement: [],
+            subjectCombinationReadiness: [],
           })
         );
       },
@@ -126,6 +127,7 @@ describe('GET /content-lead/dashboard', () => {
         itemsByState: [],
         costPerApprovedItem: { approvedCount: 0, avgInferenceCostUsd: 0, avgReviewerFeesKobo: 0 },
         interRaterAgreement: [],
+        subjectCombinationReadiness: [],
       }),
     });
 

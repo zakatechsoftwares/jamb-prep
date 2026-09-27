@@ -2,6 +2,7 @@ import type { RejectionReason } from './item-lifecycle';
 import type { SubjectAgreement } from './inter-rater-agreement';
 import type { CoverageGap } from './gap-detection-policy';
 import type { CreateBriefInput } from './brief-board-policy';
+import type { SubjectCombinationReadiness } from './content-readiness-policy';
 
 /**
  * The content lead dashboard's shapes (plan 7.11) and the service contract
@@ -43,6 +44,12 @@ export interface ContentDashboard {
   costPerApprovedItem: CostPerApprovedItem;
   /** A content signal, not a reviewer signal — see inter-rater-agreement.ts. */
   interRaterAgreement: SubjectAgreement[];
+  /**
+   * Per subject-combination Mock-exam readiness — subject-level, not
+   * objective-level (see content-readiness-policy.ts's own doc comment).
+   * Empty when no exam_configs row is active yet.
+   */
+  subjectCombinationReadiness: SubjectCombinationReadiness[];
 }
 
 export interface PaymentRunResult {

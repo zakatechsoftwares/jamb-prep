@@ -80,6 +80,7 @@ describe.runIf(hasDatabase)('content-lead-service', () => {
       expect(dashboard.itemsByState.some((s) => s.status === 'approved_uncalibrated')).toBe(true);
       expect(dashboard.costPerApprovedItem.approvedCount).toBe(1);
       expect(Array.isArray(dashboard.interRaterAgreement)).toBe(true);
+      expect(Array.isArray(dashboard.subjectCombinationReadiness)).toBe(true);
     });
   });
 

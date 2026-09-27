@@ -8,7 +8,7 @@ import type {
 } from '@jamb/shared';
 import { firstRow } from './first-row';
 
-/** Exported for brief-repository.ts's coverage-gap query, which needs the same "is this item live" definition. */
+/** Exported for brief-repository.ts's coverage-gap query and content-readiness-repository.ts's per-subject readiness query, both of which need the same "is this item live" definition. */
 export const APPROVED_STATUSES = ['approved_uncalibrated', 'approved_calibrated'];
 const QUEUE_WAITING_STATUSES = ['pending_review', 'needs_second_review'];
 
@@ -87,6 +87,25 @@ export async function itemsByState(client: PoolClient): Promise<ItemStateCount[]
     `SELECT status, count(*) AS count FROM items GROUP BY status ORDER BY status`,
   );
   return result.rows.map((row) => ({ status: row.status, count: Number(row.count) }));
+}
+
+export interface SubjectApprovedCount {
+  subjectId: number;
+  approvedCount: number;
+}
+
+/** How many approved items exist per subject — independent of any exam config or combination; the readiness feature's raw supply-side input. */
+export async function approvedItemCountBySubject(client: PoolClient): Promise<SubjectApprovedCount[]> {
+  const result = await client.query<{ subject_id: number; approved_count: string }>(
+    `SELECT subject_id, count(*) AS approved_count
+       FROM items
+      WHERE status = ANY($1)
+      GROUP BY subject_id
+      ORDER BY subject_id`,
+    [APPROVED_STATUSES],
+  );
+
+  return result.rows.map((row) => ({ subjectId: row.subject_id, approvedCount: Number(row.approved_count) }));
 }
 
 /** Cost per approved item, split into inference cost and reviewer fees (plan 7.11). */

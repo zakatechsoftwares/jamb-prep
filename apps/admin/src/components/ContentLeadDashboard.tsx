@@ -129,6 +129,32 @@ export function ContentLeadDashboard({ dashboard }: ContentLeadDashboardProps) {
           ))}
         </ul>
       </section>
+
+      <section aria-label="Subject combination readiness">
+        <h2 className="text-lg font-semibold">Mock-exam readiness by course</h2>
+        <p className="text-sm text-gray-500">
+          Whether every subject in a course has enough approved items to fill the active exam
+          blueprint — a coarser, faster signal than the queue/state views above; see the objective
+          coverage view for what to source next.
+        </p>
+        <ul>
+          {dashboard.subjectCombinationReadiness.map((combo) => (
+            <li key={combo.subjectCombinationId} data-testid={`readiness-${combo.subjectCombinationId}`}>
+              <p>
+                {combo.courseName}: <strong>{combo.ready ? 'Ready' : 'Not ready'}</strong>
+              </p>
+              <ul>
+                {combo.subjects.map((subject) => (
+                  <li key={subject.subjectId}>
+                    {subject.subjectName} ({subject.role}): {subject.approvedCount}/{subject.requiredCount}
+                    {!subject.ready && ' — short'}
+                  </li>
+                ))}
+              </ul>
+            </li>
+          ))}
+        </ul>
+      </section>
     </div>
   );
 }

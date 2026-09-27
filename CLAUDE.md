@@ -842,6 +842,60 @@ had zero rows, and `loadExamConfigForUser` throws without a
   reads; nothing client-side is ever trusted to decide what a candidate
   may do.
 
+## Mock-exam readiness by subject combination (content-lead dashboard, follow-up to subject-combination onboarding)
+
+The content-lead dashboard showed queue depth and item counts *per subject*,
+but nothing answered the actual open product question ("can a real
+candidate in this course sit a full Mock exam today?"). `content-readiness-policy.ts`
+(`packages/shared`) + `content-readiness-repository.ts` (`packages/db`) add
+that, composed into `ContentDashboard.subjectCombinationReadiness`.
+
+- **Deliberately subject-level, not objective-level.** `gap-detection-policy.ts`
+  already answers the finer-grained "which objectives need a brief"
+  question for the brief board. This is a coarser, faster "is this course
+  ready" signal — comparing each subject's total approved-item count
+  against the active exam blueprint's role-level requirement, not
+  per-objective coverage. It's a prioritization aid, not a fix for
+  reviewer throughput — it doesn't move any item through review faster.
+- **`packages/shared` has zero runtime dependencies** — confirmed via its
+  own `package.json` before writing anything, because the natural
+  signature for the new pure function would have imported `packages/db`'s
+  `SubjectCombinationSummary` type, which is backwards. Fixed by declaring
+  a structurally-identical input type independently in `packages/shared`;
+  `packages/db`'s real `listSubjectCombinations()` result passes through
+  with no conversion code, by structural typing — the same shape
+  `gap-detection-policy.ts`'s `ObjectiveCoverage` already established.
+- **`exam-config-repository.ts`'s `loadExamConfigForUser` had an
+  un-extracted, non-candidate-specific first step** (fetch the active
+  `exam_configs` row + its `exam_config_subject_rules`) that the readiness
+  feature also needed, for every combination at once rather than one
+  candidate's. Extracted into `loadActiveExamConfigRules`, called by both;
+  `loadExamConfigForUser`'s own signature, return shape, and behavior
+  (including its throw when nothing is active) are unchanged — its 3
+  existing integration tests exercise it end-to-end and catch any
+  regression, and a new test now explicitly locks in the "throws when
+  nothing is active" behavior it always implicitly depended on but never
+  had a test of its own.
+- **A composed metric that can throw must not take down the whole
+  dashboard over a case that isn't actually an error.** `loadActiveExamConfigRules`
+  throws when no `exam_configs` row is active (correct for
+  `loadExamConfigForUser`, where a candidate genuinely cannot get a
+  blueprint). `subjectCombinationReadiness` (`content-readiness-repository.ts`)
+  is a dashboard metric among several, so it checks
+  `loadActiveExamConfigId()` first (already returns `null` gracefully,
+  exactly for this) and short-circuits to `[]` rather than calling the
+  throwing function unconditionally — "nothing to report yet" is not the
+  same failure mode as "the whole dashboard is broken."
+- **Adding a required field to `ContentDashboard` breaks every existing
+  object literal built against that type, not just the one component
+  being extended.** Five test files construct one directly
+  (`apps/admin/app/content-lead/page.test.tsx`, `apps/admin/src/lib/api-client.test.ts`
+  ×2, `apps/api/src/routes/content-lead.test.ts` ×2,
+  `apps/admin/src/hooks/useContentLeadDashboard.test.tsx`) — all five
+  needed `subjectCombinationReadiness: []` added to compile, a pure ripple
+  with no behavior change, since the route/hook/client are confirmed
+  generic pass-throughs of the whole object.
+
 ## How I want you to work
 
 - Ask before installing a new dependency

@@ -15,6 +15,7 @@ const DASHBOARD: ContentDashboard = {
   itemsByState: [],
   costPerApprovedItem: { approvedCount: 0, avgInferenceCostUsd: 0, avgReviewerFeesKobo: 0 },
   interRaterAgreement: [],
+  subjectCombinationReadiness: [],
 };
 
 function wrapperWith(apiClient: Partial<ApiClient>) {
