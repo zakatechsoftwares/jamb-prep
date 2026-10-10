@@ -2276,3 +2276,20 @@ passing against `jamb_prep_test` (never dev data).
 **Next:** reviewer staffing for the pending_review backlog and the
 on-device verification of the SQLite race-condition fix both remain
 open, outside engineering's own critical path.
+
+## On-device confirmation: the release-gating resume scenario (2026-10-10)
+
+The SQLite race-condition fix (`database.ts`'s `getDb()`, fixed 2026-09-16)
+was verified by a regression test at the time, but never against the real
+scenario it was found in — CLAUDE.md's own "test that gates release":
+force-close a mock session mid-exam, relaunch, resume with the correct
+remaining time and every prior answer intact.
+
+Confirmed for real on a physical Android device today, via a fresh EAS
+development-client build (the original build from the Expo/EAS session
+had expired) connected to a local dev server over LAN: started a mock
+session, answered several items, flagged one, force-closed the app, and
+relaunched. It resumed correctly — answers, flag, and remaining time all
+intact. This closes the loop the regression test alone couldn't — a
+passing unit test proves the fix is correct in isolation; this proves it
+holds in the actual Android/Expo/SQLite runtime the bug was found in.
