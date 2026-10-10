@@ -102,6 +102,22 @@ describe('parseAuthoringResponse', () => {
     expect(result.drafts[0]?.explanation).toBe('Using \\(F = ma\\) gives the answer.');
   });
 
+  it('recovers a batch that would otherwise be silently lost to a trailing comma', () => {
+    // Reproduces a second real production failure, same shape as the
+    // LaTeX-escape one above but a different mistake: a trailing comma
+    // before a closing brace (observed for real, twice in one batch:
+    // `"...= 2.",\n    },\n    "explanation":`) -- valid in a JS object
+    // literal, not in strict JSON.
+    const serialized = JSON.stringify([VALID_ITEM]);
+    const withTrailingComma = serialized.replace('"status":"generated"}', '"status":"generated",}');
+    expect(() => JSON.parse(withTrailingComma)).toThrow();
+
+    const result = parseAuthoringResponse(withTrailingComma);
+    expect(result.drafts).toHaveLength(1);
+    expect(result.discardedCount).toBe(0);
+    expect(result.drafts[0]?.stem).toBe(VALID_ITEM.stem);
+  });
+
   it('still returns nothing for text with no valid JSON structure to repair', () => {
     expect(parseAuthoringResponse('not json at all')).toEqual({ drafts: [], discardedCount: 0 });
   });
