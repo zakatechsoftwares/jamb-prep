@@ -493,6 +493,24 @@ answer intact. Write tests for this scenario early and keep them green.
   inline `<svg>`/`dangerouslySetInnerHTML` — a browser does not execute a
   `<script>` embedded in an `<img>`-loaded SVG the way it can in an inline
   render, worth the one extra step even for internally-vetted content.
+- **An authoring response that fails strict `JSON.parse` is not
+  automatically garbage — it has specific, recurring, repairable
+  malformations, and `parseAuthoringResponse`'s catch-all fallback
+  (`{ drafts: [], discardedCount: 0 }`) cannot tell "nothing was there"
+  apart from "ten good items were there and all got silently dropped."**
+  Two real incidents, same signature (a gate report with `items: []` and
+  nonzero `totalAuthoringCostUsd`), two different causes: a LaTeX-style
+  backslash escape (`\(...\)`, 2026-09-16) and a trailing comma before a
+  closing brace/bracket (2026-10-10, hit twice in one batch). Both are
+  invalid JSON but valid-looking artifacts of how an LLM writes math/JS-
+  style text, not evidence of a genuinely malformed response — truly
+  broken text (prose, truncation) has neither pattern to repair and still
+  falls through to the same empty result. `parseAuthoringResponse`/
+  `parseSolveResponse` (`tools/item-gen/src/parse-authoring-response.ts`)
+  retry once with both repairs applied together before giving up; sweep
+  `generated-items-raw/*-gate-report.json` for `"items": []` alongside a
+  nonzero cost after any batch to catch the next one of these before it's
+  forgotten.
 
 ### Approval routes
 

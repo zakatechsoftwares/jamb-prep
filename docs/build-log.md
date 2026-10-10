@@ -2293,3 +2293,48 @@ relaunched. It resumed correctly — answers, flag, and remaining time all
 intact. This closes the loop the regression test alone couldn't — a
 passing unit test proves the fix is correct in isolation; this proves it
 holds in the actual Android/Expo/SQLite runtime the bug was found in.
+
+## Second item-gen batch: Chemistry, Mathematics, Physics (2026-10-10)
+
+A fresh batch against the same 24 objectives (8 each, `--count 10`),
+continuing generation deliberately ahead of review — the user's explicit
+call, made with the reviewer-staffing gap already named as the real
+bottleneck. Final per-subject outcome (time-scoped query, since one
+objective id range overlapped with September's leftover work — see
+below): Chemistry 56 pending_review / 24 gate_failed; Mathematics 63/17;
+Physics 67/13. 186 items reached `pending_review`, 54 gate-failed for real
+schema reasons (`duplicate_option_text`, `option_length_outlier`,
+one real near-duplicate catch) — all properly accounted for, no silent
+loss this time, confirmed by sweeping every gate report in
+`generated-items-raw/` for the "`items: []` with nonzero cost" signature
+objective 295 was originally found by.
+
+**A second, distinct cause of that exact signature, found and fixed
+immediately.** Mathematics objective 290 and Physics objective 304 both
+hit `0 auto-gated, 0 to human review, 0 gate-failed, 0 discarded` with
+real cost charged — the same symptom as objective 295's original
+incident, but NOT the same root cause: this time the model left a
+trailing comma before a closing brace (`"...= 2.",\n    },\n
+"explanation":`), valid in a JS literal, invalid in strict JSON. The
+September fix (repairing invalid backslash escapes) only patched that
+one specific malformation — it couldn't have caught this. Fixed the same
+way: `parseAuthoringResponse`/`parseSolveResponse`'s repair attempt now
+also strips trailing commas before `}`/`]`, verified against both actual
+captured raw responses (both recover all 10 items) and a new regression
+test. Both objectives were then re-run for real and recovered cleanly —
+see `fix(item-gen): recover authoring responses with a trailing comma`.
+
+**A minor, harmless side effect of the recovery, not a new bug:**
+objective 295's full 8-objective range (289–296) was included in this
+batch, so it got a second, redundant 10-item pass on top of September's
+already-recovered 10 — mildly wasteful (~$0.04) but not incorrect; that
+objective now simply has more generated content than the others. Not
+worth a special case to prevent given how rarely a single objective will
+get re-targeted by two separate batches.
+
+**Open at close, unchanged:** this is still content sitting on top of an
+already-large `pending_review` backlog, now larger — 186 more items
+across the three subjects that were already the whole bottleneck.
+Readiness-dashboard numbers for these three subjects and English are
+unaffected (still 0/40, 0/40, 0/40, 42/60 respectively) since nothing
+here was approved — deliberately deferred, per the user's own call.
