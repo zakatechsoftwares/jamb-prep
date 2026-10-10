@@ -42,11 +42,26 @@ function repairInvalidBackslashEscapes(text: string): string {
   return text.replace(/\\(?!["\\/bfnrtu])/g, '\\\\');
 }
 
-function parseJsonWithBackslashRepair(text: string): unknown {
+/**
+ * A second real, recurring mistake, same shape as the one above: a
+ * trailing comma before a closing `}`/`]` (observed for real, twice, in
+ * the same batch: `"...= 2.",\n    },\n    "explanation":` at the end of
+ * a method_steps array) -- valid in JS object/array literals, not in
+ * strict JSON, and just as capable of sinking an entire otherwise-good
+ * response. Stripped unconditionally on the repair attempt alongside the
+ * backslash fix, rather than detecting which failure occurred first --
+ * either repair is a no-op if its pattern isn't present, so applying both
+ * costs nothing when only one problem exists.
+ */
+function stripTrailingCommas(text: string): string {
+  return text.replace(/,(\s*[}\]])/g, '$1');
+}
+
+function parseJsonWithRepair(text: string): unknown {
   try {
     return JSON.parse(text);
   } catch {
-    return JSON.parse(repairInvalidBackslashEscapes(text));
+    return JSON.parse(stripTrailingCommas(repairInvalidBackslashEscapes(text)));
   }
 }
 
@@ -110,7 +125,7 @@ function tryParseDraft(raw: unknown): ItemDraft | null {
 export function parseAuthoringResponse(rawText: string): ParsedAuthoringResponse {
   let parsed: unknown;
   try {
-    parsed = parseJsonWithBackslashRepair(stripCodeFences(rawText));
+    parsed = parseJsonWithRepair(stripCodeFences(rawText));
   } catch {
     return { drafts: [], discardedCount: 0 };
   }
@@ -137,7 +152,7 @@ export function parseAuthoringResponse(rawText: string): ParsedAuthoringResponse
 export function parseSolveResponse(rawText: string): { answer: OptionLabel } | null {
   let parsed: unknown;
   try {
-    parsed = parseJsonWithBackslashRepair(stripCodeFences(rawText));
+    parsed = parseJsonWithRepair(stripCodeFences(rawText));
   } catch {
     return null;
   }
