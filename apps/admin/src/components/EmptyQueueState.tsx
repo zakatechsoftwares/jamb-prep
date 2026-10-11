@@ -1,3 +1,5 @@
+import { CheckCircleIcon } from './icons';
+
 export interface EmptyQueueStateProps {
   onRetry: () => void;
 }
@@ -10,11 +12,15 @@ export interface EmptyQueueStateProps {
 export function EmptyQueueState({ onRetry }: EmptyQueueStateProps) {
   return (
     <div className="flex flex-1 flex-col items-center justify-center gap-4 px-6 text-center">
-      <p className="text-base text-gray-600">Nothing to review right now. Check back soon.</p>
+      <CheckCircleIcon className="h-10 w-10 text-approve" />
+      <div className="flex flex-col gap-1">
+        <p className="text-base font-semibold text-gray-900">All caught up</p>
+        <p className="text-sm text-muted">Nothing to review right now. Check back soon.</p>
+      </div>
       <button
         type="button"
         onClick={onRetry}
-        className="h-touch rounded-lg bg-selected px-6 text-base font-semibold text-white"
+        className="h-touch rounded-lg bg-selected px-6 text-base font-semibold text-white shadow-sm transition-colors duration-150 hover:bg-blue-700"
       >
         Check again
       </button>

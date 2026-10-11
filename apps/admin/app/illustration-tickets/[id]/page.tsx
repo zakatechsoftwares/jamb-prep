@@ -104,11 +104,11 @@ export default function IllustrationTicketDetailPage() {
   }
 
   return (
-    <div className="flex h-dvh flex-col gap-4 overflow-y-auto p-6">
+    <div className="flex h-dvh flex-col gap-4 overflow-y-auto bg-surface-sunken p-6">
       <h1 className="text-xl font-semibold text-gray-900">Illustration ticket #{ticketId}</h1>
 
-      <div className="flex flex-col gap-1">
-        <span className="text-sm font-semibold uppercase tracking-wide text-gray-500">Sketch photo</span>
+      <div className="flex flex-col gap-2 rounded-xl border border-gray-200 bg-surface p-4 shadow-sm">
+        <span className="text-sm font-semibold uppercase tracking-wide text-muted">Sketch photo</span>
         {photoError && (
           <p role="alert" className="text-sm font-medium text-reject">
             {photoError}
@@ -118,23 +118,23 @@ export default function IllustrationTicketDetailPage() {
           <img
             src={photoUrl}
             alt="Contributor's hand sketch"
-            className="max-w-full rounded-lg border-2 border-gray-200"
+            className="max-w-full rounded-lg border border-gray-200"
           />
         )}
       </div>
 
       <label className="flex flex-col gap-1 text-sm">
-        <span className="font-semibold uppercase tracking-wide text-gray-500">SVG markup</span>
+        <span className="font-semibold uppercase tracking-wide text-muted">SVG markup</span>
         <textarea
           aria-label="SVG markup"
           value={svgMarkup}
           onChange={(event) => setSvgMarkup(event.target.value)}
-          className="rounded-lg border-2 border-gray-200 p-3 font-mono text-sm text-gray-900"
+          className="rounded-lg border-2 border-gray-200 bg-surface p-3 font-mono text-sm text-gray-900 transition-colors duration-150 focus:border-selected"
         />
       </label>
 
       <label className="flex flex-col gap-1 text-sm">
-        <span className="font-semibold uppercase tracking-wide text-gray-500">
+        <span className="font-semibold uppercase tracking-wide text-muted">
           Or upload an .svg file
         </span>
         <input
@@ -151,12 +151,12 @@ export default function IllustrationTicketDetailPage() {
       </label>
 
       <label className="flex flex-col gap-1 text-sm">
-        <span className="font-semibold uppercase tracking-wide text-gray-500">Alt text</span>
+        <span className="font-semibold uppercase tracking-wide text-muted">Alt text</span>
         <textarea
           aria-label="Alt text"
           value={altText}
           onChange={(event) => setAltText(event.target.value)}
-          className="rounded-lg border-2 border-gray-200 p-3 text-base text-gray-900"
+          className="rounded-lg border-2 border-gray-200 bg-surface p-3 text-base text-gray-900 transition-colors duration-150 focus:border-selected"
         />
       </label>
 
@@ -171,7 +171,7 @@ export default function IllustrationTicketDetailPage() {
         type="button"
         onClick={handleSubmit}
         disabled={submitting}
-        className="h-touch rounded-lg bg-selected text-base font-semibold text-white disabled:bg-gray-300"
+        className="h-touch rounded-lg bg-selected text-base font-semibold text-white shadow-sm transition-colors duration-150 hover:bg-blue-700 disabled:bg-gray-300 disabled:shadow-none"
       >
         Submit illustration
       </button>

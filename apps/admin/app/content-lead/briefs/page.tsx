@@ -32,11 +32,11 @@ export default function ContentLeadBriefsPage() {
   }
 
   return (
-    <div className="flex h-dvh flex-col overflow-y-auto">
+    <div className="flex h-dvh flex-col overflow-y-auto bg-surface-sunken">
       <h1 className="p-6 pb-0 text-xl font-semibold text-gray-900">Coverage gaps</h1>
 
       {state.status === 'loading' && (
-        <div className="flex flex-1 items-center justify-center text-sm text-gray-500">Loading…</div>
+        <div className="flex flex-1 items-center justify-center text-sm text-muted">Loading…</div>
       )}
 
       {state.status === 'forbidden' && (
@@ -50,13 +50,13 @@ export default function ContentLeadBriefsPage() {
       {state.status === 'ready' && (
         <>
           {state.gaps.length === 0 ? (
-            <p className="p-6 text-sm text-gray-500">No coverage gaps detected.</p>
+            <p className="p-6 text-sm text-muted">No coverage gaps detected.</p>
           ) : (
             <ul className="flex flex-col gap-2 p-6">
               {state.gaps.map((gap) => (
                 <li
                   key={gap.objectiveId}
-                  className="flex items-center justify-between rounded-lg border-2 border-gray-200 p-3 text-sm"
+                  className="flex items-center justify-between rounded-xl border border-gray-200 bg-surface p-3 text-sm shadow-sm transition-shadow duration-150 hover:shadow-md"
                 >
                   <span>
                     Objective #{gap.objectiveId} — short by {gap.deficit}
@@ -65,7 +65,7 @@ export default function ContentLeadBriefsPage() {
                   <button
                     type="button"
                     onClick={() => setSelectedObjectiveId(gap.objectiveId)}
-                    className="h-touch rounded-lg bg-selected px-4 text-sm font-semibold text-white"
+                    className="h-touch rounded-lg bg-selected px-4 text-sm font-semibold text-white shadow-sm transition-colors duration-150 hover:bg-blue-700"
                   >
                     Create brief
                   </button>

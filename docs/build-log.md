@@ -2404,3 +2404,64 @@ investigated). Merging the branch that made this deployment work is
 still open — the live deployment currently works because it was built
 from a local branch upload (`railway up`), not yet from `main` itself;
 a future `git push`/auto-redeploy from `main` needs this merged first.
+
+## Reviewer workspace visual redesign (2026-10-11)
+
+A pure visual/aesthetics pass across all of `apps/admin`, confirmed
+against `docs/reviewer-workspace-prompts.md`'s own guardrail table before
+touching anything: those guardrails are about workflow/IA (no queue
+browser, no bulk approve, no free-text rejection, no early key reveal,
+no layout shift on reveal) — not color, shadows, or polish — so a pure
+styling pass is explicitly clear of them. None were touched; the
+single-item flow, the fixed rejection-reason enum, the four decide
+actions, and the blind-solve-before-reveal sequencing are all unchanged.
+
+Added `--color-muted`/`--color-surface`/`--color-surface-sunken`/
+`--color-focus-ring` to the existing hand-rolled token set in
+`globals.css` (still just a handful of tokens, not a real design
+system — that gap remains, just slightly less bare). A real
+`:focus-visible` state is a genuine functional fix, not just
+aesthetics — zero interactive element anywhere had one before this,
+for a tool driven entirely by keyboard shortcuts. A small hand-rolled
+inline-SVG icon set (`icons.tsx`) covers everything needed — no new
+dependency.
+
+**A real RTL constraint worked through carefully, not guessed at:**
+several tests do exact or anchored-regex `getByText`/`getByRole` name
+matches directly on rendered text (`/^approve$/i`, `/subject #1: 12/i`).
+A visual keyboard-shortcut hint or a decorative proportion bar placed
+inside the *same* element as that matched text — even as a sibling —
+can either break an exact accessible-name match (fixed with
+`aria-hidden` on the hint) or create an ambiguous double-match when a
+new wrapping element duplicates text an ancestor already has (fixed by
+keeping matched text as bare children, decorative elements as
+empty-text siblings, never wrappers). Confirmed empirically by running
+the suite after each change, not just reasoned about — all 195 tests
+pass unchanged.
+
+Verified in a real browser against live Supabase data (not just
+component tests): the login card and the fully redesigned content-lead
+dashboard (metric cards, a real table, proportion bars for queue
+depth/items-by-state/inter-rater agreement, color-coded readiness
+pills) both render correctly end to end. One unrelated, pre-existing
+finding surfaced during that check and left uninvestigated since it's
+orthogonal to this pass: a `content_lead` session's post-login landing
+page appears to be `/content-lead` rather than `/` in at least some
+circumstances, and no redirect to `/content-lead` exists anywhere in
+the app's own source (`app/page.tsx`, `LoginForm.tsx`, `useReviewFlow.ts`,
+`AuthProvider.tsx`, `api-client.ts` were all checked directly) —
+genuinely unexplained, not something this session's changes touched or
+caused, and not blocking since `/content-lead` is itself a legitimate
+screen for that role. Worth a look if it ever actually confuses a real
+`content_lead` reviewer expecting the review queue.
+
+Final gate: `pnpm typecheck` and `pnpm lint` both clean across the
+monorepo. A full `pnpm test` run surfaced intermittent timeouts in
+`packages/db`'s integration suite (different tests failing on each of
+two consecutive runs, 11 then 1, always right at the default 5000ms
+`testTimeout`) — this branch touches zero files in `packages/db`
+(confirmed via `git diff main...HEAD --stat -- packages/db`, empty),
+and the suite's own config has no timeout override, so this is
+machine-load-driven flakiness on this run, not a regression from this
+pass. `@jamb/admin`'s own suite — the package actually changed — is
+the real gate here and passes clean: 195/195.

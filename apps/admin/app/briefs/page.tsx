@@ -43,10 +43,10 @@ export default function BriefsPage() {
   }
 
   return (
-    <div className="flex h-dvh flex-col overflow-y-auto p-6">
+    <div className="flex h-dvh flex-col overflow-y-auto bg-surface-sunken p-6">
       <h1 className="text-xl font-semibold text-gray-900">Open briefs</h1>
 
-      {state.status === 'loading' && <p className="text-sm text-gray-500">Loading…</p>}
+      {state.status === 'loading' && <p className="text-sm text-muted">Loading…</p>}
       {state.status === 'error' && <ErrorState message={state.message} onRetry={() => location.reload()} />}
       {error && (
         <p role="alert" className="mt-2 text-sm font-medium text-reject">
@@ -57,13 +57,13 @@ export default function BriefsPage() {
       {state.status === 'ready' && (
         <>
           {state.briefs.length === 0 ? (
-            <p className="mt-4 text-sm text-gray-500">No open briefs right now.</p>
+            <p className="mt-4 text-sm text-muted">No open briefs right now.</p>
           ) : (
             <ul className="mt-4 flex flex-col gap-2">
               {state.briefs.map((brief) => (
                 <li
                   key={brief.id}
-                  className="flex items-center justify-between rounded-lg border-2 border-gray-200 p-3 text-sm"
+                  className="flex items-center justify-between rounded-xl border border-gray-200 bg-surface p-3 text-sm shadow-sm transition-shadow duration-150 hover:shadow-md"
                 >
                   <span>
                     Objective #{brief.objectiveId} — {brief.itemCount} item
@@ -74,7 +74,7 @@ export default function BriefsPage() {
                     type="button"
                     disabled={claiming === brief.id}
                     onClick={() => handleClaim(brief.id)}
-                    className="h-touch rounded-lg bg-selected px-4 text-sm font-semibold text-white disabled:bg-gray-300"
+                    className="h-touch rounded-lg bg-selected px-4 text-sm font-semibold text-white shadow-sm transition-colors duration-150 hover:bg-blue-700 disabled:bg-gray-300 disabled:shadow-none"
                   >
                     Claim
                   </button>

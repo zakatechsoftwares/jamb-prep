@@ -26,17 +26,17 @@ export function InlineEditForm({
   return (
     <div className="flex flex-1 flex-col gap-3 overflow-y-auto p-4">
       <label className="flex flex-col gap-1 text-sm">
-        <span className="font-semibold uppercase tracking-wide text-gray-500">Stem</span>
+        <span className="font-semibold uppercase tracking-wide text-muted">Stem</span>
         <textarea
           value={draft.stem}
           onChange={(event) => onChange({ stem: event.target.value })}
           rows={2}
-          className="rounded-lg border-2 border-gray-200 p-2 text-base text-gray-900"
+          className="rounded-lg border-2 border-gray-200 p-2 text-base text-gray-900 transition-colors duration-150 focus:border-selected"
         />
       </label>
 
-      <fieldset className="flex flex-col gap-2">
-        <legend className="text-sm font-semibold uppercase tracking-wide text-gray-500">
+      <fieldset className="flex flex-col gap-2 rounded-lg border border-gray-200 bg-surface-sunken p-3">
+        <legend className="text-sm font-semibold uppercase tracking-wide text-muted">
           Options — pick the correct one
         </legend>
         {OPTION_LABELS.map((label) => (
@@ -47,24 +47,24 @@ export function InlineEditForm({
               aria-label={label}
               checked={draft.key === label}
               onChange={() => onChange({ key: label as OptionLabel })}
-              className="size-5"
+              className="size-5 accent-selected"
             />
             <input
               value={draft.options[label]}
               onChange={(event) => onChange({ options: { [label]: event.target.value } })}
-              className="h-touch flex-1 rounded-lg border-2 border-gray-200 px-2 text-base text-gray-900"
+              className="h-touch flex-1 rounded-lg border-2 border-gray-200 bg-surface px-2 text-base text-gray-900 transition-colors duration-150 focus:border-selected"
             />
           </div>
         ))}
       </fieldset>
 
       <label className="flex flex-col gap-1 text-sm">
-        <span className="font-semibold uppercase tracking-wide text-gray-500">Explanation</span>
+        <span className="font-semibold uppercase tracking-wide text-muted">Explanation</span>
         <textarea
           value={draft.explanation}
           onChange={(event) => onChange({ explanation: event.target.value })}
           rows={3}
-          className="rounded-lg border-2 border-gray-200 p-2 text-base text-gray-900"
+          className="rounded-lg border-2 border-gray-200 p-2 text-base text-gray-900 transition-colors duration-150 focus:border-selected"
         />
       </label>
 
@@ -72,7 +72,7 @@ export function InlineEditForm({
         <button
           type="button"
           onClick={onCancel}
-          className="h-touch flex-1 rounded-lg border-2 border-gray-200 bg-white text-base font-semibold text-gray-700"
+          className="h-touch flex-1 rounded-lg border-2 border-gray-200 bg-surface text-base font-semibold text-gray-700 transition-colors duration-150 hover:bg-gray-50"
         >
           Cancel
         </button>
@@ -80,7 +80,7 @@ export function InlineEditForm({
           type="button"
           onClick={onConfirm}
           disabled={pending}
-          className="h-touch flex-1 rounded-lg bg-approve text-base font-semibold text-white disabled:bg-gray-300"
+          className="h-touch flex-1 rounded-lg bg-approve text-base font-semibold text-white shadow-sm transition-colors duration-150 hover:bg-green-700 disabled:bg-gray-300 disabled:shadow-none"
         >
           Save and approve
         </button>
