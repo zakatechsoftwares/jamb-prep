@@ -39,7 +39,7 @@ export function SolveStep({
         <img
           src={svgToImageSrc(item.diagram.svgMarkup)}
           alt={item.diagram.altText}
-          className="max-w-full rounded-lg border-2 border-gray-200"
+          className="max-w-full rounded-lg border border-gray-200 shadow-sm"
         />
       )}
 
@@ -53,10 +53,10 @@ export function SolveStep({
               onClick={() => onSelect(option.label as OptionLabel)}
               aria-pressed={isSelected}
               disabled={queued}
-              className={`h-touch rounded-lg border-2 px-4 text-left text-base disabled:opacity-60 ${
+              className={`h-touch rounded-lg border-2 px-4 text-left text-base transition-colors duration-150 disabled:opacity-60 ${
                 isSelected
-                  ? 'border-selected bg-selected-bg font-semibold text-gray-900'
-                  : 'border-gray-200 bg-white text-gray-900'
+                  ? 'border-selected bg-selected-bg font-semibold text-gray-900 shadow-sm'
+                  : 'border-gray-200 bg-surface text-gray-900 hover:border-gray-300'
               }`}
             >
               <span className="mr-2 font-semibold">{option.label}.</span>
@@ -67,7 +67,7 @@ export function SolveStep({
       </div>
 
       {queued && (
-        <p className="text-sm text-gray-500">
+        <p className="text-sm text-muted">
           Answer queued — will reveal the key once you&apos;re back online.
         </p>
       )}
@@ -76,7 +76,7 @@ export function SolveStep({
         type="button"
         onClick={onSubmit}
         disabled={selected === null || pending || queued}
-        className="mt-auto h-touch shrink-0 rounded-lg bg-selected px-6 text-base font-semibold text-white disabled:bg-gray-300"
+        className="mt-auto h-touch shrink-0 rounded-lg bg-selected px-6 text-base font-semibold text-white shadow-sm transition-colors duration-150 hover:bg-blue-700 disabled:bg-gray-300 disabled:shadow-none"
       >
         Submit answer
       </button>
