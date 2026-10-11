@@ -4,6 +4,7 @@ import { useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
 import { useAuth } from '../../../src/auth/AuthProvider';
 import { ChangePasswordForm } from '../../../src/components/ChangePasswordForm';
+import { SignOutButton } from '../../../src/components/SignOutButton';
 import { homeRouteFor } from '../../../src/lib/home-route';
 
 /**
@@ -53,6 +54,9 @@ export default function ChangePasswordPage() {
   return (
     <div className="flex h-dvh flex-col">
       <ChangePasswordForm forced={forced} onSubmit={handleSubmit} />
+      <div className="flex justify-center bg-surface-sunken pb-6">
+        <SignOutButton />
+      </div>
     </div>
   );
 }

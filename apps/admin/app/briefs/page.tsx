@@ -4,6 +4,7 @@ import { useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
 import { useAuth } from '../../src/auth/AuthProvider';
 import { ErrorState } from '../../src/components/ErrorState';
+import { SignOutButton } from '../../src/components/SignOutButton';
 import { useBriefBoard } from '../../src/hooks/useBriefBoard';
 
 /**
@@ -44,7 +45,10 @@ export default function BriefsPage() {
 
   return (
     <div className="flex h-dvh flex-col overflow-y-auto bg-surface-sunken p-6">
-      <h1 className="text-xl font-semibold text-gray-900">Open briefs</h1>
+      <div className="flex items-center justify-between gap-2">
+        <h1 className="text-xl font-semibold text-gray-900">Open briefs</h1>
+        <SignOutButton />
+      </div>
 
       {state.status === 'loading' && <p className="text-sm text-muted">Loading…</p>}
       {state.status === 'error' && <ErrorState message={state.message} onRetry={() => location.reload()} />}

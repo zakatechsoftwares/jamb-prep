@@ -1018,6 +1018,17 @@ calibration set are still not built; every account created here starts
   user out — which is also why the content-lead dashboard and review
   header carry buttons to these screens rather than expecting anyone to
   type a URL.
+- **`signOut()` and `logout()` are different on purpose.** `logout()`
+  runs on a 401 — the same reviewer's expired session — and must leave
+  the device's offline cache and upload queue intact for when they sign
+  back in. `signOut()` (the `SignOutButton`) is a deliberate hand-over: it
+  clears the device's `OfflineStore` first, because queued work carries no
+  reviewer id and uploads under whoever is signed in — the next person's
+  session would have it refused as `not_claimed_by_you` and dropped, and
+  they'd be served the previous reviewer's claimed items. With work still
+  queued, `SignOutButton` warns and lets the reviewer choose (confirmed
+  with the user: warn, not block). Bearer tokens are stateless, so signing
+  out cannot revoke a token server-side; it only discards it from memory.
 
 ## How I want you to work
 

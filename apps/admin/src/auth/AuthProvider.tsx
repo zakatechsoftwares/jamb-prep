@@ -52,7 +52,19 @@ interface AuthContextValue {
   login(emailOrPhone: string, password: string): Promise<LoginOutcome>;
   /** Clears `session.mustChangePassword` on success; logs out on a 401. */
   changePassword(currentPassword: string, newPassword: string): Promise<ChangePasswordOutcome>;
+  /**
+   * Drops the session without touching this device's offline data — used
+   * when the server reports the session invalid (a 401), where the same
+   * reviewer will sign back in and their queued work must still be there.
+   */
   logout(): void;
+  /**
+   * The reviewer's own, deliberate sign-out: clears this device's offline
+   * cache and upload queue, then drops the session, so the next person to
+   * sign in here inherits nothing. `SignOutButton` warns first when work is
+   * still waiting to upload.
+   */
+  signOut(): Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextValue | null>(null);
@@ -111,6 +123,13 @@ export function AuthProvider({
 
   const logout = useCallback(() => setSession(null), []);
 
+  const signOut = useCallback(async () => {
+    if (store) {
+      await store.clear();
+    }
+    setSession(null);
+  }, [store]);
+
   const changePassword = useCallback(
     async (currentPassword: string, newPassword: string): Promise<ChangePasswordOutcome> => {
       if (!session) {
@@ -128,8 +147,16 @@ export function AuthProvider({
   );
 
   const value = useMemo<AuthContextValue>(
-    () => ({ session, apiClient: client, offlineStore: store, login, changePassword, logout }),
-    [session, client, store, login, changePassword, logout],
+    () => ({
+      session,
+      apiClient: client,
+      offlineStore: store,
+      login,
+      changePassword,
+      logout,
+      signOut,
+    }),
+    [session, client, store, login, changePassword, logout, signOut],
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

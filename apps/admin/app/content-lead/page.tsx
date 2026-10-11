@@ -5,6 +5,7 @@ import { useEffect, useState } from 'react';
 import { useAuth } from '../../src/auth/AuthProvider';
 import { ContentLeadDashboard } from '../../src/components/ContentLeadDashboard';
 import { ErrorState } from '../../src/components/ErrorState';
+import { SignOutButton } from '../../src/components/SignOutButton';
 import { useContentLeadDashboard } from '../../src/hooks/useContentLeadDashboard';
 
 /** How far back the dashboard's time-windowed metrics look by default. */
@@ -69,6 +70,7 @@ export default function ContentLeadPage() {
         >
           Change password
         </button>
+        <SignOutButton />
       </nav>
 
       {state.status === 'loading' && (

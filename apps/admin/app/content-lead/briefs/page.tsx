@@ -5,6 +5,7 @@ import { useEffect, useState } from 'react';
 import { useAuth } from '../../../src/auth/AuthProvider';
 import { CreateBriefForm } from '../../../src/components/CreateBriefForm';
 import { ErrorState } from '../../../src/components/ErrorState';
+import { SignOutButton } from '../../../src/components/SignOutButton';
 import { useContentLeadBriefs } from '../../../src/hooks/useContentLeadBriefs';
 
 /**
@@ -33,7 +34,10 @@ export default function ContentLeadBriefsPage() {
 
   return (
     <div className="flex h-dvh flex-col overflow-y-auto bg-surface-sunken">
-      <h1 className="p-6 pb-0 text-xl font-semibold text-gray-900">Coverage gaps</h1>
+      <div className="flex items-center justify-between gap-2 p-6 pb-0">
+        <h1 className="text-xl font-semibold text-gray-900">Coverage gaps</h1>
+        <SignOutButton />
+      </div>
 
       {state.status === 'loading' && (
         <div className="flex flex-1 items-center justify-center text-sm text-muted">Loading…</div>
