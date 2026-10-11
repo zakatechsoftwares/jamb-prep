@@ -914,6 +914,57 @@ that, composed into `ContentDashboard.subjectCombinationReadiness`.
   with no behavior change, since the route/hook/client are confirmed
   generic pass-throughs of the whole object.
 
+## Deployment (Railway, first real deploy — follow-up to mock-exam readiness)
+
+`apps/api` and `apps/admin` are live on Railway (one project, `production`
+environment), pointed at the same Supabase database the rest of this
+project already uses. Never deployed anywhere before this — no Dockerfile,
+no deploy config, no deploy step in CI existed in this repo's history.
+
+- **A workspace package with no compiled output cannot be run from a
+  `tsc` build's output, even if a `build` script exists and nominally
+  "works."** `apps/api`'s `build` script was removed, not fixed, when
+  Railway's auto-detection surfaced a real `rootDir` bug in it
+  (`TS5011`) that had simply never been exercised before — fixing that
+  error would still produce a `dist/index.js` that fails at runtime,
+  since `@jamb/db`/`@jamb/shared` are raw TypeScript everywhere with no
+  compiled output of their own. `apps/api`'s `start` script runs `node
+  --import tsx src/index.ts`, the same mechanism `dev` already used.
+- **Railway's per-service `build.buildCommand`/`deploy.startCommand`
+  are explicit, persisted overrides set once at service creation — not
+  live re-detection on every deploy.** Both services here were pinned
+  to their `dev` script from whenever they were first created, and
+  stayed pinned there regardless of what `package.json` said
+  afterward. Check `railway environment config --json` before assuming
+  a `package.json` script change alone will change what actually runs.
+- **`railway environment edit --service-config <svc> <path> <value>`
+  (the dot-path form) can report success — even an explicit `"no
+  changes to apply"` — without actually persisting anything**, in the
+  CLI version used here. The JSON-patch form (`railway environment edit
+  --json` with a heredoc) is what actually committed the same change.
+  Always verify with a fresh `railway environment config --json` read
+  after any edit — a clean exit code is not confirmation.
+- **`railway redeploy` reuses the existing build artifact.** If the
+  most recent deployment never produced a working build (as here — the
+  first attempt failed before producing anything usable), `redeploy`
+  just reproduces that same failure under a new deployment ID, which
+  reads as progress but isn't. `railway up` (a real fresh build from
+  current source) is what actually exercises new config or source
+  changes — use it, not `redeploy`, after a config or code fix.
+- **A reviewer account with `role: 'content_lead'` has full reviewer
+  access, not reduced access** — confirmed directly before provisioning
+  one: `requireContentLead`/`requireModerator` gate only the
+  content-lead/moderator-specific routes (`/content-lead/*`), and the
+  plain `/review/*` claim-and-decide routes have no role check at all,
+  matching the brief board's own "one pool, no role wall" precedent.
+  One account can review items and see the content-lead dashboard.
+- **Verification for a deployment means a real request through the
+  real path, not "the build succeeded."** `apps/admin` proxies through
+  `next.config.mjs`'s rewrites, so the thing actually worth confirming
+  is a login through `${ADMIN_URL}/api/review/login`, not just a direct
+  call to `${API_URL}/review/login` — the two can differ if `API_BASE_URL`
+  is wrong, stale, or the rewrite itself is misconfigured.
+
 ## How I want you to work
 
 - Ask before installing a new dependency

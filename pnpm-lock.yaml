@@ -90,6 +90,9 @@ importers:
       multer:
         specifier: ^2.2.0
         version: 2.2.0
+      tsx:
+        specifier: ^4.23.5
+        version: 4.23.5
     devDependencies:
       '@types/express':
         specifier: ^5.0.6
@@ -97,9 +100,6 @@ importers:
       '@types/multer':
         specifier: ^2.2.0
         version: 2.2.0
-      tsx:
-        specifier: ^4.23.5
-        version: 4.23.5
 
   apps/mobile:
     dependencies:
