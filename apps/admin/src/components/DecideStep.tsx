@@ -1,5 +1,23 @@
 import type { ReviewQueueItem, RevealResult } from '@jamb/shared';
 import { svgToImageSrc } from '../lib/svg-data-uri';
+import { AlertTriangleIcon, CheckIcon, PencilIcon, XIcon } from './icons';
+
+/**
+ * A visual keyboard-shortcut hint, `aria-hidden` so it never becomes part
+ * of the button's accessible name -- tests match on an exact anchored
+ * name (e.g. `/^approve$/i`), which a visible "1" inside the button would
+ * otherwise break.
+ */
+function KeyHint({ keyLabel }: { keyLabel: string }) {
+  return (
+    <span
+      aria-hidden="true"
+      className="rounded border border-white/40 px-1 text-xs font-normal opacity-80"
+    >
+      {keyLabel}
+    </span>
+  );
+}
 
 export interface DecideStepProps {
   item: ReviewQueueItem;
@@ -33,12 +51,14 @@ export function DecideStep({
   return (
     <div className="flex flex-1 flex-col gap-3 overflow-y-auto p-4">
       {reveal.agreesWithKey === false && (
-        <div className="rounded-lg border-2 border-reject bg-reject-bg p-3 text-sm font-semibold text-reject">
+        <div className="flex items-center gap-2 rounded-lg border-2 border-reject bg-reject-bg p-3 text-sm font-semibold text-reject">
+          <AlertTriangleIcon className="h-4 w-4 shrink-0" />
           You disagreed with the proposed key.
         </div>
       )}
       {reveal.agreesWithKey === true && (
-        <div className="rounded-lg border border-approve bg-approve-bg p-2 text-sm text-approve">
+        <div className="flex items-center gap-2 rounded-lg border border-approve bg-approve-bg p-2 text-sm text-approve">
+          <CheckIcon className="h-4 w-4 shrink-0" />
           You agreed with the proposed key.
         </div>
       )}
@@ -49,7 +69,7 @@ export function DecideStep({
         <img
           src={svgToImageSrc(item.diagram.svgMarkup)}
           alt={item.diagram.altText}
-          className="max-w-full rounded-lg border-2 border-gray-200"
+          className="max-w-full rounded-lg border border-gray-200 shadow-sm"
         />
       )}
 
@@ -59,10 +79,10 @@ export function DecideStep({
           return (
             <div
               key={option.label}
-              className={`rounded-lg border-2 px-4 py-2 text-base ${
+              className={`rounded-lg border-2 px-4 py-2 text-base transition-colors duration-150 ${
                 isCorrect
-                  ? 'border-approve bg-approve-bg font-semibold'
-                  : 'border-gray-200 bg-white'
+                  ? 'border-approve bg-approve-bg font-semibold shadow-sm'
+                  : 'border-gray-200 bg-surface'
               }`}
             >
               <span className="mr-2 font-semibold">{option.label}.</span>
@@ -72,8 +92,8 @@ export function DecideStep({
         })}
       </div>
 
-      <div className="rounded-lg bg-gray-100 p-3 text-sm text-gray-700">
-        <p className="mb-1 text-xs font-semibold uppercase tracking-wide text-gray-500">
+      <div className="rounded-lg border border-gray-200 bg-surface-sunken p-3 text-sm text-gray-700">
+        <p className="mb-1 text-xs font-semibold uppercase tracking-wide text-muted">
           Explanation — machine verdict: {reveal.verdict}
         </p>
         {reveal.explanation}
@@ -84,33 +104,41 @@ export function DecideStep({
           type="button"
           onClick={onApprove}
           disabled={pending}
-          className="h-touch rounded-lg bg-approve text-base font-semibold text-white disabled:bg-gray-300"
+          className="flex h-touch items-center justify-center gap-2 rounded-lg bg-approve text-base font-semibold text-white shadow-sm transition-colors duration-150 hover:bg-green-700 disabled:bg-gray-300 disabled:shadow-none"
         >
+          <CheckIcon className="h-5 w-5" />
           Approve
+          <KeyHint keyLabel="1" />
         </button>
         <button
           type="button"
           onClick={onStartEdit}
           disabled={pending}
-          className="h-touch rounded-lg bg-selected text-base font-semibold text-white disabled:bg-gray-300"
+          className="flex h-touch items-center justify-center gap-2 rounded-lg bg-selected text-base font-semibold text-white shadow-sm transition-colors duration-150 hover:bg-blue-700 disabled:bg-gray-300 disabled:shadow-none"
         >
+          <PencilIcon className="h-5 w-5" />
           Edit and approve
+          <KeyHint keyLabel="2" />
         </button>
         <button
           type="button"
           onClick={onStartReject}
           disabled={pending}
-          className="h-touch rounded-lg bg-reject text-base font-semibold text-white disabled:bg-gray-300"
+          className="flex h-touch items-center justify-center gap-2 rounded-lg bg-reject text-base font-semibold text-white shadow-sm transition-colors duration-150 hover:bg-red-700 disabled:bg-gray-300 disabled:shadow-none"
         >
+          <XIcon className="h-5 w-5" />
           Reject
+          <KeyHint keyLabel="3" />
         </button>
         <button
           type="button"
           onClick={onEscalate}
           disabled={pending}
-          className="h-touch rounded-lg bg-escalate text-base font-semibold text-white disabled:bg-gray-300"
+          className="flex h-touch items-center justify-center gap-2 rounded-lg bg-escalate text-base font-semibold text-white shadow-sm transition-colors duration-150 hover:bg-amber-700 disabled:bg-gray-300 disabled:shadow-none"
         >
+          <AlertTriangleIcon className="h-5 w-5" />
           Escalate
+          <KeyHint keyLabel="4" />
         </button>
       </div>
     </div>

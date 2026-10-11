@@ -28,7 +28,7 @@ export default function AuthorBriefPage() {
   }
 
   return (
-    <div className="flex h-dvh flex-col overflow-y-auto">
+    <div className="flex h-dvh flex-col overflow-y-auto bg-surface-sunken">
       <h1 className="p-6 pb-0 text-xl font-semibold text-gray-900">Author an item for brief #{briefId}</h1>
       <ContributionForm
         onSubmit={async (draft, sketchPhoto) => {

@@ -20,10 +20,33 @@
   --color-escalate-bg: var(--color-amber-50);
   --color-selected: var(--color-blue-600);
   --color-selected-bg: var(--color-blue-50);
+
+  /* Secondary/meta text -- formalizes the gray-500 already used ad hoc
+     for labels and captions throughout, rather than a new choice. */
+  --color-muted: var(--color-gray-500);
+
+  /* A card surface (white) needs something visibly different to sit on
+     top of -- --color-surface-sunken is the page background, one step
+     deeper than white, so a card's border/shadow actually reads as
+     elevation instead of disappearing into an identical background. */
+  --color-surface: var(--color-white);
+  --color-surface-sunken: var(--color-gray-100);
+
+  /* No interactive element anywhere had a visible focus state before
+     this -- a real functional gap, not just polish, for a tool driven
+     by keyboard shortcuts (A-D, 1-4, Enter, Esc). */
+  --color-focus-ring: var(--color-blue-500);
 }
 
 body {
   /* 16px minimum base size: mobile legibility, not a desktop default
      scaled down. */
   font-size: 16px;
+}
+
+/* One consistent focus-visible treatment for every interactive element,
+   rather than repeating focus: classes on every button/input/link. */
+*:focus-visible {
+  outline: 2px solid var(--color-focus-ring);
+  outline-offset: 2px;
 }

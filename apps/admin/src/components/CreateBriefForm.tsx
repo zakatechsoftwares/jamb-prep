@@ -89,81 +89,84 @@ export function CreateBriefForm({ initialObjectiveId, onSubmit }: CreateBriefFor
   }
 
   return (
-    <form onSubmit={handleSubmit} className="flex flex-col gap-4 p-6">
+    <form
+      onSubmit={handleSubmit}
+      className="flex flex-col gap-4 rounded-xl border border-gray-200 bg-surface p-6 shadow-sm"
+    >
       <h2 className="text-lg font-semibold text-gray-900">Create a brief</h2>
 
       <label className="flex flex-col gap-1 text-sm">
-        <span className="font-semibold uppercase tracking-wide text-gray-500">Objective id</span>
+        <span className="font-semibold uppercase tracking-wide text-muted">Objective id</span>
         <input
           aria-label="Objective id"
           value={objectiveId}
           onChange={(event) => setObjectiveId(event.target.value)}
-          className="h-touch rounded-lg border-2 border-gray-200 px-3 text-base text-gray-900"
+          className="h-touch rounded-lg border-2 border-gray-200 bg-surface px-3 text-base text-gray-900 transition-colors duration-150 focus:border-selected"
         />
       </label>
 
       <label className="flex flex-col gap-1 text-sm">
-        <span className="font-semibold uppercase tracking-wide text-gray-500">Item count</span>
+        <span className="font-semibold uppercase tracking-wide text-muted">Item count</span>
         <input
           aria-label="Item count"
           value={itemCount}
           onChange={(event) => setItemCount(event.target.value)}
-          className="h-touch rounded-lg border-2 border-gray-200 px-3 text-base text-gray-900"
+          className="h-touch rounded-lg border-2 border-gray-200 bg-surface px-3 text-base text-gray-900 transition-colors duration-150 focus:border-selected"
         />
       </label>
 
       <label className="flex flex-col gap-1 text-sm">
-        <span className="font-semibold uppercase tracking-wide text-gray-500">
+        <span className="font-semibold uppercase tracking-wide text-muted">
           Difficulty spread (JSON)
         </span>
         <input
           aria-label="Difficulty spread"
           value={difficultySpread}
           onChange={(event) => setDifficultySpread(event.target.value)}
-          className="h-touch rounded-lg border-2 border-gray-200 px-3 text-base text-gray-900"
+          className="h-touch rounded-lg border-2 border-gray-200 bg-surface px-3 text-base text-gray-900 transition-colors duration-150 focus:border-selected"
         />
       </label>
 
       <label className="flex flex-col gap-1 text-sm">
-        <span className="font-semibold uppercase tracking-wide text-gray-500">
+        <span className="font-semibold uppercase tracking-wide text-muted">
           Cognitive levels (JSON)
         </span>
         <input
           aria-label="Cognitive levels"
           value={cognitiveLevels}
           onChange={(event) => setCognitiveLevels(event.target.value)}
-          className="h-touch rounded-lg border-2 border-gray-200 px-3 text-base text-gray-900"
+          className="h-touch rounded-lg border-2 border-gray-200 bg-surface px-3 text-base text-gray-900 transition-colors duration-150 focus:border-selected"
         />
       </label>
 
       <label className="flex flex-col gap-1 text-sm">
-        <span className="font-semibold uppercase tracking-wide text-gray-500">Style notes</span>
+        <span className="font-semibold uppercase tracking-wide text-muted">Style notes</span>
         <textarea
           aria-label="Style notes"
           value={styleNotes}
           onChange={(event) => setStyleNotes(event.target.value)}
-          className="rounded-lg border-2 border-gray-200 p-3 text-base text-gray-900"
+          className="rounded-lg border-2 border-gray-200 bg-surface p-3 text-base text-gray-900 transition-colors duration-150 focus:border-selected"
         />
       </label>
 
       <label className="flex flex-col gap-1 text-sm">
-        <span className="font-semibold uppercase tracking-wide text-gray-500">Fee (₦)</span>
+        <span className="font-semibold uppercase tracking-wide text-muted">Fee (₦)</span>
         <input
           aria-label="Fee in naira"
           value={feeNaira}
           onChange={(event) => setFeeNaira(event.target.value)}
-          className="h-touch rounded-lg border-2 border-gray-200 px-3 text-base text-gray-900"
+          className="h-touch rounded-lg border-2 border-gray-200 bg-surface px-3 text-base text-gray-900 transition-colors duration-150 focus:border-selected"
         />
       </label>
 
       <label className="flex flex-col gap-1 text-sm">
-        <span className="font-semibold uppercase tracking-wide text-gray-500">Deadline</span>
+        <span className="font-semibold uppercase tracking-wide text-muted">Deadline</span>
         <input
           aria-label="Deadline"
           type="date"
           value={deadline}
           onChange={(event) => setDeadline(event.target.value)}
-          className="h-touch rounded-lg border-2 border-gray-200 px-3 text-base text-gray-900"
+          className="h-touch rounded-lg border-2 border-gray-200 bg-surface px-3 text-base text-gray-900 transition-colors duration-150 focus:border-selected"
         />
       </label>
 
@@ -177,7 +180,7 @@ export function CreateBriefForm({ initialObjectiveId, onSubmit }: CreateBriefFor
       <button
         type="submit"
         disabled={submitting}
-        className="h-touch rounded-lg bg-selected text-base font-semibold text-white disabled:bg-gray-300"
+        className="h-touch rounded-lg bg-selected text-base font-semibold text-white shadow-sm transition-colors duration-150 hover:bg-blue-700 disabled:bg-gray-300 disabled:shadow-none"
       >
         Create brief
       </button>

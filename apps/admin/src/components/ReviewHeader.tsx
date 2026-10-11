@@ -21,6 +21,8 @@ export interface ReviewHeaderProps {
   lateArrivalCount?: number;
 }
 
+import { WifiOffIcon } from './icons';
+
 export function ReviewHeader({
   reviewedThisSession,
   isOnline = true,
@@ -30,13 +32,14 @@ export function ReviewHeader({
   lateArrivalCount = 0,
 }: ReviewHeaderProps) {
   return (
-    <header className="flex shrink-0 flex-wrap items-center justify-between gap-2 border-b border-gray-200 bg-white px-3 py-2 text-xs">
+    <header className="flex shrink-0 flex-wrap items-center justify-between gap-2 border-b border-gray-200 bg-surface px-3 py-2 text-xs shadow-sm">
       <Stat label="Reviewed this session" value={String(reviewedThisSession)} />
       <Stat label="Accuracy" value="—" />
       <Stat label="Earned this week" value="—" />
 
       {!isOnline && (
-        <span className="rounded-full bg-reject-bg px-2 py-1 font-semibold text-reject">
+        <span className="flex items-center gap-1 rounded-full bg-reject-bg px-2 py-1 font-semibold text-reject">
+          <WifiOffIcon className="h-3.5 w-3.5" />
           Offline
         </span>
       )}
@@ -45,7 +48,7 @@ export function ReviewHeader({
         <Stat label="Pending upload" value={String(pendingDecisionCount)} />
       )}
       {nextClaimExpiry && (
-        <span className="text-gray-500">
+        <span className="text-muted">
           Earliest cached claim expires{' '}
           {nextClaimExpiry.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
         </span>
@@ -59,9 +62,9 @@ export function ReviewHeader({
 
 function Stat({ label, value }: { label: string; value: string }) {
   return (
-    <div className="flex flex-col items-center">
+    <div className="flex flex-col items-center rounded-lg px-2 py-1">
       <span className="text-sm font-semibold text-gray-900">{value}</span>
-      <span className="uppercase tracking-wide text-gray-500">{label}</span>
+      <span className="uppercase tracking-wide text-muted">{label}</span>
     </div>
   );
 }

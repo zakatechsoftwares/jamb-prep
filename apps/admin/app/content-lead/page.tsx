@@ -43,7 +43,7 @@ export default function ContentLeadPage() {
   return (
     <div className="flex h-dvh flex-col">
       {state.status === 'loading' && (
-        <div className="flex flex-1 items-center justify-center text-sm text-gray-500">
+        <div className="flex flex-1 items-center justify-center text-sm text-muted">
           Loading…
         </div>
       )}
