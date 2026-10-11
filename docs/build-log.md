@@ -2338,3 +2338,69 @@ across the three subjects that were already the whole bottleneck.
 Readiness-dashboard numbers for these three subjects and English are
 unaffected (still 0/40, 0/40, 0/40, 42/60 respectively) since nothing
 here was approved — deliberately deferred, per the user's own call.
+
+## First real deployment: apps/api + apps/admin on Railway (2026-10-11)
+
+Reviewing the backlog had been stuck on one person working through
+`apps/admin` on one local machine — getting other reviewers involved
+needed the workspace reachable over the internet, which it never had
+been. Confirmed directly before starting: no Dockerfile, no deploy
+config of any kind, no deploy step in CI anywhere in this repo's
+history. Both apps are now live on Railway (`apps/api` and
+`apps/admin`, one project, `production` environment), pointed at the
+same Supabase database everything else in this project already uses.
+
+**Two real, non-obvious findings from actually doing this:**
+
+1. **`apps/api`'s `build` script (`tsc -p tsconfig.json`) had never once
+   been exercised in this repo's history, and Railway's own
+   auto-detection (Railpack) found and ran it on the very first deploy
+   attempt** — surfacing a pre-existing bug (`TS5011`: rootDir
+   ambiguity) nothing had ever caught. Removed rather than fixed: even
+   a working `tsc` build would produce a `dist/` that can't run, since
+   `apps/api`'s workspace dependencies (`@jamb/db`, `@jamb/shared`)
+   have no compiled output at all — `node dist/index.js` would fail
+   importing `@jamb/db`'s raw `.ts` the moment it started. Added a
+   `start` script using the same `node --import tsx` mechanism `dev`
+   already relied on instead.
+2. **Railway's per-service `build.buildCommand`/`deploy.startCommand`
+   were explicit, persisted overrides from when the services were
+   first created — not live auto-detection re-run on every
+   deploy — and both services were pinned to their `dev` script, not
+   `start`,** which is why the first deploy ran `pnpm --filter
+   @jamb/api dev` / `pnpm --filter @jamb/admin dev` regardless of what
+   `package.json` said. Fixed via `railway environment edit --json`
+   (the dot-path form, `--service-config <svc> <path> <value>`,
+   silently reported success/"no changes to apply" without actually
+   persisting anything in this CLI version — the JSON-patch form via
+   stdin is what actually committed). A separate trap on top of that:
+   `railway redeploy` reuses the *existing build artifact*, so it
+   redeployed a stale image built before any of these fixes existed,
+   producing the exact same failure with a misleadingly fresh
+   deployment ID. `railway up` (a real fresh build from current
+   source) is what actually exercises new config.
+
+**Verified for real, not just "the build succeeded":** a reviewer
+account was provisioned directly against Supabase (`role:
+'content_lead'` — confirmed this role has no restriction on the plain
+review-queue routes, only the content-lead dashboard's own routes
+check for it specifically, so one account gets both), and a real
+login was completed against the deployed API both directly and through
+`apps/admin`'s rewrite proxy (`/api/review/login` →
+`${API_BASE_URL}/review/login`) — the actual path a browser takes,
+not just a direct API call.
+
+**Deliberately not done, since nothing here called for it:** a custom
+domain (Railway's free `*.up.railway.app` subdomains are fine for an
+internal tool), a Dockerfile (Railpack's auto-detection already works
+once the right commands are set), any change to how migrations run
+(Supabase's schema has been fully migrated since the earlier session
+that moved dev data there — nothing new to run).
+
+**Next:** reviewer accounts for anyone beyond the one provisioned here
+are still a manual, direct-database action (no self-service signup
+exists — see the build-log/CLAUDE.md note from when this was first
+investigated). Merging the branch that made this deployment work is
+still open — the live deployment currently works because it was built
+from a local branch upload (`railway up`), not yet from `main` itself;
+a future `git push`/auto-redeploy from `main` needs this merged first.
