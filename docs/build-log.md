@@ -2388,3 +2388,14 @@ genuinely unexplained, not something this session's changes touched or
 caused, and not blocking since `/content-lead` is itself a legitimate
 screen for that role. Worth a look if it ever actually confuses a real
 `content_lead` reviewer expecting the review queue.
+
+Final gate: `pnpm typecheck` and `pnpm lint` both clean across the
+monorepo. A full `pnpm test` run surfaced intermittent timeouts in
+`packages/db`'s integration suite (different tests failing on each of
+two consecutive runs, 11 then 1, always right at the default 5000ms
+`testTimeout`) — this branch touches zero files in `packages/db`
+(confirmed via `git diff main...HEAD --stat -- packages/db`, empty),
+and the suite's own config has no timeout override, so this is
+machine-load-driven flakiness on this run, not a regression from this
+pass. `@jamb/admin`'s own suite — the package actually changed — is
+the real gate here and passes clean: 195/195.
