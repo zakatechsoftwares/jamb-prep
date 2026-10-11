@@ -4,6 +4,7 @@ import { useRouter } from 'next/navigation';
 import { useState, type FormEvent } from 'react';
 import { APP_NAME } from '@jamb/shared';
 import { useAuth } from '../auth/AuthProvider';
+import { homeRouteFor } from '../lib/home-route';
 
 /**
  * `POST /review/login` (session 06b), the one screen this session's
@@ -32,7 +33,7 @@ export function LoginForm() {
       setError('Incorrect email/phone or password.');
       return;
     }
-    router.replace('/');
+    router.replace(homeRouteFor(outcome));
   }
 
   return (

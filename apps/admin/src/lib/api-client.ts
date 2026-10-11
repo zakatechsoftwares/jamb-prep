@@ -6,16 +6,20 @@ import type {
   ContributedItemInput,
   CoverageGap,
   CreateBriefInput,
+  CreateReviewerAccountInput,
   DecisionContext,
   IllustrationTicketSummary,
   ItemEditPatch,
   ItemStatus,
+  ManageableReviewerStatus,
   OptionLabel,
   PanelRole,
   RejectionReason,
   RejectionReasonCount,
   RevealResult,
   ReviewQueueItem,
+  ReviewerAccountSummary,
+  SubjectSummary,
 } from '@jamb/shared';
 
 /**
@@ -136,9 +140,53 @@ async function callMultipart(
 }
 
 export type LoginOutcome =
-  | { ok: true; token: string; reviewerId: number; role: PanelRole }
+  | { ok: true; token: string; reviewerId: number; role: PanelRole; mustChangePassword: boolean }
   | { ok: false; reason: 'invalid_credentials' }
   | { ok: false; reason: 'request_failed'; message: string };
+
+export type ChangePasswordOutcome =
+  | { ok: true }
+  | { ok: false; reason: 'unauthorized' }
+  | { ok: false; reason: 'wrong_current_password' }
+  | { ok: false; reason: 'invalid_input'; message: string }
+  | { ok: false; reason: 'request_failed'; message: string };
+
+export type ListReviewerAccountsOutcome =
+  | { ok: true; accounts: ReviewerAccountSummary[] }
+  | { ok: false; reason: 'unauthorized' }
+  | { ok: false; reason: 'forbidden' }
+  | { ok: false; reason: 'request_failed'; message: string };
+
+export type ListSubjectsOutcome =
+  | { ok: true; subjects: SubjectSummary[] }
+  | { ok: false; reason: 'unauthorized' }
+  | { ok: false; reason: 'forbidden' }
+  | { ok: false; reason: 'request_failed'; message: string };
+
+export type CreateReviewerAccountRequestOutcome =
+  | { ok: true; reviewerId: number; temporaryPassword: string }
+  | { ok: false; reason: 'unauthorized' }
+  | { ok: false; reason: 'forbidden' }
+  | { ok: false; reason: 'phone_taken' | 'email_taken' | 'unknown_subject' }
+  | { ok: false; reason: 'invalid_input'; message: string }
+  | { ok: false; reason: 'request_failed'; message: string };
+
+/**
+ * A 403 here means one of two things: the session isn't a content lead
+ * (`forbidden`), or the target account is one a content lead may not
+ * manage (`not_manageable` — another content lead, or a removed reviewer).
+ * The API tells them apart by the error body.
+ */
+export type ManageReviewerAccountFailure =
+  | { ok: false; reason: 'unauthorized' }
+  | { ok: false; reason: 'forbidden' | 'not_manageable' | 'not_found' }
+  | { ok: false; reason: 'request_failed'; message: string };
+
+export type ResetReviewerPasswordRequestOutcome =
+  | { ok: true; temporaryPassword: string }
+  | ManageReviewerAccountFailure;
+
+export type SetReviewerStatusRequestOutcome = { ok: true } | ManageReviewerAccountFailure;
 
 export type GetNextItemOutcome =
   | { ok: true; item: ReviewQueueItem | null }
@@ -241,6 +289,11 @@ export type FetchSketchPhotoOutcome =
 
 export interface ApiClient {
   login(emailOrPhone: string, password: string): Promise<LoginOutcome>;
+  changePassword(
+    token: string,
+    currentPassword: string,
+    newPassword: string,
+  ): Promise<ChangePasswordOutcome>;
   getNextItem(token: string): Promise<GetNextItemOutcome>;
   getNextItemBatch(token: string, count: number): Promise<GetNextItemBatchOutcome>;
   submitSolve(token: string, itemId: number, answer: OptionLabel): Promise<SubmitSolveOutcome>;
@@ -286,6 +339,21 @@ export interface ApiClient {
     input: CompleteIllustrationInput,
   ): Promise<CompleteIllustrationTicketOutcome>;
   fetchSketchPhoto(token: string, ticketId: number): Promise<FetchSketchPhotoOutcome>;
+  listReviewerAccounts(token: string): Promise<ListReviewerAccountsOutcome>;
+  listSubjects(token: string): Promise<ListSubjectsOutcome>;
+  createReviewerAccount(
+    token: string,
+    input: CreateReviewerAccountInput,
+  ): Promise<CreateReviewerAccountRequestOutcome>;
+  resetReviewerPassword(
+    token: string,
+    reviewerId: number,
+  ): Promise<ResetReviewerPasswordRequestOutcome>;
+  setReviewerStatus(
+    token: string,
+    reviewerId: number,
+    status: ManageableReviewerStatus,
+  ): Promise<SetReviewerStatusRequestOutcome>;
 }
 
 /** `baseUrl` defaults to the same-origin proxy path — see next.config.mjs's rewrite. */
@@ -306,9 +374,32 @@ export function createApiClient(fetchImpl: FetchImpl, baseUrl = '/api/review'): 
           token: response.body?.token as string,
           reviewerId: response.body?.reviewerId as number,
           role: response.body?.role as PanelRole,
+          mustChangePassword: response.body?.mustChangePassword === true,
         };
       }
       return { ok: false, reason: 'invalid_credentials' };
+    },
+
+    async changePassword(token, currentPassword, newPassword) {
+      const response = await call(fetchImpl, 'POST', `${baseUrl}/change-password`, token, {
+        currentPassword,
+        newPassword,
+      });
+
+      if (response.status === 0) {
+        return { ok: false, reason: 'request_failed', message: 'could not reach the server' };
+      }
+      if (response.status === 401) {
+        return { ok: false, reason: 'unauthorized' };
+      }
+      if (response.status === 204) {
+        return { ok: true };
+      }
+      const reason = errorReason(response, 'invalid input');
+      if (reason === 'wrong_current_password') {
+        return { ok: false, reason: 'wrong_current_password' };
+      }
+      return { ok: false, reason: 'invalid_input', message: reason };
     },
 
     async getNextItem(token) {
@@ -609,5 +700,115 @@ export function createApiClient(fetchImpl: FetchImpl, baseUrl = '/api/review'): 
       }
       return { ok: true, blob: await response.blob() };
     },
+
+    async listReviewerAccounts(token) {
+      const response = await call(fetchImpl, 'GET', '/api/content-lead/reviewers', token);
+
+      if (response.status === 0) {
+        return { ok: false, reason: 'request_failed', message: 'could not reach the server' };
+      }
+      if (response.status === 401) {
+        return { ok: false, reason: 'unauthorized' };
+      }
+      if (response.status === 403) {
+        return { ok: false, reason: 'forbidden' };
+      }
+      return {
+        ok: true,
+        accounts: (response.body?.accounts as ReviewerAccountSummary[] | undefined) ?? [],
+      };
+    },
+
+    async listSubjects(token) {
+      const response = await call(fetchImpl, 'GET', '/api/content-lead/subjects', token);
+
+      if (response.status === 0) {
+        return { ok: false, reason: 'request_failed', message: 'could not reach the server' };
+      }
+      if (response.status === 401) {
+        return { ok: false, reason: 'unauthorized' };
+      }
+      if (response.status === 403) {
+        return { ok: false, reason: 'forbidden' };
+      }
+      return {
+        ok: true,
+        subjects: (response.body?.subjects as SubjectSummary[] | undefined) ?? [],
+      };
+    },
+
+    async createReviewerAccount(token, input) {
+      const response = await call(fetchImpl, 'POST', '/api/content-lead/reviewers', token, input);
+
+      if (response.status === 0) {
+        return { ok: false, reason: 'request_failed', message: 'could not reach the server' };
+      }
+      if (response.status === 401) {
+        return { ok: false, reason: 'unauthorized' };
+      }
+      if (response.status === 403) {
+        return { ok: false, reason: 'forbidden' };
+      }
+      if (response.status === 201) {
+        return {
+          ok: true,
+          reviewerId: response.body?.reviewerId as number,
+          temporaryPassword: response.body?.temporaryPassword as string,
+        };
+      }
+      const reason = errorReason(response, 'invalid input');
+      if (reason === 'phone_taken' || reason === 'email_taken' || reason === 'unknown_subject') {
+        return { ok: false, reason };
+      }
+      return { ok: false, reason: 'invalid_input', message: reason };
+    },
+
+    async resetReviewerPassword(token, reviewerId) {
+      const response = await call(
+        fetchImpl,
+        'POST',
+        `/api/content-lead/reviewers/${reviewerId}/reset-password`,
+        token,
+      );
+
+      if (response.status === 200) {
+        return { ok: true, temporaryPassword: response.body?.temporaryPassword as string };
+      }
+      return manageFailure(response);
+    },
+
+    async setReviewerStatus(token, reviewerId, status) {
+      const response = await call(
+        fetchImpl,
+        'POST',
+        `/api/content-lead/reviewers/${reviewerId}/status`,
+        token,
+        { status },
+      );
+
+      if (response.status === 204) {
+        return { ok: true };
+      }
+      return manageFailure(response);
+    },
   };
+}
+
+function manageFailure(response: RawResponse): ManageReviewerAccountFailure {
+  if (response.status === 0) {
+    return { ok: false, reason: 'request_failed', message: 'could not reach the server' };
+  }
+  if (response.status === 401) {
+    return { ok: false, reason: 'unauthorized' };
+  }
+  if (response.status === 403) {
+    return {
+      ok: false,
+      reason: errorReason(response, 'forbidden') === 'not_manageable' ? 'not_manageable' : 'forbidden',
+    };
+  }
+  if (response.status === 404) {
+    return { ok: false, reason: 'not_found' };
+  }
+  return { ok: false, reason: 'request_failed', message: errorReason(response, 'request failed') };
 }

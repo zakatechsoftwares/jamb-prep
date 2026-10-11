@@ -4,6 +4,7 @@ import { useRouter } from 'next/navigation';
 import { useEffect } from 'react';
 import { useAuth } from '../../src/auth/AuthProvider';
 import { LoginForm } from '../../src/components/LoginForm';
+import { homeRouteFor } from '../../src/lib/home-route';
 
 export default function LoginPage() {
   const { session } = useAuth();
@@ -11,7 +12,7 @@ export default function LoginPage() {
 
   useEffect(() => {
     if (session) {
-      router.replace(session.role === 'content_lead' ? '/content-lead' : '/');
+      router.replace(homeRouteFor(session));
     }
   }, [session, router]);
 

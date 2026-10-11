@@ -11,6 +11,7 @@ import type {
   ReviewDecisionService,
   ReviewEscalationService,
   ReviewQueueService,
+  ReviewerAccountService,
   SubjectCombinationService,
 } from '@jamb/shared';
 // From the dependency-free `./reviewer-errors` subpath, not `@jamb/db`'s
@@ -27,6 +28,7 @@ import { createIllustrationTicketsRouter } from './routes/illustration-tickets';
 import { createReviewDecisionRouter } from './routes/review-decision';
 import { createReviewEscalationRouter } from './routes/review-escalation';
 import { createReviewQueueRouter } from './routes/review-queue';
+import { createReviewerAccountsRouter } from './routes/reviewer-accounts';
 import { createSubjectCombinationsRouter } from './routes/subject-combinations';
 
 export interface AppDependencies {
@@ -40,6 +42,7 @@ export interface AppDependencies {
   reviewEscalation?: ReviewEscalationService;
   auth?: AuthService;
   contentLead?: ContentLeadService;
+  reviewerAccounts?: ReviewerAccountService;
   briefBoard?: BriefBoardService;
   illustrationBoard?: IllustrationBoardService;
   candidateSync?: CandidateSyncService;
@@ -70,6 +73,9 @@ export function createApp(dependencies: AppDependencies = {}): Express {
   }
   if (dependencies.contentLead) {
     app.use('/content-lead', createContentLeadRouter(dependencies.contentLead));
+  }
+  if (dependencies.reviewerAccounts) {
+    app.use('/content-lead', createReviewerAccountsRouter(dependencies.reviewerAccounts));
   }
   if (dependencies.briefBoard) {
     app.use('/briefs', createBriefsRouter(dependencies.briefBoard));

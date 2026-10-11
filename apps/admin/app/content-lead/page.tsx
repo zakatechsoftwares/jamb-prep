@@ -40,8 +40,37 @@ export default function ContentLeadPage() {
     return null;
   }
 
+  // router.push, never a plain <a href>: the session lives only in memory,
+  // so a full page load would sign the content lead out.
   return (
     <div className="flex h-dvh flex-col">
+      <nav
+        aria-label="Content lead"
+        className="flex shrink-0 flex-wrap gap-2 border-b border-gray-200 bg-surface px-3 py-2"
+      >
+        <button
+          type="button"
+          onClick={() => router.push('/content-lead/reviewers')}
+          className="h-touch rounded-lg border-2 border-gray-200 bg-surface px-4 text-sm font-semibold text-gray-900"
+        >
+          Review panel
+        </button>
+        <button
+          type="button"
+          onClick={() => router.push('/content-lead/briefs')}
+          className="h-touch rounded-lg border-2 border-gray-200 bg-surface px-4 text-sm font-semibold text-gray-900"
+        >
+          Coverage gaps
+        </button>
+        <button
+          type="button"
+          onClick={() => router.push('/account/password')}
+          className="h-touch rounded-lg border-2 border-gray-200 bg-surface px-4 text-sm font-semibold text-gray-900"
+        >
+          Change password
+        </button>
+      </nav>
+
       {state.status === 'loading' && (
         <div className="flex flex-1 items-center justify-center text-sm text-muted">
           Loading…

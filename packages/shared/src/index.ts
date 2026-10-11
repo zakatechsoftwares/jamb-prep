@@ -11,6 +11,7 @@ export * from './scoring';
 export * from './review-queue-policy';
 export * from './review-decision-policy';
 export * from './reviewer-auth-policy';
+export * from './reviewer-account-policy';
 export * from './gold-scoring-policy';
 export * from './earnings-policy';
 export * from './accuracy-threshold-policy';

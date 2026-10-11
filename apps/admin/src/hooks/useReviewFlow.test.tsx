@@ -7,7 +7,7 @@ import { createOfflineStore, type OfflineStore } from '../lib/offline-store';
 import { AuthProvider } from '../auth/AuthProvider';
 import { useReviewFlow } from './useReviewFlow';
 
-const SESSION = { token: 'tok123', reviewerId: 7, role: 'reviewer' as const };
+const SESSION = { token: 'tok123', reviewerId: 7, role: 'reviewer' as const, mustChangePassword: false };
 
 const ITEM: ReviewQueueItem = {
   itemId: 42,

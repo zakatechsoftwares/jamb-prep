@@ -19,6 +19,8 @@ export interface ReviewHeaderProps {
   pendingDecisionCount?: number;
   nextClaimExpiry?: Date | null;
   lateArrivalCount?: number;
+  /** Shown as a small button when provided; the page owns the navigation. */
+  onChangePassword?: () => void;
 }
 
 import { WifiOffIcon } from './icons';
@@ -30,6 +32,7 @@ export function ReviewHeader({
   pendingDecisionCount = 0,
   nextClaimExpiry = null,
   lateArrivalCount = 0,
+  onChangePassword,
 }: ReviewHeaderProps) {
   return (
     <header className="flex shrink-0 flex-wrap items-center justify-between gap-2 border-b border-gray-200 bg-surface px-3 py-2 text-xs shadow-sm">
@@ -55,6 +58,15 @@ export function ReviewHeader({
       )}
       {lateArrivalCount > 0 && (
         <Stat label="Recorded as second opinion" value={String(lateArrivalCount)} />
+      )}
+      {onChangePassword && (
+        <button
+          type="button"
+          onClick={onChangePassword}
+          className="rounded-lg px-2 py-1 font-semibold text-selected underline-offset-2 hover:underline"
+        >
+          Change password
+        </button>
       )}
     </header>
   );

@@ -1,4 +1,5 @@
 import type { PanelRole } from './item-lifecycle';
+import type { ChangePasswordOutcome } from './reviewer-account-policy';
 
 /**
  * The outcome of verifying a reviewer's credentials, declared here and
@@ -12,15 +13,25 @@ import type { PanelRole } from './item-lifecycle';
  * at all. `not_active` is reported distinctly — it only fires once the
  * password has already verified, so the caller already holds valid
  * credentials and is not learning anything they could not otherwise prove.
+ *
+ * `mustChangePassword` is true while the account still holds a temporary
+ * password a content lead issued (`reviewer-account-policy.ts`); the admin
+ * app keeps the reviewer on the change-password screen until it clears.
  */
 export type AuthenticateOutcome =
-  | { ok: true; reviewerId: number; userId: number; role: PanelRole }
+  | { ok: true; reviewerId: number; userId: number; role: PanelRole; mustChangePassword: boolean }
   | { ok: false; reason: 'invalid_credentials' }
   | { ok: false; reason: 'not_active'; status: string };
 
 /** What `apps/api`'s login route needs from the review workflow. */
 export interface AuthService {
   login(emailOrPhone: string, password: string): Promise<AuthenticateOutcome>;
+  /** `reviewerId` always comes from the authenticated session, never the body. */
+  changePassword(
+    reviewerId: number,
+    currentPassword: string,
+    newPassword: string,
+  ): Promise<ChangePasswordOutcome>;
 }
 
 export interface LoginInput {

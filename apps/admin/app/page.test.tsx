@@ -56,7 +56,7 @@ describe('ReviewPage', () => {
     render(
       <AuthProvider
         apiClient={apiClient}
-        initialSession={{ token: 'tok123', reviewerId: 7, role: 'reviewer' }}
+        initialSession={{ token: 'tok123', reviewerId: 7, role: 'reviewer', mustChangePassword: false }}
       >
         <ReviewPage />
       </AuthProvider>,
