@@ -965,6 +965,60 @@ no deploy config, no deploy step in CI existed in this repo's history.
   call to `${API_URL}/review/login` — the two can differ if `API_BASE_URL`
   is wrong, stale, or the rewrite itself is misconfigured.
 
+## Reviewer account management (review panel, follow-up to deployment)
+
+Content leads create, reset and suspend panel accounts at
+`/content-lead/reviewers` — the replacement for provisioning reviewers by
+hand in the database. Plan 7.8's self-service application form and
+calibration set are still not built; every account created here starts
+`active`.
+
+- **A content lead can manage every panel role except their own.**
+  `ASSIGNABLE_REVIEWER_ROLES` (`packages/shared/src/reviewer-account-policy.ts`)
+  excludes `content_lead`, and `isManageableAccount` refuses both a
+  `content_lead` target and a `removed` one — otherwise any content-lead
+  session could take over any other by resetting its password, and a
+  status button could undo `sweepReviewerAccuracy`'s removal for
+  sustained accuracy failure. Content-lead accounts stay a direct
+  database action, on purpose.
+- **A temporary password is returned exactly once and never stored in
+  plain text.** Generated in `packages/db` (`temporary-password.ts`,
+  `node:crypto`'s `randomInt` as the default of an injected picker — this
+  value *is* a credential, unlike `generateSyncId`), hashed before
+  storage, sent with `Cache-Control: no-store`, and flagged
+  `reviewers.must_change_password` (migration `0023`).
+- **The forced first-login change is a client-side gate, deliberately.**
+  `PasswordChangeGate` (root layout) renders nothing but
+  `/account/password` for a must-change session — nothing in place of the
+  page, so no page's data-fetching effect fires first. The API does not
+  refuse a must-change session: whoever holds the temporary password
+  could change it themselves anyway, so server enforcement would protect
+  nothing; the point is only that the content lead never learns the
+  password the reviewer settles on.
+- **A phone or email already belonging to *any* user — a candidate
+  included — is rejected, never attached to.** A mistyped number must not
+  hand reviewer access to a stranger's account. Detected from the
+  database's own constraint names (`users_phone_key`, `users_email_key`,
+  `reviewer_subjects_subject_id_fkey`), not a check-then-insert, so two
+  content leads racing on one number still get a clean `phone_taken`.
+  Email is required for a new account; phone is matched exactly at login
+  and not normalised (`0803…` ≠ `+234803…`) — normalising it is a change
+  to candidate registration too, not one to make here alone.
+- **A wrong current password on `/review/change-password` is a 400, not
+  a 401** — the session is still valid, and the admin client treats any
+  401 as "log me out".
+- **`homeRouteFor` (`apps/admin/src/lib/home-route.ts`) is the one rule
+  for where a signed-in session lands.** It also explains the
+  "unexplained" `content_lead` → `/content-lead` landing the visual
+  redesign's build-log entry recorded: `app/login/page.tsx`'s own
+  already-signed-in effect did it, racing `LoginForm`'s `replace('/')`.
+  Both now route through `homeRouteFor`, so they agree.
+- **In-app navigation is `router.push`, never `<a href>`.** The session
+  lives only in memory (`AuthProvider`), so a full page load signs the
+  user out — which is also why the content-lead dashboard and review
+  header carry buttons to these screens rather than expecting anyone to
+  type a URL.
+
 ## How I want you to work
 
 - Ask before installing a new dependency
