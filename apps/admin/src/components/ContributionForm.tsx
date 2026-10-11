@@ -122,21 +122,29 @@ export function ContributionForm({ onSubmit }: ContributionFormProps) {
   }
 
   return (
-    <form onSubmit={handleSubmit} className="flex flex-col gap-4 p-6">
+    <form
+      onSubmit={handleSubmit}
+      className="flex flex-col gap-4 rounded-xl border border-gray-200 bg-surface p-6 shadow-sm"
+    >
       <label className="flex flex-col gap-1 text-sm">
-        <span className="font-semibold uppercase tracking-wide text-gray-500">Stem</span>
+        <span className="font-semibold uppercase tracking-wide text-muted">Stem</span>
         <textarea
           aria-label="Stem"
           value={stem}
           onChange={(event) => setStem(event.target.value)}
-          className="rounded-lg border-2 border-gray-200 p-3 text-base text-gray-900"
+          className="rounded-lg border-2 border-gray-200 bg-surface p-3 text-base text-gray-900 transition-colors duration-150 focus:border-selected"
         />
       </label>
 
       <fieldset className="flex flex-col gap-3">
-        <legend className="text-sm font-semibold uppercase tracking-wide text-gray-500">Options</legend>
+        <legend className="text-sm font-semibold uppercase tracking-wide text-muted">Options</legend>
         {OPTION_LABELS.map((label) => (
-          <div key={label} className="flex flex-col gap-1 rounded-lg border-2 border-gray-200 p-3">
+          <div
+            key={label}
+            className={`flex flex-col gap-1 rounded-lg border-2 p-3 transition-colors duration-150 ${
+              correctLabel === label ? 'border-selected bg-selected-bg' : 'border-gray-200 bg-surface'
+            }`}
+          >
             <label className="flex items-center gap-2 text-sm">
               <input
                 type="radio"
@@ -159,7 +167,7 @@ export function ContributionForm({ onSubmit }: ContributionFormProps) {
                 placeholder="Distractor rationale"
                 value={options[label].distractorRationale}
                 onChange={(event) => updateOption(label, { distractorRationale: event.target.value })}
-                className="h-touch rounded-lg border-2 border-gray-200 px-3 text-sm text-gray-900"
+                className="h-touch rounded-lg border-2 border-gray-200 bg-surface px-3 text-sm text-gray-900 transition-colors duration-150 focus:border-selected"
               />
             )}
           </div>
@@ -167,58 +175,58 @@ export function ContributionForm({ onSubmit }: ContributionFormProps) {
       </fieldset>
 
       <label className="flex flex-col gap-1 text-sm">
-        <span className="font-semibold uppercase tracking-wide text-gray-500">Explanation</span>
+        <span className="font-semibold uppercase tracking-wide text-muted">Explanation</span>
         <textarea
           aria-label="Explanation"
           value={explanation}
           onChange={(event) => setExplanation(event.target.value)}
-          className="rounded-lg border-2 border-gray-200 p-3 text-base text-gray-900"
+          className="rounded-lg border-2 border-gray-200 bg-surface p-3 text-base text-gray-900 transition-colors duration-150 focus:border-selected"
         />
       </label>
 
       <label className="flex flex-col gap-1 text-sm">
-        <span className="font-semibold uppercase tracking-wide text-gray-500">
+        <span className="font-semibold uppercase tracking-wide text-muted">
           Method steps (one per line)
         </span>
         <textarea
           aria-label="Method steps"
           value={methodStepsText}
           onChange={(event) => setMethodStepsText(event.target.value)}
-          className="rounded-lg border-2 border-gray-200 p-3 text-base text-gray-900"
+          className="rounded-lg border-2 border-gray-200 bg-surface p-3 text-base text-gray-900 transition-colors duration-150 focus:border-selected"
         />
       </label>
 
       <label className="flex flex-col gap-1 text-sm">
-        <span className="font-semibold uppercase tracking-wide text-gray-500">Cognitive level</span>
+        <span className="font-semibold uppercase tracking-wide text-muted">Cognitive level</span>
         <input
           aria-label="Cognitive level"
           value={cognitiveLevel}
           onChange={(event) => setCognitiveLevel(event.target.value)}
-          className="h-touch rounded-lg border-2 border-gray-200 px-3 text-base text-gray-900"
+          className="h-touch rounded-lg border-2 border-gray-200 bg-surface px-3 text-base text-gray-900 transition-colors duration-150 focus:border-selected"
         />
       </label>
 
       <label className="flex flex-col gap-1 text-sm">
-        <span className="font-semibold uppercase tracking-wide text-gray-500">
+        <span className="font-semibold uppercase tracking-wide text-muted">
           Author difficulty (0-1)
         </span>
         <input
           aria-label="Author difficulty"
           value={authorDifficulty}
           onChange={(event) => setAuthorDifficulty(event.target.value)}
-          className="h-touch rounded-lg border-2 border-gray-200 px-3 text-base text-gray-900"
+          className="h-touch rounded-lg border-2 border-gray-200 bg-surface px-3 text-base text-gray-900 transition-colors duration-150 focus:border-selected"
         />
       </label>
 
       <label className="flex flex-col gap-1 text-sm">
-        <span className="font-semibold uppercase tracking-wide text-gray-500">
+        <span className="font-semibold uppercase tracking-wide text-muted">
           Expected time (seconds)
         </span>
         <input
           aria-label="Expected time in seconds"
           value={expectedTimeSeconds}
           onChange={(event) => setExpectedTimeSeconds(event.target.value)}
-          className="h-touch rounded-lg border-2 border-gray-200 px-3 text-base text-gray-900"
+          className="h-touch rounded-lg border-2 border-gray-200 bg-surface px-3 text-base text-gray-900 transition-colors duration-150 focus:border-selected"
         />
       </label>
 
@@ -229,7 +237,7 @@ export function ContributionForm({ onSubmit }: ContributionFormProps) {
           checked={needsDiagram}
           onChange={(event) => setNeedsDiagram(event.target.checked)}
         />
-        <span className="font-semibold uppercase tracking-wide text-gray-500">
+        <span className="font-semibold uppercase tracking-wide text-muted">
           This item needs a diagram
         </span>
       </label>
@@ -237,19 +245,19 @@ export function ContributionForm({ onSubmit }: ContributionFormProps) {
       {needsDiagram && (
         <>
           <label className="flex flex-col gap-1 text-sm">
-            <span className="font-semibold uppercase tracking-wide text-gray-500">
+            <span className="font-semibold uppercase tracking-wide text-muted">
               Figure description
             </span>
             <textarea
               aria-label="Figure description"
               value={figureDescription}
               onChange={(event) => setFigureDescription(event.target.value)}
-              className="rounded-lg border-2 border-gray-200 p-3 text-base text-gray-900"
+              className="rounded-lg border-2 border-gray-200 bg-surface p-3 text-base text-gray-900 transition-colors duration-150 focus:border-selected"
             />
           </label>
 
           <label className="flex flex-col gap-1 text-sm">
-            <span className="font-semibold uppercase tracking-wide text-gray-500">
+            <span className="font-semibold uppercase tracking-wide text-muted">
               Sketch photo
             </span>
             <input
@@ -272,7 +280,7 @@ export function ContributionForm({ onSubmit }: ContributionFormProps) {
       <button
         type="submit"
         disabled={submitting}
-        className="h-touch rounded-lg bg-selected text-base font-semibold text-white disabled:bg-gray-300"
+        className="h-touch rounded-lg bg-selected text-base font-semibold text-white shadow-sm transition-colors duration-150 hover:bg-blue-700 disabled:bg-gray-300 disabled:shadow-none"
       >
         Submit item
       </button>
