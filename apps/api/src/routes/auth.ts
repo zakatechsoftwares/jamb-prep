@@ -1,7 +1,7 @@
 import { Router } from 'express';
-import { parseLoginInput, type AuthService } from '@jamb/shared';
+import { parseChangePasswordInput, parseLoginInput, type AuthService } from '@jamb/shared';
 import { signSessionToken } from '@jamb/db/session-tokens';
-import { sessionSecret } from '../reviewer-identity';
+import { resolveReviewerId, sessionSecret } from '../reviewer-identity';
 
 const SESSION_TTL_MINUTES = 60;
 
@@ -43,7 +43,46 @@ export function createAuthRouter(service: AuthService): Router {
           SESSION_TTL_MINUTES,
         );
 
-        res.json({ token, reviewerId: outcome.reviewerId, role: outcome.role });
+        res.json({
+          token,
+          reviewerId: outcome.reviewerId,
+          role: outcome.role,
+          mustChangePassword: outcome.mustChangePassword,
+        });
+      })
+      .catch(next);
+  });
+
+  /**
+   * A reviewer replacing their own password — the forced change after a
+   * content lead issued a temporary one, or any later change. The reviewer
+   * is the session's, never the body's. A wrong current password is a 400,
+   * not a 401: the session itself is still valid, and the admin client
+   * treats a 401 as "log me out".
+   */
+  router.post('/change-password', (req, res, next) => {
+    const reviewerId = resolveReviewerId(req);
+    if (reviewerId === null) {
+      res.status(401).json({ error: 'authentication required' });
+      return;
+    }
+
+    let input;
+    try {
+      input = parseChangePasswordInput(req.body);
+    } catch (error) {
+      res.status(400).json({ error: error instanceof Error ? error.message : String(error) });
+      return;
+    }
+
+    service
+      .changePassword(reviewerId, input.currentPassword, input.newPassword)
+      .then((outcome) => {
+        if (!outcome.ok) {
+          res.status(400).json({ error: outcome.reason });
+          return;
+        }
+        res.status(204).end();
       })
       .catch(next);
   });

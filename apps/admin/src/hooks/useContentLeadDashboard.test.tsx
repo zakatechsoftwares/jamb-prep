@@ -6,7 +6,7 @@ import type { ApiClient } from '../lib/api-client';
 import { AuthProvider } from '../auth/AuthProvider';
 import { useContentLeadDashboard } from './useContentLeadDashboard';
 
-const SESSION = { token: 'tok123', reviewerId: 3, role: 'content_lead' as const };
+const SESSION = { token: 'tok123', reviewerId: 3, role: 'content_lead' as const, mustChangePassword: false };
 
 const DASHBOARD: ContentDashboard = {
   acceptedItemsPerReviewerHour: 1,

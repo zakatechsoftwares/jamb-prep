@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from 'next';
 import type { ReactNode } from 'react';
 import { AuthProvider } from '../src/auth/AuthProvider';
+import { PasswordChangeGate } from '../src/components/PasswordChangeGate';
 import { ServiceWorkerRegistration } from '../src/components/ServiceWorkerRegistration';
 import './globals.css';
 
@@ -21,7 +22,9 @@ export default function RootLayout({ children }: { children: ReactNode }) {
     <html lang="en">
       <body className="h-dvh bg-gray-50 text-gray-900 antialiased">
         <ServiceWorkerRegistration />
-        <AuthProvider>{children}</AuthProvider>
+        <AuthProvider>
+          <PasswordChangeGate>{children}</PasswordChangeGate>
+        </AuthProvider>
       </body>
     </html>
   );

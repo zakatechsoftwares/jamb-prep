@@ -37,7 +37,7 @@ describe('ContentLeadPage', () => {
     render(
       <AuthProvider
         apiClient={{} as ApiClient}
-        initialSession={{ token: 'tok123', reviewerId: 7, role: 'reviewer' }}
+        initialSession={{ token: 'tok123', reviewerId: 7, role: 'reviewer', mustChangePassword: false }}
       >
         <ContentLeadPage />
       </AuthProvider>,
@@ -55,7 +55,7 @@ describe('ContentLeadPage', () => {
     render(
       <AuthProvider
         apiClient={apiClient}
-        initialSession={{ token: 'tok123', reviewerId: 7, role: 'content_lead' }}
+        initialSession={{ token: 'tok123', reviewerId: 7, role: 'content_lead', mustChangePassword: false }}
       >
         <ContentLeadPage />
       </AuthProvider>,
@@ -80,7 +80,7 @@ describe('ContentLeadPage', () => {
     render(
       <AuthProvider
         apiClient={apiClient}
-        initialSession={{ token: 'tok123', reviewerId: 7, role: 'content_lead' }}
+        initialSession={{ token: 'tok123', reviewerId: 7, role: 'content_lead', mustChangePassword: false }}
       >
         <ContentLeadPage />
       </AuthProvider>,

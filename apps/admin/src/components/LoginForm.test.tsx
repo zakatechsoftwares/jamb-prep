@@ -24,6 +24,7 @@ describe('LoginForm', () => {
           token: 'tok123',
           reviewerId: 7,
           role: 'reviewer',
+          mustChangePassword: false,
         }))}
       >
         <LoginForm />
@@ -35,6 +36,55 @@ describe('LoginForm', () => {
     await user.click(screen.getByRole('button', { name: /log in/i }));
 
     await waitFor(() => expect(replace).toHaveBeenCalledWith('/'));
+  });
+
+  it('sends a session holding a temporary password to the change-password screen', async () => {
+    const user = userEvent.setup();
+    replace.mockClear();
+    render(
+      <AuthProvider
+        apiClient={fakeApiClient(async () => ({
+          ok: true,
+          token: 'tok123',
+          reviewerId: 7,
+          role: 'reviewer',
+          mustChangePassword: true,
+        }))}
+      >
+        <LoginForm />
+      </AuthProvider>,
+    );
+
+    await user.type(screen.getByLabelText(/email or phone/i), 'reviewer@example.test');
+    await user.type(screen.getByLabelText(/password/i), 'TempPass2345');
+    await user.click(screen.getByRole('button', { name: /log in/i }));
+
+    await waitFor(() => expect(replace).toHaveBeenCalledWith('/account/password'));
+    expect(replace).not.toHaveBeenCalledWith('/');
+  });
+
+  it('sends a content lead to the dashboard', async () => {
+    const user = userEvent.setup();
+    replace.mockClear();
+    render(
+      <AuthProvider
+        apiClient={fakeApiClient(async () => ({
+          ok: true,
+          token: 'tok123',
+          reviewerId: 1,
+          role: 'content_lead',
+          mustChangePassword: false,
+        }))}
+      >
+        <LoginForm />
+      </AuthProvider>,
+    );
+
+    await user.type(screen.getByLabelText(/email or phone/i), 'lead@example.test');
+    await user.type(screen.getByLabelText(/password/i), 'hunter22');
+    await user.click(screen.getByRole('button', { name: /log in/i }));
+
+    await waitFor(() => expect(replace).toHaveBeenCalledWith('/content-lead'));
   });
 
   it('shows an error and does not redirect on invalid credentials', async () => {

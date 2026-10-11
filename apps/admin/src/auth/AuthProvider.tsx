@@ -10,7 +10,12 @@ import {
   type ReactNode,
 } from 'react';
 import type { PanelRole } from '@jamb/shared';
-import { createApiClient, type ApiClient, type LoginOutcome } from '../lib/api-client';
+import {
+  createApiClient,
+  type ApiClient,
+  type ChangePasswordOutcome,
+  type LoginOutcome,
+} from '../lib/api-client';
 import { createOfflineStore, type OfflineStore } from '../lib/offline-store';
 
 /** One database for the life of the app — every reviewer session on this
@@ -27,6 +32,12 @@ export interface AuthSession {
   token: string;
   reviewerId: number;
   role: PanelRole;
+  /**
+   * True while the account still holds a temporary password a content
+   * lead issued. `PasswordChangeGate` keeps every screen except
+   * `/account/password` unreachable until it clears.
+   */
+  mustChangePassword: boolean;
 }
 
 interface AuthContextValue {
@@ -39,6 +50,8 @@ interface AuthContextValue {
    */
   offlineStore: OfflineStore | null;
   login(emailOrPhone: string, password: string): Promise<LoginOutcome>;
+  /** Clears `session.mustChangePassword` on success; logs out on a 401. */
+  changePassword(currentPassword: string, newPassword: string): Promise<ChangePasswordOutcome>;
   logout(): void;
 }
 
@@ -84,7 +97,12 @@ export function AuthProvider({
     async (emailOrPhone: string, password: string): Promise<LoginOutcome> => {
       const outcome = await client.login(emailOrPhone, password);
       if (outcome.ok) {
-        setSession({ token: outcome.token, reviewerId: outcome.reviewerId, role: outcome.role });
+        setSession({
+          token: outcome.token,
+          reviewerId: outcome.reviewerId,
+          role: outcome.role,
+          mustChangePassword: outcome.mustChangePassword,
+        });
       }
       return outcome;
     },
@@ -93,9 +111,25 @@ export function AuthProvider({
 
   const logout = useCallback(() => setSession(null), []);
 
+  const changePassword = useCallback(
+    async (currentPassword: string, newPassword: string): Promise<ChangePasswordOutcome> => {
+      if (!session) {
+        return { ok: false, reason: 'unauthorized' };
+      }
+      const outcome = await client.changePassword(session.token, currentPassword, newPassword);
+      if (outcome.ok) {
+        setSession((current) => (current ? { ...current, mustChangePassword: false } : current));
+      } else if (outcome.reason === 'unauthorized') {
+        setSession(null);
+      }
+      return outcome;
+    },
+    [client, session],
+  );
+
   const value = useMemo<AuthContextValue>(
-    () => ({ session, apiClient: client, offlineStore: store, login, logout }),
-    [session, client, store, login, logout],
+    () => ({ session, apiClient: client, offlineStore: store, login, changePassword, logout }),
+    [session, client, store, login, changePassword, logout],
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

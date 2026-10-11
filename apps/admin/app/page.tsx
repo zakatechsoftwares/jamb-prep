@@ -45,6 +45,7 @@ export default function ReviewPage() {
         pendingDecisionCount={flow.pendingDecisionCount}
         nextClaimExpiry={flow.nextClaimExpiry}
         lateArrivalCount={flow.lateArrivalCount}
+        onChangePassword={() => router.push('/account/password')}
       />
 
       {state.status === 'loading' && (

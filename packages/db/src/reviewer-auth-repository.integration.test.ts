@@ -87,6 +87,9 @@ describe.runIf(hasDatabase)('reviewer auth', () => {
         reviewerId: fixture.reviewerId,
         userId: fixture.userId,
         role: 'moderator',
+        // setReviewerPassword is the out-of-band path, not a temporary
+        // password a content lead issued — no forced change.
+        mustChangePassword: false,
       });
     } finally {
       client.release();

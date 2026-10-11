@@ -1,12 +1,13 @@
 import { afterAll, describe, expect, it } from 'vitest';
 import type { AuthService } from '@jamb/shared';
-import { parseSessionToken } from '@jamb/db/session-tokens';
+import { parseSessionToken, signSessionToken } from '@jamb/db/session-tokens';
 import { createApp } from '../app';
 
 process.env.REVIEWER_SESSION_SECRET ??= 'test-secret-do-not-use-in-prod';
 
 interface Recorded {
   loginCalls: { emailOrPhone: string; password: string }[];
+  changePasswordCalls: { reviewerId: number; currentPassword: string; newPassword: string }[];
 }
 
 function startApp(service: Partial<AuthService>): {
@@ -14,7 +15,7 @@ function startApp(service: Partial<AuthService>): {
   close: () => void;
   recorded: Recorded;
 } {
-  const recorded: Recorded = { loginCalls: [] };
+  const recorded: Recorded = { loginCalls: [], changePasswordCalls: [] };
 
   const app = createApp({
     auth: {
@@ -23,6 +24,13 @@ function startApp(service: Partial<AuthService>): {
         return (
           service.login?.(emailOrPhone, password) ??
           Promise.resolve({ ok: false, reason: 'invalid_credentials' })
+        );
+      },
+      changePassword: (reviewerId, currentPassword, newPassword) => {
+        recorded.changePasswordCalls.push({ reviewerId, currentPassword, newPassword });
+        return (
+          service.changePassword?.(reviewerId, currentPassword, newPassword) ??
+          Promise.resolve({ ok: true })
         );
       },
     },
@@ -61,7 +69,7 @@ describe('POST /review/login', () => {
     const { url, recorded } = run({
       login: async (emailOrPhone, password) =>
         emailOrPhone === 'reviewer@example.test' && password === 'correct horse'
-          ? { ok: true, reviewerId: 7, userId: 70, role: 'moderator' }
+          ? { ok: true, reviewerId: 7, userId: 70, role: 'moderator', mustChangePassword: true }
           : { ok: false, reason: 'invalid_credentials' },
     });
 
@@ -70,11 +78,17 @@ describe('POST /review/login', () => {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ emailOrPhone: 'reviewer@example.test', password: 'correct horse' }),
     });
-    const body = await readJson<{ token: string; reviewerId: number; role: string }>(response);
+    const body = await readJson<{
+      token: string;
+      reviewerId: number;
+      role: string;
+      mustChangePassword: boolean;
+    }>(response);
 
     expect(response.status).toBe(200);
     expect(body.reviewerId).toBe(7);
     expect(body.role).toBe('moderator');
+    expect(body.mustChangePassword).toBe(true);
     expect(typeof body.token).toBe('string');
 
     const payload = parseSessionToken(body.token, process.env.REVIEWER_SESSION_SECRET!, new Date());
@@ -198,5 +212,77 @@ describe('createApp without an auth service', () => {
     } finally {
       server.close();
     }
+  });
+});
+
+describe('POST /review/change-password', () => {
+  function authHeader(reviewerId: number) {
+    const token = signSessionToken(
+      { reviewerId, role: 'reviewer' },
+      process.env.REVIEWER_SESSION_SECRET!,
+      new Date(),
+      60,
+    );
+    return { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' };
+  }
+
+  it('changes the password for the session reviewer, never one named in the body', async () => {
+    const { url, recorded } = run({});
+
+    const response = await fetch(`${url}/review/change-password`, {
+      method: 'POST',
+      headers: authHeader(7),
+      body: JSON.stringify({
+        reviewerId: 99,
+        currentPassword: 'TempPass2345',
+        newPassword: 'my-own-secret',
+      }),
+    });
+
+    expect(response.status).toBe(204);
+    expect(recorded.changePasswordCalls).toEqual([
+      { reviewerId: 7, currentPassword: 'TempPass2345', newPassword: 'my-own-secret' },
+    ]);
+  });
+
+  it('returns 401 with no session, without calling the service', async () => {
+    const { url, recorded } = run({});
+
+    const response = await fetch(`${url}/review/change-password`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ currentPassword: 'TempPass2345', newPassword: 'my-own-secret' }),
+    });
+
+    expect(response.status).toBe(401);
+    expect(recorded.changePasswordCalls).toEqual([]);
+  });
+
+  it('returns 400 for a too-short new password, without calling the service', async () => {
+    const { url, recorded } = run({});
+
+    const response = await fetch(`${url}/review/change-password`, {
+      method: 'POST',
+      headers: authHeader(7),
+      body: JSON.stringify({ currentPassword: 'TempPass2345', newPassword: 'short' }),
+    });
+
+    expect(response.status).toBe(400);
+    expect(recorded.changePasswordCalls).toEqual([]);
+  });
+
+  it('returns 400, not 401, for a wrong current password — the session is still valid', async () => {
+    const { url } = run({
+      changePassword: async () => ({ ok: false, reason: 'wrong_current_password' }),
+    });
+
+    const response = await fetch(`${url}/review/change-password`, {
+      method: 'POST',
+      headers: authHeader(7),
+      body: JSON.stringify({ currentPassword: 'not-it', newPassword: 'my-own-secret' }),
+    });
+
+    expect(response.status).toBe(400);
+    expect(await response.json()).toEqual({ error: 'wrong_current_password' });
   });
 });

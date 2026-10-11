@@ -2465,3 +2465,88 @@ and the suite's own config has no timeout override, so this is
 machine-load-driven flakiness on this run, not a regression from this
 pass. `@jamb/admin`'s own suite — the package actually changed — is
 the real gate here and passes clean: 195/195.
+
+## Reviewer account management: content-lead provisioning (2026-10-11)
+
+The deployment entry's own **Next** line named the gap: every reviewer
+beyond the first was still a manual, direct-database action — no signup,
+no password reset, no way for a contracted reviewer to get an account
+without someone writing `users`/`reviewers`/`reviewer_subjects` rows by
+hand and calling `setReviewerPassword`. This is plan 7.8's onboarding
+split in two, by agreement: **Step 1 (this entry)** is content-lead
+provisioning; **Step 2** — the public application form, the 30-item
+calibration set, auto-scoring, and the first-50 shadow audit — needs a
+decision on where calibration items come from and what the accuracy
+threshold is, and is not started.
+
+Two decisions confirmed with the user before building: the first login
+**forces** a password change (hence migration `0023`), and a phone or
+email already in use by any user is **rejected** rather than attached
+to. Two more from reviewing the tests first: email is **required** for
+a new account, and the minimum password length is **8**.
+
+What was built:
+
+- `packages/shared/src/reviewer-account-policy.ts` (tests written and
+  approved first): boundary validators for create / change-password /
+  status, `ASSIGNABLE_REVIEWER_ROLES` (no `content_lead`),
+  `MANAGEABLE_REVIEWER_STATUSES` (`active`/`suspended` only),
+  `isManageableAccount`, and the `ReviewerAccountService` contract.
+  `AuthService` gained `changePassword`, and `AuthenticateOutcome`
+  gained `mustChangePassword`.
+- `packages/db`: migration `0023` (`reviewers.must_change_password`,
+  default `false` so no existing account is retroactively forced),
+  `temporary-password.ts`, `reviewer-account-repository.ts`, and
+  `changeOwnPassword` in `reviewer-auth-repository.ts` (requires the
+  current password even though the caller is authenticated, and goes
+  through `loadReviewer` so a suspended reviewer's unexpired token
+  can't change it).
+- `apps/api`: `GET/POST /content-lead/reviewers`,
+  `POST /content-lead/reviewers/:id/reset-password`,
+  `POST /content-lead/reviewers/:id/status`, `GET /content-lead/subjects`
+  (all `requireContentLead`), `POST /review/change-password`, and
+  `mustChangePassword` on the login response.
+- `apps/admin`: `/content-lead/reviewers` (create form, one-time
+  password notice with copy button, account list with reset /
+  suspend / reactivate), `/account/password`, `PasswordChangeGate` in
+  the root layout, `homeRouteFor`, and navigation buttons on the
+  content-lead dashboard and the review header.
+
+**The "unexplained" `content_lead` landing from the visual redesign
+entry is explained:** `app/login/page.tsx`'s own already-signed-in
+effect redirected a content lead to `/content-lead`, racing
+`LoginForm`'s unconditional `replace('/')`. Both now go through
+`homeRouteFor`.
+
+**Found, not fixed — out of scope, worth its own small change:**
+`apps/admin/next.config.mjs` proxies `/api/review`, `/api/content-lead`
+and `/api/briefs`, but `api-client.ts` also calls
+`/api/illustration-tickets/...` (four call sites), which has no
+rewrite. Through the deployed admin app the illustration-ticket board
+should 404 — not verified against the live deployment.
+
+**Not yet deployed.** Migration `0023` must be applied to the Supabase
+database before the new `apps/api` code is deployed — the new login
+query selects `must_change_password`, so the new code against the old
+schema would break every login, not just the new screens.
+
+**A test-load regression caught and fixed before it shipped.** The new
+admin form tests first typed every field keystroke by keystroke. Each
+passed alone, but under the full suite's default parallelism they pushed
+enough jsdom load onto this machine that 15 tests crossed the 5000ms
+timeout — including four pre-existing `LoginForm` tests nothing here
+changed. Switching the new tests to click-then-`user.paste` (one input
+event per field rather than one per character) brought `apps/admin`
+back to 239/239 at default parallelism, with no config change.
+
+Final gate: `pnpm typecheck` and `pnpm lint` clean across the monorepo;
+`next build` of `apps/admin` succeeds with both new routes in the route
+table. `pnpm test` against a local `jamb_prep_test`: `packages/shared`
+562/562, `apps/admin` 239/239, `apps/mobile` 29/29, `apps/api`
+162/162, `tools/item-gen` 49/49, `packages/db` 277/277 on its own run —
+the one full-suite run had a single `packages/db` failure,
+`review-queue.integration.test.ts`'s "serves the oldest item first
+within a band", at 6.7s against the 5000ms timeout, which passed 34/34
+when that file was rerun and in the package's own full run. That is the
+same intermittent `packages/db` timeout the visual-redesign entry
+recorded, in a file this work does not touch.

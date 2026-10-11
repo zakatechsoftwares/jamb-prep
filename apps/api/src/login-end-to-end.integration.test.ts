@@ -18,6 +18,8 @@ describe.runIf(hasDatabase)('login end-to-end', () => {
     const app = createApp({
       auth: {
         login: (emailOrPhone, password) => db.authenticateReviewer(emailOrPhone, password),
+        changePassword: (reviewerId, currentPassword, newPassword) =>
+          db.changeOwnPassword(reviewerId, currentPassword, newPassword),
       },
       reviewQueue: {
         getNextItem: (reviewerId) => db.getNextItem(reviewerId),

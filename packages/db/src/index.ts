@@ -26,7 +26,20 @@ export {
   revealItem,
   submitBlindAnswer,
 } from './review-decision-repository';
-export { authenticateReviewer, setReviewerPassword } from './reviewer-auth-repository';
+export {
+  authenticateReviewer,
+  changeOwnPassword,
+  setReviewerPassword,
+} from './reviewer-auth-repository';
+// Content-lead management of panel accounts (plan 7.8) — the replacement
+// for provisioning reviewers by hand in the database.
+export {
+  createReviewerAccount,
+  listReviewerAccounts,
+  listSubjects,
+  resetReviewerPassword,
+  setReviewerStatus,
+} from './reviewer-account-repository';
 // The content-lead dashboard and its two write actions (plan 7.11), composed
 // from content-dashboard-repository / inter-rater-agreement-repository /
 // payment-run-repository / moderator-audit-repository. Only the composed,

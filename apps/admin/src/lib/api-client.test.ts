@@ -49,7 +49,13 @@ describe('login', () => {
 
     const result = await client.login('reviewer@example.test', 'hunter2');
 
-    expect(result).toEqual({ ok: true, token: 'tok123', reviewerId: 7, role: 'reviewer' });
+    expect(result).toEqual({
+      ok: true,
+      token: 'tok123',
+      reviewerId: 7,
+      role: 'reviewer',
+      mustChangePassword: false,
+    });
     expect(calls).toEqual([
       {
         url: '/api/review/login',
@@ -487,6 +493,190 @@ describe('getContentDashboard', () => {
     expect(await client.getContentDashboard('tok123', new Date())).toEqual({
       ok: false,
       reason: 'forbidden',
+    });
+  });
+});
+
+describe('login mustChangePassword', () => {
+  it('passes the server flag through when a temporary password is still held', async () => {
+    const { fetchImpl } = fakeFetch([
+      {
+        status: 200,
+        body: { token: 'tok123', reviewerId: 7, role: 'reviewer', mustChangePassword: true },
+      },
+    ]);
+    const result = await createApiClient(fetchImpl).login('reviewer@example.test', 'TempPass2345');
+    expect(result).toMatchObject({ ok: true, mustChangePassword: true });
+  });
+});
+
+describe('changePassword', () => {
+  it('posts both passwords with the bearer token and reports ok on 204', async () => {
+    const { fetchImpl, calls } = fakeFetch([{ status: 204 }]);
+    const result = await createApiClient(fetchImpl).changePassword(
+      'tok',
+      'TempPass2345',
+      'my-secret',
+    );
+
+    expect(result).toEqual({ ok: true });
+    expect(calls).toEqual([
+      {
+        url: '/api/review/change-password',
+        method: 'POST',
+        headers: { 'content-type': 'application/json', authorization: 'Bearer tok' },
+        body: { currentPassword: 'TempPass2345', newPassword: 'my-secret' },
+      },
+    ]);
+  });
+
+  it('distinguishes a wrong current password from other 400s', async () => {
+    const wrong = fakeFetch([{ status: 400, body: { error: 'wrong_current_password' } }]);
+    expect(await createApiClient(wrong.fetchImpl).changePassword('tok', 'x', 'my-secret')).toEqual({
+      ok: false,
+      reason: 'wrong_current_password',
+    });
+
+    const invalid = fakeFetch([
+      { status: 400, body: { error: 'newPassword must be at least 8 characters' } },
+    ]);
+    expect(await createApiClient(invalid.fetchImpl).changePassword('tok', 'x', 'y')).toEqual({
+      ok: false,
+      reason: 'invalid_input',
+      message: 'newPassword must be at least 8 characters',
+    });
+  });
+
+  it('reports unauthorized on 401', async () => {
+    const { fetchImpl } = fakeFetch([{ status: 401, body: { error: 'authentication required' } }]);
+    expect(await createApiClient(fetchImpl).changePassword('tok', 'x', 'my-secret')).toEqual({
+      ok: false,
+      reason: 'unauthorized',
+    });
+  });
+});
+
+describe('reviewer account management', () => {
+  const account = {
+    reviewerId: 4,
+    fullName: 'Adaeze Okafor',
+    phone: '+2348031234567',
+    email: 'adaeze@example.test',
+    role: 'reviewer',
+    status: 'active',
+    subjects: [{ id: 2, name: 'Physics' }],
+    mustChangePassword: true,
+    createdAt: '2026-10-11T09:00:00.000Z',
+  };
+
+  it('lists accounts and subjects from the content-lead routes', async () => {
+    const accounts = fakeFetch([{ status: 200, body: { accounts: [account] } }]);
+    expect(await createApiClient(accounts.fetchImpl).listReviewerAccounts('tok')).toEqual({
+      ok: true,
+      accounts: [account],
+    });
+    expect(accounts.calls[0]?.url).toBe('/api/content-lead/reviewers');
+
+    const subjects = fakeFetch([{ status: 200, body: { subjects: [{ id: 2, name: 'Physics' }] } }]);
+    expect(await createApiClient(subjects.fetchImpl).listSubjects('tok')).toEqual({
+      ok: true,
+      subjects: [{ id: 2, name: 'Physics' }],
+    });
+    expect(subjects.calls[0]?.url).toBe('/api/content-lead/subjects');
+  });
+
+  it('reports forbidden on 403 from the list routes', async () => {
+    const { fetchImpl } = fakeFetch([{ status: 403, body: { error: 'content_lead role required' } }]);
+    expect(await createApiClient(fetchImpl).listReviewerAccounts('tok')).toEqual({
+      ok: false,
+      reason: 'forbidden',
+    });
+  });
+
+  it('creates an account, returning the temporary password', async () => {
+    const input = {
+      fullName: 'Adaeze Okafor',
+      phone: '+2348031234567',
+      email: 'adaeze@example.test',
+      role: 'reviewer' as const,
+      subjectIds: [2],
+    };
+    const { fetchImpl, calls } = fakeFetch([
+      { status: 201, body: { reviewerId: 4, temporaryPassword: 'TempPass2345' } },
+    ]);
+
+    expect(await createApiClient(fetchImpl).createReviewerAccount('tok', input)).toEqual({
+      ok: true,
+      reviewerId: 4,
+      temporaryPassword: 'TempPass2345',
+    });
+    expect(calls[0]).toMatchObject({
+      url: '/api/content-lead/reviewers',
+      method: 'POST',
+      body: input,
+    });
+  });
+
+  it('maps the named create failures to their own reasons', async () => {
+    const input = {
+      fullName: 'A',
+      phone: '+2348031234567',
+      email: 'a@example.test',
+      role: 'contributor' as const,
+      subjectIds: [],
+    };
+    for (const [status, error] of [
+      [409, 'phone_taken'],
+      [409, 'email_taken'],
+      [400, 'unknown_subject'],
+    ] as const) {
+      const { fetchImpl } = fakeFetch([{ status, body: { error } }]);
+      expect(await createApiClient(fetchImpl).createReviewerAccount('tok', input)).toEqual({
+        ok: false,
+        reason: error,
+      });
+    }
+  });
+
+  it('resets a password, telling not_manageable apart from forbidden by the error body', async () => {
+    const ok = fakeFetch([{ status: 200, body: { temporaryPassword: 'FreshPass678' } }]);
+    expect(await createApiClient(ok.fetchImpl).resetReviewerPassword('tok', 5)).toEqual({
+      ok: true,
+      temporaryPassword: 'FreshPass678',
+    });
+    expect(ok.calls[0]).toMatchObject({
+      url: '/api/content-lead/reviewers/5/reset-password',
+      method: 'POST',
+    });
+
+    const notManageable = fakeFetch([{ status: 403, body: { error: 'not_manageable' } }]);
+    expect(await createApiClient(notManageable.fetchImpl).resetReviewerPassword('tok', 5)).toEqual({
+      ok: false,
+      reason: 'not_manageable',
+    });
+
+    const forbidden = fakeFetch([{ status: 403, body: { error: 'content_lead role required' } }]);
+    expect(await createApiClient(forbidden.fetchImpl).resetReviewerPassword('tok', 5)).toEqual({
+      ok: false,
+      reason: 'forbidden',
+    });
+
+    const missing = fakeFetch([{ status: 404, body: { error: 'not_found' } }]);
+    expect(await createApiClient(missing.fetchImpl).resetReviewerPassword('tok', 5)).toEqual({
+      ok: false,
+      reason: 'not_found',
+    });
+  });
+
+  it('sets a status, reporting ok on 204', async () => {
+    const { fetchImpl, calls } = fakeFetch([{ status: 204 }]);
+    expect(await createApiClient(fetchImpl).setReviewerStatus('tok', 5, 'suspended')).toEqual({
+      ok: true,
+    });
+    expect(calls[0]).toMatchObject({
+      url: '/api/content-lead/reviewers/5/status',
+      method: 'POST',
+      body: { status: 'suspended' },
     });
   });
 });

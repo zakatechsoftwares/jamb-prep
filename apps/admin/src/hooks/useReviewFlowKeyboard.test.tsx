@@ -7,7 +7,7 @@ import { AuthProvider } from '../auth/AuthProvider';
 import { useReviewFlow } from './useReviewFlow';
 import { useReviewFlowKeyboard } from './useReviewFlowKeyboard';
 
-const SESSION = { token: 'tok123', reviewerId: 7, role: 'reviewer' as const };
+const SESSION = { token: 'tok123', reviewerId: 7, role: 'reviewer' as const, mustChangePassword: false };
 
 const ITEM: ReviewQueueItem = {
   itemId: 42,
