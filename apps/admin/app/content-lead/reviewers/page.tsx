@@ -11,6 +11,7 @@ import { useAuth } from '../../../src/auth/AuthProvider';
 import { CreateReviewerForm } from '../../../src/components/CreateReviewerForm';
 import { ErrorState } from '../../../src/components/ErrorState';
 import { ReviewerList } from '../../../src/components/ReviewerList';
+import { SignOutButton } from '../../../src/components/SignOutButton';
 import { TemporaryPasswordNotice } from '../../../src/components/TemporaryPasswordNotice';
 import { useReviewerAccounts } from '../../../src/hooks/useReviewerAccounts';
 
@@ -93,13 +94,16 @@ export default function ContentLeadReviewersPage() {
     <div className="flex h-dvh flex-col overflow-y-auto bg-surface-sunken">
       <div className="flex items-center justify-between gap-2 p-6 pb-0">
         <h1 className="text-xl font-semibold text-gray-900">Review panel</h1>
-        <button
-          type="button"
-          onClick={() => router.push('/content-lead')}
-          className="h-touch rounded-lg border-2 border-gray-200 bg-surface px-4 text-sm font-semibold text-gray-900"
-        >
-          Dashboard
-        </button>
+        <div className="flex flex-wrap gap-2">
+          <button
+            type="button"
+            onClick={() => router.push('/content-lead')}
+            className="h-touch rounded-lg border-2 border-gray-200 bg-surface px-4 text-sm font-semibold text-gray-900"
+          >
+            Dashboard
+          </button>
+          <SignOutButton />
+        </div>
       </div>
 
       {state.status === 'loading' && (

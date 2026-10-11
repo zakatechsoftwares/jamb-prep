@@ -9,6 +9,7 @@ import { ErrorState } from '../src/components/ErrorState';
 import { InlineEditForm } from '../src/components/InlineEditForm';
 import { RejectionReasonPicker } from '../src/components/RejectionReasonPicker';
 import { ReviewHeader } from '../src/components/ReviewHeader';
+import { SignOutButton } from '../src/components/SignOutButton';
 import { SolveStep } from '../src/components/SolveStep';
 import { useReviewFlow } from '../src/hooks/useReviewFlow';
 import { useReviewFlowKeyboard } from '../src/hooks/useReviewFlowKeyboard';
@@ -46,7 +47,9 @@ export default function ReviewPage() {
         nextClaimExpiry={flow.nextClaimExpiry}
         lateArrivalCount={flow.lateArrivalCount}
         onChangePassword={() => router.push('/account/password')}
-      />
+      >
+        <SignOutButton />
+      </ReviewHeader>
 
       {state.status === 'loading' && (
         <div className="flex flex-1 items-center justify-center text-sm text-muted">

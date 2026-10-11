@@ -214,6 +214,26 @@ describe('pending solves', () => {
   });
 });
 
+describe('clear', () => {
+  it('empties cached items and both upload queues in one go', async () => {
+    const store = await openStore();
+    await store.cacheItems([{ item: makeItem(1), reveal: null, cachedAt: new Date() }]);
+    await store.queueSolve({ itemId: 1, answer: 'C', queuedAt: new Date() });
+    await store.queueDecision({
+      idempotencyKey: 'key-1',
+      itemId: 2,
+      input: { action: 'approve' },
+      queuedAt: new Date(),
+    });
+
+    await store.clear();
+
+    expect(await store.countCachedItems()).toBe(0);
+    expect(await store.countPendingSolves()).toBe(0);
+    expect(await store.countPendingDecisions()).toBe(0);
+  });
+});
+
 describe('persistence across handles on the same database', () => {
   it('a second store opened against the same name sees what the first wrote', async () => {
     const name = freshDbName();

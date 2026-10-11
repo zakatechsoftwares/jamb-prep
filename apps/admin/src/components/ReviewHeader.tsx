@@ -21,8 +21,11 @@ export interface ReviewHeaderProps {
   lateArrivalCount?: number;
   /** Shown as a small button when provided; the page owns the navigation. */
   onChangePassword?: () => void;
+  /** Rendered at the end of the header — the page passes its sign-out control. */
+  children?: ReactNode;
 }
 
+import type { ReactNode } from 'react';
 import { WifiOffIcon } from './icons';
 
 export function ReviewHeader({
@@ -33,6 +36,7 @@ export function ReviewHeader({
   nextClaimExpiry = null,
   lateArrivalCount = 0,
   onChangePassword,
+  children,
 }: ReviewHeaderProps) {
   return (
     <header className="flex shrink-0 flex-wrap items-center justify-between gap-2 border-b border-gray-200 bg-surface px-3 py-2 text-xs shadow-sm">
@@ -68,6 +72,7 @@ export function ReviewHeader({
           Change password
         </button>
       )}
+      {children}
     </header>
   );
 }

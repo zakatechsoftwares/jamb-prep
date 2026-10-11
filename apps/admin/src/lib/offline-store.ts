@@ -56,6 +56,16 @@ export interface OfflineStore {
   removePendingSolve(itemId: number): Promise<void>;
   countPendingSolves(): Promise<number>;
 
+  /**
+   * Empties every store: cached items and both upload queues. Called on an
+   * explicit sign-out, so the next person to sign in on this device is not
+   * served the previous reviewer's claimed items, and their queued work is
+   * never uploaded under someone else's session (it would be refused as
+   * not_claimed_by_you and dropped anyway). Not called on a 401 — that is
+   * the same reviewer's expired session, and their queue must survive it.
+   */
+  clear(): Promise<void>;
+
   close(): void;
 }
 
@@ -188,6 +198,15 @@ export async function createOfflineStore(dbName: string): Promise<OfflineStore> 
 
     async countPendingSolves() {
       return count(PENDING_SOLVES_STORE);
+    },
+
+    async clear() {
+      const storeNames = [CACHED_ITEMS_STORE, PENDING_DECISIONS_STORE, PENDING_SOLVES_STORE];
+      const tx = db.transaction(storeNames, 'readwrite');
+      for (const storeName of storeNames) {
+        tx.objectStore(storeName).clear();
+      }
+      await txDone(tx);
     },
 
     close() {
