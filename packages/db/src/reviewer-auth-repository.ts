@@ -105,8 +105,9 @@ export async function setReviewerPassword(reviewerId: number, password: string):
  * to lock the real reviewer out of their account.
  *
  * Goes through `loadReviewer`, so a suspended or removed reviewer whose
- * token has not yet expired gets `ReviewerNotActiveError` (a 403 via
- * `app.ts`) rather than a password change.
+ * token has not yet expired gets `ReviewerNotActiveError` (a 401 via
+ * `app.ts`, which also signs the admin client out) rather than a
+ * password change.
  */
 export async function changeOwnPassword(
   reviewerId: number,
