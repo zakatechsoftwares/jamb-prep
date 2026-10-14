@@ -8,11 +8,7 @@ import { SignOutButton } from '../../src/components/SignOutButton';
 import { useBriefBoard } from '../../src/hooks/useBriefBoard';
 
 /**
- * The open brief board (plan 7.12). Gated only on having a session at all —
- * no role check — matching how the review queue treats reviewers and
- * contributors as one pool with no role-based wall. Deliberately just a
- * list-and-claim board, nothing more: no filter, no search, matching this
- * workspace's existing anti-cherry-picking stance for the review queue.
+ * The open brief board (plan 7.12).
  */
 export default function BriefsPage() {
   const { session } = useAuth();
@@ -44,43 +40,69 @@ export default function BriefsPage() {
   }
 
   return (
-    <div className="flex h-dvh flex-col overflow-y-auto bg-surface-sunken p-6">
-      <div className="flex items-center justify-between gap-2">
-        <h1 className="text-xl font-semibold text-gray-900">Open briefs</h1>
+    <div className="flex h-dvh flex-col overflow-y-auto bg-surface-sunken p-6 sm:p-8">
+      <div className="flex items-center justify-between gap-4 border-b border-gray-200/80 pb-4">
+        <div>
+          <h1 className="text-2xl font-bold tracking-tight text-gray-900">Open briefs</h1>
+          <p className="text-xs text-muted">Claim syllabus items to author and earn reviewer bounties.</p>
+        </div>
         <SignOutButton />
       </div>
 
-      {state.status === 'loading' && <p className="text-sm text-muted">Loading…</p>}
-      {state.status === 'error' && <ErrorState message={state.message} onRetry={() => location.reload()} />}
+      {state.status === 'loading' && (
+        <div className="mt-8 flex items-center justify-center text-sm text-muted">
+          Loading open briefs…
+        </div>
+      )}
+      {state.status === 'error' && (
+        <ErrorState message={state.message} onRetry={() => location.reload()} />
+      )}
       {error && (
-        <p role="alert" className="mt-2 text-sm font-medium text-reject">
+        <div role="alert" className="mt-4 rounded-xl border border-reject/30 bg-reject-bg p-3 text-sm font-semibold text-reject">
           {error}
-        </p>
+        </div>
       )}
 
       {state.status === 'ready' && (
         <>
           {state.briefs.length === 0 ? (
-            <p className="mt-4 text-sm text-muted">No open briefs right now.</p>
+            <div className="mt-8 rounded-2xl border border-gray-200/80 bg-surface p-8 text-center shadow-xs">
+              <span className="text-3xl">📋</span>
+              <p className="mt-2 text-base font-semibold text-gray-800">No open briefs right now</p>
+              <p className="text-xs text-muted">Check back later when content leads commission new syllabus items.</p>
+            </div>
           ) : (
-            <ul className="mt-4 flex flex-col gap-2">
+            <ul className="mt-6 flex flex-col gap-3">
               {state.briefs.map((brief) => (
                 <li
                   key={brief.id}
-                  className="flex items-center justify-between rounded-xl border border-gray-200 bg-surface p-3 text-sm shadow-sm transition-shadow duration-150 hover:shadow-md"
+                  className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 rounded-2xl border border-gray-200/90 bg-surface p-4 shadow-xs transition-all duration-150 hover:shadow-md"
                 >
-                  <span>
-                    Objective #{brief.objectiveId} — {brief.itemCount} item
-                    {brief.itemCount === 1 ? '' : 's'} — ₦{(brief.feeKobo / 100).toLocaleString()} — due{' '}
-                    {new Date(brief.deadline).toLocaleDateString()}
-                  </span>
+                  <div className="flex flex-col gap-1.5">
+                    <span className="text-sm font-medium text-gray-900">
+                      Objective #{brief.objectiveId} — {brief.itemCount} item
+                      {brief.itemCount === 1 ? '' : 's'} — ₦{(brief.feeKobo / 100).toLocaleString()} — due{' '}
+                      {new Date(brief.deadline).toLocaleDateString()}
+                    </span>
+                    <div className="flex flex-wrap items-center gap-2">
+                      <span className="rounded-full bg-emerald-50 border border-emerald-200 px-2.5 py-0.5 text-xs font-bold text-emerald-700">
+                        Fee: ₦{(brief.feeKobo / 100).toLocaleString()}
+                      </span>
+                      <span className="rounded-full bg-blue-50 border border-blue-200 px-2.5 py-0.5 text-xs font-semibold text-blue-700">
+                        {brief.itemCount} item{brief.itemCount === 1 ? '' : 's'}
+                      </span>
+                      <span className="text-xs text-muted">
+                        Due: {new Date(brief.deadline).toLocaleDateString()}
+                      </span>
+                    </div>
+                  </div>
                   <button
                     type="button"
                     disabled={claiming === brief.id}
                     onClick={() => handleClaim(brief.id)}
-                    className="h-touch rounded-lg bg-selected px-4 text-sm font-semibold text-white shadow-sm transition-colors duration-150 hover:bg-blue-700 disabled:bg-gray-300 disabled:shadow-none"
+                    className="h-touch rounded-xl bg-selected px-6 text-sm font-bold text-white shadow-xs transition-all duration-150 hover:bg-blue-700 active:scale-[0.99] disabled:bg-gray-300 disabled:shadow-none"
                   >
-                    Claim
+                    {claiming === brief.id ? 'Claiming…' : 'Claim'}
                   </button>
                 </li>
               ))}

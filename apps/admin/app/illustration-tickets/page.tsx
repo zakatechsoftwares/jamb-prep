@@ -8,11 +8,7 @@ import { SignOutButton } from '../../src/components/SignOutButton';
 import { useIllustrationBoard } from '../../src/hooks/useIllustrationBoard';
 
 /**
- * The illustrator queue (plan 7.12 step 5). Gated only on having a session
- * at all — no role check — matching the brief board's own decision that
- * illustrators are not a new role. Deliberately just a list-and-claim
- * board, nothing more, same anti-cherry-picking stance as the review queue
- * and the brief board.
+ * The illustrator queue (plan 7.12 step 5).
  */
 export default function IllustrationTicketsPage() {
   const { session } = useAuth();
@@ -44,39 +40,55 @@ export default function IllustrationTicketsPage() {
   }
 
   return (
-    <div className="flex h-dvh flex-col overflow-y-auto bg-surface-sunken p-6">
-      <div className="flex items-center justify-between gap-2">
-        <h1 className="text-xl font-semibold text-gray-900">Open illustration tickets</h1>
+    <div className="flex h-dvh flex-col overflow-y-auto bg-surface-sunken p-6 sm:p-8">
+      <div className="flex items-center justify-between gap-4 border-b border-gray-200/80 pb-4">
+        <div>
+          <h1 className="text-2xl font-bold tracking-tight text-gray-900">Open illustration tickets</h1>
+          <p className="text-xs text-muted">Claim scientific figures and diagrams needing vector illustration.</p>
+        </div>
         <SignOutButton />
       </div>
 
-      {state.status === 'loading' && <p className="text-sm text-muted">Loading…</p>}
-      {state.status === 'error' && <ErrorState message={state.message} onRetry={() => location.reload()} />}
+      {state.status === 'loading' && (
+        <div className="mt-8 flex items-center justify-center text-sm text-muted">
+          Loading open illustration tickets…
+        </div>
+      )}
+      {state.status === 'error' && (
+        <ErrorState message={state.message} onRetry={() => location.reload()} />
+      )}
       {error && (
-        <p role="alert" className="mt-2 text-sm font-medium text-reject">
+        <div role="alert" className="mt-4 rounded-xl border border-reject/30 bg-reject-bg p-3 text-sm font-semibold text-reject">
           {error}
-        </p>
+        </div>
       )}
 
       {state.status === 'ready' && (
         <>
           {state.tickets.length === 0 ? (
-            <p className="mt-4 text-sm text-muted">No open illustration tickets right now.</p>
+            <div className="mt-8 rounded-2xl border border-gray-200/80 bg-surface p-8 text-center shadow-xs">
+              <span className="text-3xl">🎨</span>
+              <p className="mt-2 text-base font-semibold text-gray-800">No open illustration tickets right now</p>
+              <p className="text-xs text-muted">All diagram requests are currently claimed or complete.</p>
+            </div>
           ) : (
-            <ul className="mt-4 flex flex-col gap-2">
+            <ul className="mt-6 flex flex-col gap-3">
               {state.tickets.map((ticket) => (
                 <li
                   key={ticket.id}
-                  className="flex items-center justify-between rounded-xl border border-gray-200 bg-surface p-3 text-sm shadow-sm transition-shadow duration-150 hover:shadow-md"
+                  className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 rounded-2xl border border-gray-200/90 bg-surface p-4 shadow-xs transition-all duration-150 hover:shadow-md"
                 >
-                  <span>{ticket.figureDescription}</span>
+                  <div className="flex flex-col gap-1">
+                    <span className="text-sm font-medium text-gray-900">{ticket.figureDescription}</span>
+                    <span className="text-xs font-semibold text-muted">Ticket #{ticket.id}</span>
+                  </div>
                   <button
                     type="button"
                     disabled={claiming === ticket.id}
                     onClick={() => handleClaim(ticket.id)}
-                    className="h-touch rounded-lg bg-selected px-4 text-sm font-semibold text-white shadow-sm transition-colors duration-150 hover:bg-blue-700 disabled:bg-gray-300 disabled:shadow-none"
+                    className="h-touch rounded-xl bg-selected px-6 text-sm font-bold text-white shadow-xs transition-all duration-150 hover:bg-blue-700 active:scale-[0.99] disabled:bg-gray-300 disabled:shadow-none"
                   >
-                    Claim
+                    {claiming === ticket.id ? 'Claiming…' : 'Claim'}
                   </button>
                 </li>
               ))}
