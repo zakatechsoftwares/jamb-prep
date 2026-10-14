@@ -6,10 +6,7 @@ import { useAuth } from '../auth/AuthProvider';
 
 /**
  * Signs the reviewer out and clears this device's offline data
- * (`AuthProvider.signOut`). When reviews are still waiting to upload — the
- * reviewer worked offline and hasn't reconnected — it warns first: signing
- * out discards them, since queued work is never uploaded under the next
- * person's session. The reviewer chooses; nothing is blocked.
+ * (`AuthProvider.signOut`).
  */
 export function SignOutButton() {
   const { offlineStore, signOut } = useAuth();
@@ -41,9 +38,9 @@ export function SignOutButton() {
       <div
         role="alertdialog"
         aria-label="Unsent reviews"
-        className="flex w-full flex-col gap-2 rounded-lg border-2 border-escalate bg-escalate-bg p-3 text-sm text-gray-900"
+        className="flex w-full flex-col gap-3 rounded-2xl border-2 border-escalate/40 bg-escalate-bg p-4 text-sm text-gray-900 shadow-xs"
       >
-        <p>
+        <p className="font-medium leading-relaxed">
           You have {unsentCount} {unsentCount === 1 ? 'review' : 'reviews'} not yet uploaded.
           Reconnect and wait for {unsentCount === 1 ? 'it' : 'them'} to upload, or sign out now
           and lose {unsentCount === 1 ? 'it' : 'them'}.
@@ -52,7 +49,7 @@ export function SignOutButton() {
           <button
             type="button"
             onClick={() => setUnsentCount(null)}
-            className="h-touch flex-1 rounded-lg bg-selected px-4 font-semibold text-white"
+            className="flex h-touch flex-1 items-center justify-center rounded-xl bg-selected px-4 font-bold text-white shadow-xs transition-colors hover:bg-blue-700"
           >
             Stay signed in
           </button>
@@ -60,7 +57,7 @@ export function SignOutButton() {
             type="button"
             disabled={busy}
             onClick={() => void finishSignOut()}
-            className="h-touch flex-1 rounded-lg border-2 border-reject bg-surface px-4 font-semibold text-reject disabled:border-gray-200 disabled:text-gray-300"
+            className="flex h-touch flex-1 items-center justify-center rounded-xl border border-reject/40 bg-surface px-4 font-bold text-reject shadow-2xs transition-colors hover:bg-reject-bg disabled:border-gray-200 disabled:text-gray-300"
           >
             Sign out anyway
           </button>
@@ -74,7 +71,7 @@ export function SignOutButton() {
       type="button"
       disabled={busy}
       onClick={() => void handleClick()}
-      className="h-touch rounded-lg border-2 border-gray-200 bg-surface px-4 text-sm font-semibold text-gray-900 disabled:text-gray-300"
+      className="flex h-touch items-center justify-center rounded-xl border border-gray-200/90 bg-surface px-4 text-sm font-semibold text-gray-700 shadow-2xs transition-all duration-150 hover:border-gray-300 hover:bg-gray-50 active:scale-[0.99] disabled:text-gray-300"
     >
       Sign out
     </button>

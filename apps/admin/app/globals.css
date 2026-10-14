@@ -1,52 +1,59 @@
 @import 'tailwindcss';
 
 /*
- * Design tokens for the reviewer workspace (plan 7.9). There is no
- * pre-existing design system to draw from — see CLAUDE.md for that gap —
- * so these are hand-picked for the stated constraints: a 360px phone, an
- * evening, five minutes, one thumb.
+ * Design tokens for the reviewer workspace (plan 7.9).
+ * Polished for academic rigor, high contrast, and responsive thumb ergonomics.
  */
 @theme {
-  /* 48px: Android's own minimum recommended touch target. Every tappable
-     control in this app — option letters, action buttons, reason chips —
+  /* 48px: Minimum recommended touch target. Every tappable control
      is at least this tall. */
   --spacing-touch: 3rem;
 
-  --color-approve: var(--color-green-600);
-  --color-approve-bg: var(--color-green-50);
-  --color-reject: var(--color-red-600);
-  --color-reject-bg: var(--color-red-50);
-  --color-escalate: var(--color-amber-600);
-  --color-escalate-bg: var(--color-amber-50);
-  --color-selected: var(--color-blue-600);
-  --color-selected-bg: var(--color-blue-50);
+  --color-approve: #059669;
+  --color-approve-bg: #ecfdf5;
+  --color-reject: #e11d48;
+  --color-reject-bg: #fff1f2;
+  --color-escalate: #d97706;
+  --color-escalate-bg: #fffbeb;
+  --color-selected: #2563eb;
+  --color-selected-bg: #eff6ff;
 
-  /* Secondary/meta text -- formalizes the gray-500 already used ad hoc
-     for labels and captions throughout, rather than a new choice. */
-  --color-muted: var(--color-gray-500);
+  /* Secondary/meta text */
+  --color-muted: #64748b;
 
-  /* A card surface (white) needs something visibly different to sit on
-     top of -- --color-surface-sunken is the page background, one step
-     deeper than white, so a card's border/shadow actually reads as
-     elevation instead of disappearing into an identical background. */
-  --color-surface: var(--color-white);
-  --color-surface-sunken: var(--color-gray-100);
+  /* Page and card elevation */
+  --color-surface: #ffffff;
+  --color-surface-sunken: #f8fafc;
 
-  /* No interactive element anywhere had a visible focus state before
-     this -- a real functional gap, not just polish, for a tool driven
-     by keyboard shortcuts (A-D, 1-4, Enter, Esc). */
-  --color-focus-ring: var(--color-blue-500);
+  /* Focus ring for keyboard accessibility */
+  --color-focus-ring: #3b82f6;
 }
 
 body {
-  /* 16px minimum base size: mobile legibility, not a desktop default
-     scaled down. */
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
   font-size: 16px;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
 }
 
-/* One consistent focus-visible treatment for every interactive element,
-   rather than repeating focus: classes on every button/input/link. */
+/* Consistent focus-visible treatment for keyboard navigation */
 *:focus-visible {
   outline: 2px solid var(--color-focus-ring);
   outline-offset: 2px;
+}
+
+/* Subtle, polished scrollbars */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: #cbd5e1;
+  border-radius: 9999px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #94a3b8;
 }
