@@ -1,10 +1,24 @@
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { useRouter } from 'expo-router';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
-import type { OptionLabel } from '@jamb/shared';
+import {
+  adjacentItemId,
+  buildSubjectSections,
+  locateItem,
+  recordVisit,
+  sectionProgress,
+  subjectEntryItemId,
+  type LastVisitedBySubject,
+  type OptionLabel,
+} from '@jamb/shared';
 import { useMockSession } from '../hooks/useMockSession';
-import { DEMO_ITEMS, findDemoItem } from '../lib/demo-fixture';
+import { DEMO_ITEMS, DEMO_SUBJECTS, findDemoItem } from '../lib/demo-fixture';
 import { colors, radii, shadows } from '../theme';
+
+// The demo item set never changes during a session, so its subject tabs
+// are computed once. Every navigation rule lives in @jamb/shared's
+// mock-navigation (rule 7); this screen only renders its answers.
+const SECTIONS = buildSubjectSections(DEMO_SUBJECTS, DEMO_ITEMS);
 
 function formatRemaining(totalSeconds: number): string {
   const minutes = Math.floor(totalSeconds / 60);
@@ -24,6 +38,17 @@ export default function MockSessionScreen() {
     toggleFlag,
     navigate,
   } = useMockSession();
+  const [lastVisited, setLastVisited] = useState<LastVisitedBySubject>({});
+  const currentItemId = session?.currentItemId ?? null;
+
+  // Remember every question the candidate lands on, however they got there
+  // (tab, palette, arrows, or a resumed session), so a subject tab can
+  // return them to it.
+  useEffect(() => {
+    if (currentItemId !== null) {
+      setLastVisited((previous) => recordVisit(SECTIONS, previous, currentItemId));
+    }
+  }, [currentItemId]);
 
   // Auto-submit on expiry (or a manual submit reaching the same phase)
   // navigates to results, carrying only the session id -- the score itself
@@ -90,6 +115,10 @@ export default function MockSessionScreen() {
 
   const currentItem = findDemoItem(session.currentItemId);
   const currentProgress = session.progress[session.currentItemId];
+  const location = locateItem(SECTIONS, session.currentItemId);
+  const currentSection = SECTIONS[location.sectionIndex]!;
+  const previousItemId = adjacentItemId(SECTIONS, session.currentItemId, 'previous');
+  const nextItemId = adjacentItemId(SECTIONS, session.currentItemId, 'next');
   const isTimeCritical = remainingSeconds <= 300; // < 5 mins
   const isTimeWarning = remainingSeconds <= 900 && !isTimeCritical; // < 15 mins
 
@@ -98,7 +127,9 @@ export default function MockSessionScreen() {
       {/* Top Bar: Subject Pill & Digital Countdown Timer */}
       <View style={styles.examHeader}>
         <View style={styles.subjectChip}>
-          <Text style={styles.subjectChipText}>{currentItem.subjectName}</Text>
+          <Text style={styles.subjectChipText}>
+            Question {location.position} of {location.total}
+          </Text>
         </View>
         <View
           style={[
@@ -120,7 +151,43 @@ export default function MockSessionScreen() {
         </View>
       </View>
 
-      {/* Question Palette Scroll Row */}
+      {/* Subject Tabs */}
+      <View style={styles.subjectTabsWrapper}>
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={styles.subjectTabsContent}
+        >
+          {SECTIONS.map((section) => {
+            const isActive = section.subjectId === currentSection.subjectId;
+            const { answered, total } = sectionProgress(section, session.progress);
+            return (
+              <Pressable
+                key={section.subjectId}
+                accessibilityRole="tab"
+                accessibilityState={{ selected: isActive }}
+                onPress={() =>
+                  navigate(subjectEntryItemId(SECTIONS, section.subjectId, lastVisited))
+                }
+                style={({ pressed }) => [
+                  styles.subjectTab,
+                  isActive && styles.subjectTabActive,
+                  pressed && styles.buttonPressed,
+                ]}
+              >
+                <Text style={[styles.subjectTabText, isActive && styles.subjectTabTextActive]}>
+                  {section.name}
+                </Text>
+                <Text style={[styles.subjectTabCount, isActive && styles.subjectTabCountActive]}>
+                  {answered}/{total}
+                </Text>
+              </Pressable>
+            );
+          })}
+        </ScrollView>
+      </View>
+
+      {/* Question Palette Scroll Row: the current subject's questions only */}
       <View style={styles.paletteWrapper}>
         <ScrollView
           horizontal
@@ -128,13 +195,13 @@ export default function MockSessionScreen() {
           style={styles.palette}
           contentContainerStyle={styles.paletteContent}
         >
-          {DEMO_ITEMS.map((item) => {
-            const progress = session.progress[item.itemId];
-            const isCurrent = item.itemId === session.currentItemId;
+          {currentSection.itemIds.map((itemId, index) => {
+            const progress = session.progress[itemId];
+            const isCurrent = itemId === session.currentItemId;
             return (
               <Pressable
-                key={item.itemId}
-                onPress={() => navigate(item.itemId)}
+                key={itemId}
+                onPress={() => navigate(itemId)}
                 style={[
                   styles.paletteCell,
                   progress?.answered && styles.paletteCellAnswered,
@@ -149,7 +216,7 @@ export default function MockSessionScreen() {
                     isCurrent && styles.paletteCellTextCurrent,
                   ]}
                 >
-                  {item.itemId}
+                  {index + 1}
                 </Text>
                 {progress?.flagged && <View style={styles.flagDot} />}
               </Pressable>
@@ -162,7 +229,9 @@ export default function MockSessionScreen() {
       <ScrollView style={styles.questionScroll} contentContainerStyle={styles.questionContent}>
         <View style={styles.stemCard}>
           <View style={styles.stemHeaderRow}>
-            <Text style={styles.questionNumberLabel}>Item #{currentItem.itemId}</Text>
+            <Text style={styles.questionNumberLabel}>
+              {currentSection.name} · Question {location.position}
+            </Text>
             {currentProgress?.flagged && (
               <View style={styles.flaggedChip}>
                 <Text style={styles.flaggedChipText}>⚑ Flagged</Text>
@@ -219,6 +288,45 @@ export default function MockSessionScreen() {
           </Pressable>
         </View>
       </ScrollView>
+
+      {/* Previous / Next: run through the whole exam, across subjects */}
+      <View style={styles.navBar}>
+        <Pressable
+          accessibilityLabel="Previous question"
+          disabled={previousItemId === null}
+          onPress={() => previousItemId !== null && navigate(previousItemId)}
+          style={({ pressed }) => [
+            styles.navButton,
+            previousItemId === null && styles.navButtonDisabled,
+            pressed && styles.buttonPressed,
+          ]}
+        >
+          <Text style={[styles.navButtonText, previousItemId === null && styles.navButtonTextDisabled]}>
+            ◀ Previous
+          </Text>
+        </Pressable>
+        <Pressable
+          accessibilityLabel="Next question"
+          disabled={nextItemId === null}
+          onPress={() => nextItemId !== null && navigate(nextItemId)}
+          style={({ pressed }) => [
+            styles.navButton,
+            styles.navButtonNext,
+            nextItemId === null && styles.navButtonDisabled,
+            pressed && styles.buttonPressed,
+          ]}
+        >
+          <Text
+            style={[
+              styles.navButtonText,
+              styles.navButtonTextNext,
+              nextItemId === null && styles.navButtonTextDisabled,
+            ]}
+          >
+            Next ▶
+          </Text>
+        </Pressable>
+      </View>
     </View>
   );
 }
@@ -363,6 +471,85 @@ const styles = StyleSheet.create({
   },
   timerTextCritical: {
     color: colors.danger,
+  },
+  subjectTabsWrapper: {
+    backgroundColor: colors.surface,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.border,
+    paddingVertical: 8,
+  },
+  subjectTabsContent: {
+    gap: 8,
+    paddingHorizontal: 16,
+  },
+  subjectTab: {
+    minHeight: 48,
+    paddingHorizontal: 14,
+    paddingVertical: 6,
+    borderRadius: radii.md,
+    borderWidth: 1.5,
+    borderColor: colors.border,
+    backgroundColor: colors.surfaceAlt,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  subjectTabActive: {
+    borderColor: colors.primary,
+    backgroundColor: colors.primary,
+  },
+  subjectTabText: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: colors.textPrimary,
+  },
+  subjectTabTextActive: {
+    color: colors.textInverted,
+  },
+  subjectTabCount: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: colors.textMuted,
+  },
+  subjectTabCountActive: {
+    color: colors.primaryLight,
+  },
+  navBar: {
+    flexDirection: 'row',
+    gap: 12,
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    backgroundColor: colors.surface,
+    borderTopWidth: 1,
+    borderTopColor: colors.border,
+  },
+  navButton: {
+    flex: 1,
+    minHeight: 48,
+    borderRadius: radii.md,
+    borderWidth: 1.5,
+    borderColor: colors.borderDark,
+    backgroundColor: colors.surface,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  navButtonNext: {
+    borderColor: colors.primary,
+    backgroundColor: colors.primary,
+  },
+  navButtonDisabled: {
+    borderColor: colors.border,
+    backgroundColor: colors.surfaceAlt,
+  },
+  navButtonText: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: colors.textPrimary,
+  },
+  navButtonTextNext: {
+    color: colors.textInverted,
+  },
+  navButtonTextDisabled: {
+    color: colors.textMuted,
   },
   paletteWrapper: {
     backgroundColor: colors.surface,
