@@ -36,7 +36,16 @@ export default function ContentLeadBriefsPage() {
     <div className="flex h-dvh flex-col overflow-y-auto bg-surface-sunken">
       <div className="flex items-center justify-between gap-2 p-6 pb-0">
         <h1 className="text-xl font-semibold text-gray-900">Coverage gaps</h1>
-        <SignOutButton />
+        <div className="flex flex-wrap gap-2">
+          <button
+            type="button"
+            onClick={() => router.push('/content-lead')}
+            className="h-touch rounded-lg border-2 border-gray-200 bg-surface px-4 text-sm font-semibold text-gray-900"
+          >
+            Dashboard
+          </button>
+          <SignOutButton />
+        </div>
       </div>
 
       {state.status === 'loading' && (
