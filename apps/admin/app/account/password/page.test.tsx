@@ -6,8 +6,9 @@ import { AuthProvider, type AuthSession } from '../../../src/auth/AuthProvider';
 import ChangePasswordPage from './page';
 
 const replace = vi.fn();
+const push = vi.fn();
 vi.mock('next/navigation', () => ({
-  useRouter: () => ({ replace }),
+  useRouter: () => ({ replace, push }),
 }));
 
 function fakeClient(outcome: ChangePasswordOutcome) {
@@ -33,7 +34,49 @@ async function submit(current: string, next: string) {
 }
 
 describe('ChangePasswordPage', () => {
-  beforeEach(() => replace.mockClear());
+  beforeEach(() => {
+    replace.mockClear();
+    push.mockClear();
+  });
+
+  it('offers no way back during a forced change — there is nowhere to go until it is done', () => {
+    render(
+      <AuthProvider apiClient={fakeClient({ ok: true })} initialSession={FORCED}>
+        <ChangePasswordPage />
+      </AuthProvider>,
+    );
+    expect(screen.queryByRole('button', { name: /back to/i })).toBeNull();
+  });
+
+  it('takes a reviewer making a voluntary change back to the review workspace', async () => {
+    const user = userEvent.setup({ delay: null });
+    render(
+      <AuthProvider
+        apiClient={fakeClient({ ok: true })}
+        initialSession={{ ...FORCED, mustChangePassword: false }}
+      >
+        <ChangePasswordPage />
+      </AuthProvider>,
+    );
+
+    await user.click(screen.getByRole('button', { name: /back to reviewing/i }));
+    expect(push).toHaveBeenCalledWith('/');
+  });
+
+  it('takes a content lead making a voluntary change back to the dashboard', async () => {
+    const user = userEvent.setup({ delay: null });
+    render(
+      <AuthProvider
+        apiClient={fakeClient({ ok: true })}
+        initialSession={{ ...FORCED, role: 'content_lead', mustChangePassword: false }}
+      >
+        <ChangePasswordPage />
+      </AuthProvider>,
+    );
+
+    await user.click(screen.getByRole('button', { name: /back to dashboard/i }));
+    expect(push).toHaveBeenCalledWith('/content-lead');
+  });
 
   it('redirects to /login when there is no session', () => {
     render(

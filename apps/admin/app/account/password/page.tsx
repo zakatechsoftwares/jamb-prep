@@ -29,11 +29,15 @@ export default function ChangePasswordPage() {
     return null;
   }
   const { role } = session;
+  // Where "back" goes is the same place a successful change lands. A forced
+  // change has no back: PasswordChangeGate holds the session here until it
+  // is done, so the button would only bounce straight back.
+  const home = homeRouteFor({ role, mustChangePassword: false });
 
   async function handleSubmit(currentPassword: string, newPassword: string) {
     const outcome = await changePassword(currentPassword, newPassword);
     if (outcome.ok) {
-      router.replace(homeRouteFor({ role, mustChangePassword: false }));
+      router.replace(home);
       return { ok: true as const };
     }
     switch (outcome.reason) {
@@ -54,7 +58,16 @@ export default function ChangePasswordPage() {
   return (
     <div className="flex h-dvh flex-col">
       <ChangePasswordForm forced={forced} onSubmit={handleSubmit} />
-      <div className="flex justify-center bg-surface-sunken pb-6">
+      <div className="flex flex-wrap justify-center gap-2 bg-surface-sunken pb-6">
+        {!forced && (
+          <button
+            type="button"
+            onClick={() => router.push(home)}
+            className="h-touch rounded-lg border-2 border-gray-200 bg-surface px-4 text-sm font-semibold text-gray-900"
+          >
+            {role === 'content_lead' ? 'Back to dashboard' : 'Back to reviewing'}
+          </button>
+        )}
         <SignOutButton />
       </div>
     </div>
