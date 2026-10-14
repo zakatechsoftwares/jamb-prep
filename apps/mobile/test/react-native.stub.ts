@@ -1,4 +1,4 @@
-type ChildrenProps = { children?: unknown };
+type ChildrenProps = { children?: unknown; [key: string]: unknown };
 
 export function View(_props: ChildrenProps) {
   return null;
@@ -13,6 +13,18 @@ export function Pressable(_props: ChildrenProps) {
 }
 
 export function ScrollView(_props: ChildrenProps) {
+  return null;
+}
+
+export function TextInput(_props: ChildrenProps) {
+  return null;
+}
+
+export function FlatList(_props: ChildrenProps) {
+  return null;
+}
+
+export function ActivityIndicator(_props: ChildrenProps) {
   return null;
 }
 

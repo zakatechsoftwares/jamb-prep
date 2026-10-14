@@ -2,6 +2,7 @@ import { useEffect } from 'react';
 import { Stack } from 'expo-router';
 import { downloadAvailablePacks } from '../lib/content-sync';
 import { syncPendingSessions } from '../lib/sync';
+import { colors } from '../theme';
 
 export default function RootLayout() {
   // Best-effort retry of any session that failed to sync last time, and an
@@ -12,5 +13,23 @@ export default function RootLayout() {
     void downloadAvailablePacks();
   }, []);
 
-  return <Stack screenOptions={{ headerTitle: 'JAMB UTME Prep' }} />;
+  return (
+    <Stack
+      screenOptions={{
+        headerTitle: 'JAMB UTME Prep',
+        headerStyle: {
+          backgroundColor: colors.brandNavy,
+        },
+        headerTintColor: colors.textInverted,
+        headerTitleStyle: {
+          fontWeight: '700',
+          fontSize: 18,
+        },
+        headerShadowVisible: false,
+        contentStyle: {
+          backgroundColor: colors.background,
+        },
+      }}
+    />
+  );
 }
