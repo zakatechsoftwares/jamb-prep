@@ -1,11 +1,21 @@
-import { buildAttemptUploadPayloads, generateSyncId } from '@jamb/shared';
 import {
+  buildAttemptUploadPayloads,
+  decideCandidateSignOut,
+  generateSyncId,
+  type CandidateSignOutDecision,
+} from '@jamb/shared';
+import {
+  clearLocalCandidate,
+  endOpenPracticeSessions,
+  hasOpenMockSession,
   loadLocalCandidate,
   loadLocalProgressEvents,
   loadSessionsNeedingSync,
+  loadUnsyncedSessionExamConfigIds,
   markSessionSynced,
   saveLocalCandidate,
 } from './database';
+import { DEMO_EXAM_CONFIG_ID } from './demo-fixture';
 import {
   endCandidateSession,
   recordCandidateAttempt,
@@ -76,4 +86,28 @@ export async function syncPendingSessions(): Promise<void> {
       // next call to syncPendingSessions retries it from the top.
     }
   }
+}
+
+/**
+ * The first half of signing out: closes any practice session a force-close
+ * left open, uploads everything it can, then asks
+ * `decideCandidateSignOut` whether anything uploadable is still waiting.
+ * Nothing is cleared here -- the screen confirms with the candidate first
+ * and then calls `completeSignOut`. Never throws on a failed upload: that
+ * just shows up as sessions still waiting.
+ */
+export async function trySignOut(now: Date): Promise<CandidateSignOutDecision> {
+  await endOpenPracticeSessions(now);
+  await syncPendingSessions();
+
+  return decideCandidateSignOut({
+    hasOpenMockSession: await hasOpenMockSession(),
+    unsyncedSessionExamConfigIds: await loadUnsyncedSessionExamConfigIds(),
+    unsyncableExamConfigId: DEMO_EXAM_CONFIG_ID,
+  });
+}
+
+/** Forgets the candidate on this device. Call only after `trySignOut` allowed it. */
+export async function completeSignOut(): Promise<void> {
+  await clearLocalCandidate();
 }

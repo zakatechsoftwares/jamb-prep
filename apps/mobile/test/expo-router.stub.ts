@@ -14,3 +14,8 @@ export function useRouter() {
 export function useLocalSearchParams(): Record<string, string | undefined> {
   return {};
 }
+
+/** Never fires under the stub — screens only need it to import cleanly. */
+export function useFocusEffect(_effect: () => void | (() => void)): void {
+  return undefined;
+}
