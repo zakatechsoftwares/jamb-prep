@@ -182,6 +182,49 @@ export async function loadLocalCandidate(): Promise<LocalCandidate | null> {
   };
 }
 
+/**
+ * Forgets the registered candidate on this device (sign-out). Only the
+ * identity row goes: sessions and attempts are never deleted (rule 2), and
+ * `trySignOut` only lets this run once every uploadable session has synced.
+ */
+export async function clearLocalCandidate(): Promise<void> {
+  const database = await getDb();
+  await database.runAsync(`DELETE FROM local_candidate WHERE id = 1`);
+}
+
+/** A mock session that has started and not yet ended -- sign-out waits for it. */
+export async function hasOpenMockSession(): Promise<boolean> {
+  const database = await getDb();
+  const row = await database.getFirstAsync<{ id: number }>(
+    `SELECT id FROM local_sessions WHERE ended_at IS NULL AND mode = 'mock' LIMIT 1`,
+  );
+  return row !== null;
+}
+
+/**
+ * Stamps an end time on any practice session left open -- `usePractice`
+ * ends its session when the screen unmounts, so one is only left open by a
+ * force-close mid-practice. An open session never syncs, so without this
+ * its answers would sit on the device forever. Only `ended_at` changes; no
+ * attempt row is touched (rule 2).
+ */
+export async function endOpenPracticeSessions(endedAt: Date): Promise<void> {
+  const database = await getDb();
+  await database.runAsync(
+    `UPDATE local_sessions SET ended_at = ? WHERE ended_at IS NULL AND mode = 'practice'`,
+    [endedAt.toISOString()],
+  );
+}
+
+/** The exam config id of every ended session not yet synced, for the sign-out check. */
+export async function loadUnsyncedSessionExamConfigIds(): Promise<number[]> {
+  const database = await getDb();
+  const rows = await database.getAllAsync<{ exam_config_id: number }>(
+    `SELECT exam_config_id FROM local_sessions WHERE ended_at IS NOT NULL AND sync_state != 'synced'`,
+  );
+  return rows.map((row) => row.exam_config_id);
+}
+
 export async function startLocalSession(
   startedAt: Date,
   endAt: Date,
@@ -284,7 +327,14 @@ export async function loadLocalSessionForResume(): Promise<LocalSessionResume | 
     started_at: string;
     end_at: string;
     last_observed_at: string;
-  }>(`SELECT id, started_at, end_at, last_observed_at FROM local_sessions WHERE ended_at IS NULL ORDER BY id DESC LIMIT 1`);
+  }>(
+    // Mock sessions only. A practice session left open by a force-close or
+    // reload also has ended_at IS NULL; without the mode filter the mock
+    // screen "resumed" it and replayed real practice items into the demo
+    // mock, which threw (applyMockSessionEvent: item not in this session).
+    `SELECT id, started_at, end_at, last_observed_at FROM local_sessions
+      WHERE ended_at IS NULL AND mode = 'mock' ORDER BY id DESC LIMIT 1`,
+  );
   if (!session) {
     return null;
   }

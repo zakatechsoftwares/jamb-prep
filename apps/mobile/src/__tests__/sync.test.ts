@@ -16,6 +16,10 @@ vi.mock('../lib/database', () => ({
   loadSessionsNeedingSync: vi.fn(),
   loadLocalProgressEvents: vi.fn(),
   markSessionSynced: vi.fn(),
+  clearLocalCandidate: vi.fn(),
+  endOpenPracticeSessions: vi.fn(),
+  hasOpenMockSession: vi.fn(),
+  loadUnsyncedSessionExamConfigIds: vi.fn(),
 }));
 
 vi.mock('../lib/candidate-api-client', () => ({
@@ -165,5 +169,58 @@ describe('syncPendingSessions', () => {
     await expect(syncPendingSessions()).resolves.toBeUndefined();
 
     expect(database.markSessionSynced).not.toHaveBeenCalled();
+  });
+});
+
+describe('trySignOut', () => {
+  const NOW = new Date('2026-10-15T09:00:00.000Z');
+
+  async function arrange(options: { openMock: boolean; unsyncedConfigIds: number[] }) {
+    const database = await import('../lib/database');
+    vi.mocked(database.loadLocalCandidate).mockResolvedValue(null);
+    vi.mocked(database.hasOpenMockSession).mockResolvedValue(options.openMock);
+    vi.mocked(database.loadUnsyncedSessionExamConfigIds).mockResolvedValue(options.unsyncedConfigIds);
+    return database;
+  }
+
+  it('closes open practice sessions and tries to upload before deciding', async () => {
+    const database = await arrange({ openMock: false, unsyncedConfigIds: [] });
+    const { trySignOut } = await import('../lib/sync');
+
+    expect(await trySignOut(NOW)).toEqual({ canSignOut: true });
+    expect(database.endOpenPracticeSessions).toHaveBeenCalledWith(NOW);
+    // syncPendingSessions ran (it starts by loading the candidate).
+    expect(database.loadLocalCandidate).toHaveBeenCalled();
+    // Deciding never clears anything -- that waits for the candidate to confirm.
+    expect(database.clearLocalCandidate).not.toHaveBeenCalled();
+  });
+
+  it('refuses while a mock is open', async () => {
+    await arrange({ openMock: true, unsyncedConfigIds: [] });
+    const { trySignOut } = await import('../lib/sync');
+
+    expect(await trySignOut(NOW)).toEqual({ canSignOut: false, reason: 'mock_in_progress' });
+  });
+
+  it('refuses while real sessions are still waiting, ignoring demo ones', async () => {
+    await arrange({ openMock: false, unsyncedConfigIds: [0, 5, 0] });
+    const { trySignOut } = await import('../lib/sync');
+
+    expect(await trySignOut(NOW)).toEqual({
+      canSignOut: false,
+      reason: 'unsynced_sessions',
+      unsyncedCount: 1,
+    });
+  });
+});
+
+describe('completeSignOut', () => {
+  it('forgets the candidate on this device', async () => {
+    const database = await import('../lib/database');
+    const { completeSignOut } = await import('../lib/sync');
+
+    await completeSignOut();
+
+    expect(database.clearLocalCandidate).toHaveBeenCalledTimes(1);
   });
 });

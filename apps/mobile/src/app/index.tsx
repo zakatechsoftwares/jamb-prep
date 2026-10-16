@@ -1,8 +1,9 @@
-import { useEffect, useState } from 'react';
-import { useRouter } from 'expo-router';
+import { useCallback, useState } from 'react';
+import { useFocusEffect, useRouter } from 'expo-router';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { APP_NAME } from '@jamb/shared';
 import { loadLocalCandidate } from '../lib/database';
+import { completeSignOut, trySignOut } from '../lib/sync';
 import { colors, radii, shadows } from '../theme';
 
 export default function Home() {
@@ -10,19 +11,60 @@ export default function Home() {
   const [status, setStatus] = useState<
     { kind: 'not_registered' } | { kind: 'no_course' } | { kind: 'ready'; courseName: string }
   >({ kind: 'not_registered' });
+  const [signOut, setSignOut] = useState<
+    | { kind: 'idle' }
+    | { kind: 'checking' }
+    | { kind: 'confirm' }
+    | { kind: 'blocked'; message: string }
+    | { kind: 'signing_out' }
+  >({ kind: 'idle' });
 
-  useEffect(() => {
-    void (async () => {
-      const candidate = await loadLocalCandidate();
-      if (!candidate) {
-        setStatus({ kind: 'not_registered' });
-      } else if (!candidate.courseName) {
-        setStatus({ kind: 'no_course' });
-      } else {
-        setStatus({ kind: 'ready', courseName: candidate.courseName });
-      }
-    })();
-  }, []);
+  // The sign-out rule itself lives in @jamb/shared's candidate-sign-out-policy
+  // (rule 7); this only turns its answer into what the candidate sees.
+  async function handleSignOutPress() {
+    setSignOut({ kind: 'checking' });
+    const decision = await trySignOut(new Date());
+    if (decision.canSignOut) {
+      setSignOut({ kind: 'confirm' });
+    } else if (decision.reason === 'mock_in_progress') {
+      setSignOut({
+        kind: 'blocked',
+        message:
+          'You have a mock exam in progress. Open it and finish it before signing out — if its time has run out, opening it ends it.',
+      });
+    } else {
+      const count = decision.unsyncedCount;
+      setSignOut({
+        kind: 'blocked',
+        message: `${count} ${count === 1 ? 'session has' : 'sessions have'} not uploaded yet. Connect to the internet and try again, so none of your answers are lost.`,
+      });
+    }
+  }
+
+  async function handleConfirmSignOut() {
+    setSignOut({ kind: 'signing_out' });
+    await completeSignOut();
+    setStatus({ kind: 'not_registered' });
+    setSignOut({ kind: 'idle' });
+  }
+
+  // Reloaded every time Home comes into view, not just on first mount, so
+  // returning from registration (even part-way, before choosing a course)
+  // shows the current identity and its Sign out button straight away.
+  useFocusEffect(
+    useCallback(() => {
+      void (async () => {
+        const candidate = await loadLocalCandidate();
+        if (!candidate) {
+          setStatus({ kind: 'not_registered' });
+        } else if (!candidate.courseName) {
+          setStatus({ kind: 'no_course' });
+        } else {
+          setStatus({ kind: 'ready', courseName: candidate.courseName });
+        }
+      })();
+    }, []),
+  );
 
   return (
     <ScrollView style={styles.screen} contentContainerStyle={styles.container}>
@@ -124,6 +166,53 @@ export default function Home() {
             </View>
           </View>
         )}
+
+        {status.kind !== 'not_registered' && signOut.kind === 'confirm' && (
+          <View style={styles.signOutPanel}>
+            <Text style={styles.signOutPanelText}>
+              Sign out? You can sign back in any time by registering with the same phone number.
+            </Text>
+            <View style={styles.signOutPanelButtons}>
+              <Pressable
+                onPress={() => setSignOut({ kind: 'idle' })}
+                style={({ pressed }) => [styles.signOutCancelButton, pressed && styles.buttonPressed]}
+              >
+                <Text style={styles.signOutCancelText}>Stay signed in</Text>
+              </Pressable>
+              <Pressable
+                onPress={() => void handleConfirmSignOut()}
+                style={({ pressed }) => [styles.signOutConfirmButton, pressed && styles.buttonPressed]}
+              >
+                <Text style={styles.signOutConfirmText}>Sign out</Text>
+              </Pressable>
+            </View>
+          </View>
+        )}
+
+        {status.kind !== 'not_registered' && signOut.kind === 'blocked' && (
+          <View style={[styles.signOutPanel, styles.signOutPanelBlocked]}>
+            <Text style={styles.signOutPanelText}>{signOut.message}</Text>
+            <Pressable
+              onPress={() => setSignOut({ kind: 'idle' })}
+              style={({ pressed }) => [styles.signOutCancelButton, pressed && styles.buttonPressed]}
+            >
+              <Text style={styles.signOutCancelText}>OK</Text>
+            </Pressable>
+          </View>
+        )}
+
+        {status.kind !== 'not_registered' &&
+          (signOut.kind === 'idle' || signOut.kind === 'checking' || signOut.kind === 'signing_out') && (
+            <Pressable
+              disabled={signOut.kind !== 'idle'}
+              onPress={() => void handleSignOutPress()}
+              style={({ pressed }) => [styles.signOutButton, pressed && styles.buttonPressed]}
+            >
+              <Text style={styles.signOutButtonText}>
+                {signOut.kind === 'idle' ? 'Sign out' : 'Checking your answers are uploaded…'}
+              </Text>
+            </Pressable>
+          )}
       </View>
 
       {/* Footer Assurance */}
@@ -137,6 +226,72 @@ export default function Home() {
 }
 
 const styles = StyleSheet.create({
+  signOutButton: {
+    marginTop: 12,
+    minHeight: 48,
+    borderRadius: radii.md,
+    borderWidth: 1.5,
+    borderColor: colors.borderDark,
+    backgroundColor: colors.surface,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 16,
+  },
+  signOutButtonText: {
+    fontSize: 15,
+    fontWeight: '700',
+    color: colors.textSecondary,
+  },
+  signOutPanel: {
+    marginTop: 12,
+    gap: 12,
+    padding: 14,
+    borderRadius: radii.md,
+    borderWidth: 1.5,
+    borderColor: colors.primaryBorder,
+    backgroundColor: colors.primaryLight,
+  },
+  signOutPanelBlocked: {
+    borderColor: colors.warningBorder,
+    backgroundColor: colors.warningLight,
+  },
+  signOutPanelText: {
+    fontSize: 15,
+    lineHeight: 22,
+    color: colors.textPrimary,
+  },
+  signOutPanelButtons: {
+    flexDirection: 'row',
+    gap: 10,
+  },
+  signOutCancelButton: {
+    flex: 1,
+    minHeight: 48,
+    borderRadius: radii.md,
+    borderWidth: 1.5,
+    borderColor: colors.borderDark,
+    backgroundColor: colors.surface,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  signOutCancelText: {
+    fontSize: 15,
+    fontWeight: '700',
+    color: colors.textPrimary,
+  },
+  signOutConfirmButton: {
+    flex: 1,
+    minHeight: 48,
+    borderRadius: radii.md,
+    backgroundColor: colors.danger,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  signOutConfirmText: {
+    fontSize: 15,
+    fontWeight: '700',
+    color: colors.textInverted,
+  },
   screen: {
     flex: 1,
     backgroundColor: colors.background,
