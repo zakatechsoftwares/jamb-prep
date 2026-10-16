@@ -203,8 +203,9 @@ export async function hasOpenMockSession(): Promise<boolean> {
 
 /**
  * Stamps an end time on any practice session left open -- `usePractice`
- * ends its session when the screen unmounts, so one is only left open by a
- * force-close mid-practice. An open session never syncs, so without this
+ * ends its session on Finish, on Change subject, and when the screen
+ * unmounts, so one is only left open by a force-close or reload
+ * mid-practice. An open session never syncs, so without this
  * its answers would sit on the device forever. Only `ended_at` changes; no
  * attempt row is touched (rule 2).
  */

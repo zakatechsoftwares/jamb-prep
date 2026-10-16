@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import type { OptionLabel } from '@jamb/shared';
@@ -6,13 +6,32 @@ import { usePractice } from '../hooks/usePractice';
 import { colors, radii, shadows } from '../theme';
 
 /**
- * Item-by-item Practice mode (plan 6.1) — stem, four options, submit,
- * immediate correct/incorrect plus explanation, then the next item.
+ * Practice mode (plan 6.1) — stem, four options, submit, immediate
+ * correct/incorrect plus explanation. A question palette and Previous/Next
+ * move freely (skipping allowed; answered questions are review-only), and
+ * the session ends on Finish or Change subject. Every rule here comes from
+ * @jamb/shared's practice-session-reducer via usePractice (rule 7).
  */
 export default function PracticeSessionScreen() {
   const router = useRouter();
   const { subjectId } = useLocalSearchParams<{ subjectId: string }>();
   const practice = usePractice();
+  const [confirmingFinish, setConfirmingFinish] = useState(false);
+
+  function requestFinish() {
+    if (practice.summary.unanswered > 0) {
+      setConfirmingFinish(true);
+      return;
+    }
+    practice.finish();
+  }
+
+  function changeSubject() {
+    // Every submitted answer is already recorded; ending the session here
+    // lets it sync, then the candidate picks another subject.
+    practice.finish();
+    router.replace('/practice');
+  }
 
   useEffect(() => {
     const parsed = subjectId ? Number(subjectId) : NaN;
@@ -40,9 +59,8 @@ export default function PracticeSessionScreen() {
   }
 
   if (practice.phase === 'finished') {
-    const percentage = Math.round(
-      practice.totalItems > 0 ? (practice.correctCount / practice.totalItems) * 100 : 0,
-    );
+    const { correct, answered, unanswered } = practice.summary;
+    const percentage = Math.round(answered > 0 ? (correct / answered) * 100 : 0);
 
     return (
       <View style={styles.center}>
@@ -51,10 +69,15 @@ export default function PracticeSessionScreen() {
           <Text style={styles.summaryTitle}>Practice Session Complete!</Text>
           <View style={styles.scorePill}>
             <Text style={styles.summary}>
-              {practice.correctCount} / {practice.totalItems}
+              {correct} / {answered}
             </Text>
             <Text style={styles.summaryPercent}>({percentage}%)</Text>
           </View>
+          {unanswered > 0 && (
+            <Text style={styles.summaryFeedback}>
+              {unanswered} {unanswered === 1 ? 'question was' : 'questions were'} left unanswered.
+            </Text>
+          )}
           <Text style={styles.summaryFeedback}>
             {percentage >= 70
               ? 'Great mastery! Keep up the momentum for your UTME preparation.'
@@ -81,7 +104,8 @@ export default function PracticeSessionScreen() {
   }
 
   const correctLabel = item.options.find((option) => option.isCorrect)?.label;
-  const progressFraction = (practice.currentIndex + 1) / practice.totalItems;
+  const progressFraction =
+    practice.totalItems > 0 ? practice.summary.answered / practice.totalItems : 0;
 
   return (
     <View style={styles.screen}>
@@ -91,13 +115,50 @@ export default function PracticeSessionScreen() {
           <Text style={styles.progressText}>
             Question {practice.currentIndex + 1} of {practice.totalItems}
           </Text>
-          <Text style={styles.liveScoreBadge}>{practice.correctCount} Correct</Text>
+          <Text style={styles.liveScoreBadge}>
+            {practice.summary.correct} correct · {practice.summary.answered} answered
+          </Text>
         </View>
         <View style={styles.progressBarBackground}>
           <View
             style={[styles.progressBarFill, { width: `${Math.round(progressFraction * 100)}%` }]}
           />
         </View>
+      </View>
+
+      {/* Question palette: green correct, red wrong, outlined current */}
+      <View style={styles.paletteWrapper}>
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={styles.paletteContent}
+        >
+          {practice.answers.map((answer, index) => {
+            const isCurrent = index === practice.currentIndex;
+            return (
+              <Pressable
+                key={index}
+                accessibilityLabel={`Question ${index + 1}`}
+                onPress={() => practice.goTo(index)}
+                style={[
+                  styles.paletteCell,
+                  answer?.isCorrect === true && styles.paletteCellCorrect,
+                  answer?.isCorrect === false && styles.paletteCellWrong,
+                  isCurrent && styles.paletteCellCurrent,
+                ]}
+              >
+                <Text
+                  style={[
+                    styles.paletteCellText,
+                    answer !== null && !isCurrent && styles.paletteCellTextInverted,
+                  ]}
+                >
+                  {index + 1}
+                </Text>
+              </Pressable>
+            );
+          })}
+        </ScrollView>
       </View>
 
       <ScrollView style={styles.scroll} contentContainerStyle={styles.scrollContent}>
@@ -171,9 +232,9 @@ export default function PracticeSessionScreen() {
           </View>
         )}
 
-        {/* Submit or Next Button */}
-        <View style={styles.actionContainer}>
-          {!practice.revealed ? (
+        {/* Submit (unanswered questions only; answered ones are review-only) */}
+        {!practice.revealed && (
+          <View style={styles.actionContainer}>
             <Pressable
               onPress={() => void practice.submitAnswer()}
               disabled={practice.selected === null}
@@ -185,20 +246,87 @@ export default function PracticeSessionScreen() {
             >
               <Text style={styles.primaryButtonText}>Submit Answer</Text>
             </Pressable>
-          ) : (
+          </View>
+        )}
+
+        {/* Session controls */}
+        {confirmingFinish ? (
+          <View style={styles.confirmPanel}>
+            <Text style={styles.confirmText}>
+              You have {practice.summary.unanswered} unanswered{' '}
+              {practice.summary.unanswered === 1 ? 'question' : 'questions'}. Finish anyway?
+            </Text>
+            <View style={styles.sessionControls}>
+              <Pressable
+                onPress={() => setConfirmingFinish(false)}
+                style={({ pressed }) => [styles.secondaryButton, pressed && styles.buttonPressed]}
+              >
+                <Text style={styles.secondaryButtonText}>Keep practising</Text>
+              </Pressable>
+              <Pressable
+                onPress={() => practice.finish()}
+                style={({ pressed }) => [styles.finishButton, pressed && styles.buttonPressed]}
+              >
+                <Text style={styles.finishButtonText}>Finish</Text>
+              </Pressable>
+            </View>
+          </View>
+        ) : (
+          <View style={styles.sessionControls}>
             <Pressable
-              onPress={practice.nextItem}
-              style={({ pressed }) => [styles.nextButton, pressed && styles.buttonPressed]}
+              onPress={changeSubject}
+              style={({ pressed }) => [styles.secondaryButton, pressed && styles.buttonPressed]}
             >
-              <Text style={styles.nextButtonText}>
-                {practice.currentIndex + 1 >= practice.totalItems
-                  ? 'Finish Practice →'
-                  : 'Next Question →'}
-              </Text>
+              <Text style={styles.secondaryButtonText}>Change subject</Text>
             </Pressable>
-          )}
-        </View>
+            <Pressable
+              onPress={requestFinish}
+              style={({ pressed }) => [styles.finishButton, pressed && styles.buttonPressed]}
+            >
+              <Text style={styles.finishButtonText}>Finish practice</Text>
+            </Pressable>
+          </View>
+        )}
       </ScrollView>
+
+      {/* Previous / Next — skipping is allowed */}
+      <View style={styles.navBar}>
+        <Pressable
+          accessibilityLabel="Previous question"
+          disabled={!practice.canGoPrevious}
+          onPress={practice.goPrevious}
+          style={({ pressed }) => [
+            styles.navButton,
+            !practice.canGoPrevious && styles.navButtonDisabled,
+            pressed && styles.buttonPressed,
+          ]}
+        >
+          <Text style={[styles.navButtonText, !practice.canGoPrevious && styles.navButtonTextDisabled]}>
+            ◀ Previous
+          </Text>
+        </Pressable>
+        <Pressable
+          accessibilityLabel="Next question"
+          disabled={!practice.canGoNext}
+          onPress={practice.goNext}
+          style={({ pressed }) => [
+            styles.navButton,
+            styles.navButtonNext,
+            !practice.canGoNext && styles.navButtonDisabled,
+            pressed && styles.buttonPressed,
+          ]}
+        >
+          <Text
+            style={[
+              styles.navButtonText,
+              styles.navButtonTextNext,
+              !practice.canGoNext && styles.navButtonTextDisabled,
+            ]}
+          >
+            Next ▶
+          </Text>
+        </Pressable>
+      </View>
     </View>
   );
 }
@@ -404,18 +532,6 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     fontSize: 16,
   },
-  nextButton: {
-    backgroundColor: colors.brandEmerald,
-    paddingVertical: 14,
-    borderRadius: radii.md,
-    alignItems: 'center',
-    ...shadows.subtle,
-  },
-  nextButtonText: {
-    color: colors.textInverted,
-    fontWeight: '700',
-    fontSize: 16,
-  },
   summaryCard: {
     backgroundColor: colors.surface,
     borderRadius: radii.xl,
@@ -485,6 +601,133 @@ const styles = StyleSheet.create({
     color: colors.textSecondary,
     textAlign: 'center',
     lineHeight: 20,
+  },
+  paletteWrapper: {
+    backgroundColor: colors.surface,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.border,
+    paddingVertical: 8,
+  },
+  paletteContent: {
+    gap: 8,
+    paddingHorizontal: 16,
+  },
+  paletteCell: {
+    width: 38,
+    height: 38,
+    borderRadius: radii.sm,
+    borderWidth: 1.5,
+    borderColor: colors.borderDark,
+    backgroundColor: colors.surface,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  paletteCellCorrect: {
+    backgroundColor: colors.success,
+    borderColor: colors.success,
+  },
+  paletteCellWrong: {
+    backgroundColor: colors.danger,
+    borderColor: colors.danger,
+  },
+  paletteCellCurrent: {
+    borderColor: colors.primary,
+    borderWidth: 2.5,
+  },
+  paletteCellText: {
+    fontWeight: '700',
+    fontSize: 13,
+    color: colors.textPrimary,
+  },
+  paletteCellTextInverted: {
+    color: colors.textInverted,
+  },
+  sessionControls: {
+    flexDirection: 'row',
+    gap: 10,
+    marginTop: 8,
+  },
+  secondaryButton: {
+    flex: 1,
+    minHeight: 48,
+    borderRadius: radii.md,
+    borderWidth: 1.5,
+    borderColor: colors.borderDark,
+    backgroundColor: colors.surface,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  secondaryButtonText: {
+    fontSize: 15,
+    fontWeight: '700',
+    color: colors.textPrimary,
+  },
+  finishButton: {
+    flex: 1,
+    minHeight: 48,
+    borderRadius: radii.md,
+    borderWidth: 1.5,
+    borderColor: colors.brandEmerald,
+    backgroundColor: colors.brandEmeraldLight,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  finishButtonText: {
+    fontSize: 15,
+    fontWeight: '700',
+    color: colors.brandEmerald,
+  },
+  confirmPanel: {
+    marginTop: 8,
+    gap: 4,
+    padding: 14,
+    borderRadius: radii.md,
+    borderWidth: 1.5,
+    borderColor: colors.warningBorder,
+    backgroundColor: colors.warningLight,
+  },
+  confirmText: {
+    fontSize: 15,
+    lineHeight: 22,
+    color: colors.textPrimary,
+  },
+  navBar: {
+    flexDirection: 'row',
+    gap: 12,
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    backgroundColor: colors.surface,
+    borderTopWidth: 1,
+    borderTopColor: colors.border,
+  },
+  navButton: {
+    flex: 1,
+    minHeight: 48,
+    borderRadius: radii.md,
+    borderWidth: 1.5,
+    borderColor: colors.borderDark,
+    backgroundColor: colors.surface,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  navButtonNext: {
+    borderColor: colors.primary,
+    backgroundColor: colors.primary,
+  },
+  navButtonDisabled: {
+    borderColor: colors.border,
+    backgroundColor: colors.surfaceAlt,
+  },
+  navButtonText: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: colors.textPrimary,
+  },
+  navButtonTextNext: {
+    color: colors.textInverted,
+  },
+  navButtonTextDisabled: {
+    color: colors.textMuted,
   },
   buttonPressed: {
     opacity: 0.85,
