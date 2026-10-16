@@ -327,7 +327,14 @@ export async function loadLocalSessionForResume(): Promise<LocalSessionResume | 
     started_at: string;
     end_at: string;
     last_observed_at: string;
-  }>(`SELECT id, started_at, end_at, last_observed_at FROM local_sessions WHERE ended_at IS NULL ORDER BY id DESC LIMIT 1`);
+  }>(
+    // Mock sessions only. A practice session left open by a force-close or
+    // reload also has ended_at IS NULL; without the mode filter the mock
+    // screen "resumed" it and replayed real practice items into the demo
+    // mock, which threw (applyMockSessionEvent: item not in this session).
+    `SELECT id, started_at, end_at, last_observed_at FROM local_sessions
+      WHERE ended_at IS NULL AND mode = 'mock' ORDER BY id DESC LIMIT 1`,
+  );
   if (!session) {
     return null;
   }
