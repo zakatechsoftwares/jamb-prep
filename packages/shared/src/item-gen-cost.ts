@@ -29,6 +29,23 @@ export interface ModelPricing {
  */
 export const MODEL_PRICING: Record<string, ModelPricing> = {
   'gpt-4.1': { inputCostPerMillionUsd: 2, outputCostPerMillionUsd: 8 },
+  /**
+   * `tools/item-gen`'s authoring and independent-solve calls now run
+   * through `codex exec`/`claude -p`, billed through the user's existing
+   * ChatGPT/Claude subscriptions rather than a metered API — genuinely
+   * $0 marginal cost per call, not a simplification. Confirmed by a real
+   * call: `claude -p --output-format json` reports its own `total_cost_usd`
+   * (observed $0.32 for a one-line trivial reply, driven by ~40K tokens of
+   * fixed tool/system-prompt overhead) and a per-model `costUSD` — both are
+   * list-price *estimates*, never what's actually billed under a flat
+   * subscription, and both `codex-cli-client.ts`/`claude-cli-client.ts`
+   * deliberately never read them. These two keys are what
+   * `run-generation.ts` actually charges against (fixed strings, not
+   * either CLI's own real underlying model name), so this stays correct
+   * regardless of which model each CLI's own defaults pick.
+   */
+  'codex-cli': { inputCostPerMillionUsd: 0, outputCostPerMillionUsd: 0 },
+  'claude-code-cli': { inputCostPerMillionUsd: 0, outputCostPerMillionUsd: 0 },
 };
 
 export function computeCallCostUsd(model: string, usage: TokenUsage): number {

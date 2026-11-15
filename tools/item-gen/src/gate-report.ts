@@ -36,6 +36,17 @@ export interface GateReport {
   keyDistributionAfter: Record<OptionLabel, number>;
   totalAuthoringCostUsd: number;
   totalInferenceCostUsd: number;
+  /**
+   * How many live-bank candidates the duplicate-detection gate had to skip
+   * because their stored embedding's dimension didn't match the new
+   * embedding's -- the "silent failure needs a counter" rule, for the
+   * local-embedding-model migration's dimension break (voyage-3's vectors
+   * are a different size from the new local model's). A skipped candidate
+   * is simply not compared against, never a crash; this is how many times
+   * that happened, so the degraded dedup coverage is visible rather than
+   * silently assumed fine.
+   */
+  legacyEmbeddingsSkipped: number;
 }
 
 export interface GateReportSummary {
@@ -120,6 +131,12 @@ export function formatGateReport(report: GateReport): string {
     `Summary: ${summary.autoGated} auto-gated, ${summary.pendingReview} to human review, ${summary.gateFailed} gate-failed, ${summary.discardedBeforeInsert} discarded before insert`,
     `Cost: $${report.totalAuthoringCostUsd.toFixed(4)} authoring + solve calls, $${report.totalInferenceCostUsd.toFixed(4)} total recorded on inserted items`,
   ];
+
+  if (report.legacyEmbeddingsSkipped > 0) {
+    lines.push(
+      `Duplicate check: skipped ${report.legacyEmbeddingsSkipped} live-bank embedding(s) with a mismatched dimension (not compared against, not a failure)`,
+    );
+  }
 
   return lines.join('\n');
 }

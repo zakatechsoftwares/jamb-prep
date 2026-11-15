@@ -22,7 +22,7 @@ function item(overrides: Partial<ItemGateResult>): ItemGateResult {
   };
 }
 
-function report(items: ItemGateResult[]): GateReport {
+function report(items: ItemGateResult[], overrides: Partial<GateReport> = {}): GateReport {
   return {
     objectiveId: 42,
     subject: 'Chemistry',
@@ -32,6 +32,8 @@ function report(items: ItemGateResult[]): GateReport {
     keyDistributionAfter: { A: 1, B: 1, C: 1, D: 1 },
     totalAuthoringCostUsd: 0.04,
     totalInferenceCostUsd: 0.05,
+    legacyEmbeddingsSkipped: 0,
+    ...overrides,
   };
 }
 
@@ -111,5 +113,13 @@ describe('formatGateReport', () => {
       ]),
     );
     expect(text).toContain('(not inserted)');
+  });
+
+  it('mentions skipped legacy-dimension embeddings only when there were any', () => {
+    const clean = formatGateReport(report([item({})], { legacyEmbeddingsSkipped: 0 }));
+    expect(clean).not.toContain('skipped');
+
+    const withSkips = formatGateReport(report([item({})], { legacyEmbeddingsSkipped: 2 }));
+    expect(withSkips).toContain('skipped 2 live-bank embedding(s) with a mismatched dimension');
   });
 });

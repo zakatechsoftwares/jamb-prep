@@ -25,8 +25,8 @@ const VALID_ITEM = {
 };
 
 describe('parseAuthoringResponse', () => {
-  it('parses a well-formed array of items', () => {
-    const result = parseAuthoringResponse(JSON.stringify([VALID_ITEM]));
+  it('parses a well-formed {items: [...]} response', () => {
+    const result = parseAuthoringResponse(JSON.stringify({ items: [VALID_ITEM] }));
     expect(result.discardedCount).toBe(0);
     expect(result.drafts).toHaveLength(1);
     expect(result.drafts[0]?.stem).toBe(VALID_ITEM.stem);
@@ -37,7 +37,9 @@ describe('parseAuthoringResponse', () => {
   });
 
   it('strips a markdown code fence around the JSON', () => {
-    const result = parseAuthoringResponse('```json\n' + JSON.stringify([VALID_ITEM]) + '\n```');
+    const result = parseAuthoringResponse(
+      '```json\n' + JSON.stringify({ items: [VALID_ITEM] }) + '\n```',
+    );
     expect(result.drafts).toHaveLength(1);
   });
 
@@ -45,8 +47,15 @@ describe('parseAuthoringResponse', () => {
     expect(parseAuthoringResponse('not json at all')).toEqual({ drafts: [], discardedCount: 0 });
   });
 
-  it('returns nothing for valid JSON that is not an array', () => {
-    expect(parseAuthoringResponse(JSON.stringify({ not: 'an array' }))).toEqual({
+  it('returns nothing for a bare array (the old, no-longer-valid shape)', () => {
+    expect(parseAuthoringResponse(JSON.stringify([VALID_ITEM]))).toEqual({
+      drafts: [],
+      discardedCount: 0,
+    });
+  });
+
+  it('returns nothing for valid JSON with no items array', () => {
+    expect(parseAuthoringResponse(JSON.stringify({ not: 'an items array' }))).toEqual({
       drafts: [],
       discardedCount: 0,
     });
@@ -54,21 +63,25 @@ describe('parseAuthoringResponse', () => {
 
   it('discards an entry missing a stem, counting it separately from the valid ones', () => {
     const result = parseAuthoringResponse(
-      JSON.stringify([VALID_ITEM, { ...VALID_ITEM, stem: '' }]),
+      JSON.stringify({ items: [VALID_ITEM, { ...VALID_ITEM, stem: '' }] }),
     );
     expect(result.drafts).toHaveLength(1);
     expect(result.discardedCount).toBe(1);
   });
 
   it('discards an entry with an invalid correct_option', () => {
-    const result = parseAuthoringResponse(JSON.stringify([{ ...VALID_ITEM, correct_option: 'E' }]));
+    const result = parseAuthoringResponse(
+      JSON.stringify({ items: [{ ...VALID_ITEM, correct_option: 'E' }] }),
+    );
     expect(result.drafts).toHaveLength(0);
     expect(result.discardedCount).toBe(1);
   });
 
   it('discards an entry with an empty option', () => {
     const result = parseAuthoringResponse(
-      JSON.stringify([{ ...VALID_ITEM, options: { A: 'newton', B: '', C: 'watt', D: 'pascal' } }]),
+      JSON.stringify({
+        items: [{ ...VALID_ITEM, options: { A: 'newton', B: '', C: 'watt', D: 'pascal' } }],
+      }),
     );
     expect(result.drafts).toHaveLength(0);
     expect(result.discardedCount).toBe(1);
@@ -76,9 +89,18 @@ describe('parseAuthoringResponse', () => {
 
   it('carries contains_calculation through as the model self-report', () => {
     const result = parseAuthoringResponse(
-      JSON.stringify([{ ...VALID_ITEM, contains_calculation: true }]),
+      JSON.stringify({ items: [{ ...VALID_ITEM, contains_calculation: true }] }),
     );
     expect(result.drafts[0]?.modelReportedContainsCalculation).toBe(true);
+  });
+
+  it('treats a null distractor_rationale entry (the correct option\'s own) as absent', () => {
+    const result = parseAuthoringResponse(
+      JSON.stringify({
+        items: [{ ...VALID_ITEM, distractor_rationale: { ...VALID_ITEM.distractor_rationale, A: null } }],
+      }),
+    );
+    expect(result.drafts[0]?.options.find((o) => o.label === 'A')?.distractorRationale).toBeNull();
   });
 
   it('recovers a batch that would otherwise be silently lost to a LaTeX-style backslash escape', () => {
@@ -87,7 +109,7 @@ describe('parseAuthoringResponse', () => {
     // `\(5^2 × 5^{10}\)` -- `\(`/`\)` are not valid JSON escapes, so strict
     // JSON.parse failed for the whole response and both items and the
     // authoring spend vanished with drafts=0, discardedCount=0.
-    const withLatexEscape = JSON.stringify([VALID_ITEM]).replace(
+    const withLatexEscape = JSON.stringify({ items: [VALID_ITEM] }).replace(
       'The newton is the SI unit of force.',
       String.raw`Using \(F = ma\) gives the answer.`,
     );
@@ -108,8 +130,8 @@ describe('parseAuthoringResponse', () => {
     // before a closing brace (observed for real, twice in one batch:
     // `"...= 2.",\n    },\n    "explanation":`) -- valid in a JS object
     // literal, not in strict JSON.
-    const serialized = JSON.stringify([VALID_ITEM]);
-    const withTrailingComma = serialized.replace('"status":"generated"}', '"status":"generated",}');
+    const serialized = JSON.stringify({ items: [VALID_ITEM] });
+    const withTrailingComma = serialized.replace('"status":"generated"}]}', '"status":"generated",}]}');
     expect(() => JSON.parse(withTrailingComma)).toThrow();
 
     const result = parseAuthoringResponse(withTrailingComma);

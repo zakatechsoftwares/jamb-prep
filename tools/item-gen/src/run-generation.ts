@@ -27,8 +27,10 @@ import {
   type GeneratedItemInsert,
   type ObjectiveContext,
 } from '@jamb/db';
-import { callOpenAi, isRetryableOpenAiError, type FetchImpl } from './openai-client';
-import { callVoyageEmbed, isRetryableVoyageError } from './voyage-client';
+import { callCodexCli, isRetryableCodexCliError } from './codex-cli-client';
+import { callClaudeCli, isRetryableClaudeCliError } from './claude-cli-client';
+import type { RunCliImpl } from './cli-exec';
+import type { LocalEmbedder } from './local-embedding-client';
 import { withRetry } from './retry';
 import { buildAuthoringPrompt, type DifficultyTarget } from './authoring-prompt';
 import { buildIndependentSolvePrompt, toIndependentSolveInput } from './independent-solve-prompt';
@@ -58,9 +60,17 @@ import type { GateReport, ItemGateResult } from './gate-report';
 const DUPLICATE_SIMILARITY_THRESHOLD = 0.92;
 const CONCURRENCY_LIMIT = 3;
 const RETRY_OPTIONS_BASE = { maxAttempts: 4, initialDelayMs: 1000 };
-const AUTHORING_MAX_TOKENS = 8192;
-const SOLVE_MAX_TOKENS = 512;
 const AUTHORING_PROMPT_VERSION = 1;
+
+/**
+ * Fixed pricing keys for `item-gen-cost.ts`'s `MODEL_PRICING`, never the
+ * real underlying model name either CLI happens to pick -- both are
+ * pinned to $0 there (subscription calls, no per-token billing), and
+ * pinning the lookup key to the CLI itself rather than its model keeps
+ * that true regardless of which model each CLI's own defaults select.
+ */
+const CODEX_CLI_PRICING_KEY = 'codex-cli';
+const CLAUDE_CLI_PRICING_KEY = 'claude-code-cli';
 
 export interface RunGenerationOptions {
   subject: string;
@@ -73,11 +83,13 @@ export interface RunGenerationOptions {
 export interface RunGenerationDependencies {
   readClient: PoolClient;
   withTransaction: <T>(fn: (client: PoolClient) => Promise<T>) => Promise<T>;
-  fetchImpl: FetchImpl;
-  openaiApiKey: string;
-  openaiModel: string;
-  voyageApiKey: string;
-  voyageModel: string;
+  runCli: RunCliImpl;
+  /** Optional override; omitted lets each CLI use its own default model. */
+  codexModel?: string;
+  claudeModel?: string;
+  /** Path to an already-written JSON Schema file for the authoring call's `--output-schema` (see `authoring-schema.ts`). Writing it is the caller's job. */
+  authoringOutputSchemaPath: string;
+  embedder: LocalEmbedder;
   random: () => number;
   sleep: (ms: number) => Promise<void>;
   now: () => Date;
@@ -114,6 +126,8 @@ interface BatchState {
   liveBank: EmbeddingCandidate[];
   /** Items inserted so far this batch — mutated as processing proceeds. */
   batchEmbeddings: EmbeddingCandidate[];
+  /** Running total across the batch — mutated as processing proceeds. See `GateReport.legacyEmbeddingsSkipped`'s own doc comment. */
+  legacyEmbeddingsSkipped: number;
 }
 
 export async function runGeneration(
@@ -139,13 +153,12 @@ export async function runGeneration(
 
   const authoringResult = await withRetry(
     () =>
-      callOpenAi(deps.fetchImpl, {
-        apiKey: deps.openaiApiKey,
-        model: deps.openaiModel,
-        messages: [{ role: 'user', content: authoringPrompt }],
-        maxTokens: AUTHORING_MAX_TOKENS,
+      callCodexCli(deps.runCli, {
+        prompt: authoringPrompt,
+        model: deps.codexModel,
+        outputSchemaPath: deps.authoringOutputSchemaPath,
       }),
-    { ...RETRY_OPTIONS_BASE, sleep: deps.sleep, isRetryable: isRetryableOpenAiError },
+    { ...RETRY_OPTIONS_BASE, sleep: deps.sleep, isRetryable: isRetryableCodexCliError },
   );
 
   const authoringLogPath = await logRawResponse(deps.logDir, {
@@ -155,7 +168,7 @@ export async function runGeneration(
     rawResponse: authoringResult.rawResponse,
   });
 
-  const authoringCostUsd = computeCallCostUsd(deps.openaiModel, authoringResult.usage);
+  const authoringCostUsd = computeCallCostUsd(CODEX_CLI_PRICING_KEY, authoringResult.usage);
   const { drafts, discardedCount } = parseAuthoringResponse(authoringResult.text);
 
   const discardedResults: ItemGateResult[] = Array.from(
@@ -188,6 +201,7 @@ export async function runGeneration(
       keyDistributionAfter: { A: 0, B: 0, C: 0, D: 0 },
       totalAuthoringCostUsd: authoringCostUsd,
       totalInferenceCostUsd: 0,
+      legacyEmbeddingsSkipped: 0,
     };
   }
 
@@ -202,6 +216,7 @@ export async function runGeneration(
     queueConfig,
     liveBank,
     batchEmbeddings: [],
+    legacyEmbeddingsSkipped: 0,
   };
 
   const itemResults = await runWithConcurrencyLimit(
@@ -224,6 +239,7 @@ export async function runGeneration(
     keyDistributionAfter: rebalance.distributionAfter,
     totalAuthoringCostUsd: authoringCostUsd,
     totalInferenceCostUsd,
+    legacyEmbeddingsSkipped: batchState.legacyEmbeddingsSkipped,
   };
 }
 
@@ -265,7 +281,8 @@ async function processOneItem(
     stemEmbedding,
     inferenceCostUsd,
     provenance: {
-      model: deps.openaiModel,
+      model: CODEX_CLI_PRICING_KEY,
+      codexModel: deps.codexModel ?? null,
       promptVersion: AUTHORING_PROMPT_VERSION,
       generatedAt: deps.now().toISOString(),
       rawResponseLogPath: batch.authoringLogPath,
@@ -317,25 +334,26 @@ async function processOneItem(
     };
   }
 
-  const embedResult = await withRetry(
-    () =>
-      callVoyageEmbed(deps.fetchImpl, {
-        apiKey: deps.voyageApiKey,
-        model: deps.voyageModel,
-        texts: [draft.stem],
-      }),
-    { ...RETRY_OPTIONS_BASE, sleep: deps.sleep, isRetryable: isRetryableVoyageError },
-  );
-  await logRawResponse(deps.logDir, {
-    callType: 'embedding',
-    objectiveId: options.objectiveId,
-    timestamp: deps.now(),
-    rawResponse: embedResult.rawResponse,
-  });
-  const embedding = embedResult.embeddings[0] ?? [];
+  // Computed locally (ONNX, no network, no API response) -- no retry
+  // wrapper and no raw-response audit log, since there is no external
+  // call whose response varies run to run to audit; the same text always
+  // produces the same vector.
+  const embedding = (await deps.embedder.embed([draft.stem]))[0] ?? [];
 
   let bestMatch: { itemId: number; similarity: number } | null = null;
   for (const candidate of [...batch.liveBank, ...batch.batchEmbeddings]) {
+    // The local embedding model's vectors are a different dimension than
+    // the Voyage-sourced vectors already stored on existing live-bank
+    // items -- cosineSimilarity throws on a length mismatch by design, so
+    // a mismatched candidate is skipped (not compared against) rather
+    // than crashing the whole item. Counted, not silent -- see
+    // `GateReport.legacyEmbeddingsSkipped`'s own doc comment for why this
+    // is a required fix, not a nice-to-have, and why a backfill to
+    // restore full dedup coverage is a deliberate, separate follow-up.
+    if (candidate.stemEmbedding.length !== embedding.length) {
+      batch.legacyEmbeddingsSkipped += 1;
+      continue;
+    }
     const similarity = cosineSimilarity(embedding, candidate.stemEmbedding);
     if (!bestMatch || similarity > bestMatch.similarity) {
       bestMatch = { itemId: candidate.itemId, similarity };
@@ -369,14 +387,8 @@ async function processOneItem(
 
   const solvePrompt = buildIndependentSolvePrompt(toIndependentSolveInput(draft));
   const solveResult = await withRetry(
-    () =>
-      callOpenAi(deps.fetchImpl, {
-        apiKey: deps.openaiApiKey,
-        model: deps.openaiModel,
-        messages: [{ role: 'user', content: solvePrompt }],
-        maxTokens: SOLVE_MAX_TOKENS,
-      }),
-    { ...RETRY_OPTIONS_BASE, sleep: deps.sleep, isRetryable: isRetryableOpenAiError },
+    () => callClaudeCli(deps.runCli, { prompt: solvePrompt, model: deps.claudeModel }),
+    { ...RETRY_OPTIONS_BASE, sleep: deps.sleep, isRetryable: isRetryableClaudeCliError },
   );
   await logRawResponse(deps.logDir, {
     callType: 'independent_solve',
@@ -384,7 +396,7 @@ async function processOneItem(
     timestamp: deps.now(),
     rawResponse: solveResult.rawResponse,
   });
-  const solveCostUsd = computeCallCostUsd(deps.openaiModel, solveResult.usage);
+  const solveCostUsd = computeCallCostUsd(CLAUDE_CLI_PRICING_KEY, solveResult.usage);
   const parsedSolve = parseSolveResponse(solveResult.text);
   const correctLabel = draft.options.find((option) => option.isCorrect)!.label;
   const verdict: IndependentSolveVerdict =
