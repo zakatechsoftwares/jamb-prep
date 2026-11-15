@@ -2550,3 +2550,97 @@ within a band", at 6.7s against the 5000ms timeout, which passed 34/34
 when that file was rerun and in the package's own full run. That is the
 same intermittent `packages/db` timeout the visual-redesign entry
 recorded, in a file this work does not touch.
+
+## Local-first generation pipeline: subscription CLIs, local embeddings, local-first database (2026-11-15)
+
+`tools/item-gen` stops paying per-token entirely. Authoring moves from a
+direct OpenAI HTTP call to headless `codex exec` (the user's ChatGPT
+subscription); the independent solve moves to headless `claude -p` (the
+user's Claude subscription); duplicate-detection embeddings move from
+Voyage's API to a local ONNX model (`@huggingface/transformers`,
+`Xenova/all-MiniLM-L6-v2`, no API key for any of the three). Generation
+and review both move back to local Postgres; a new `tools/sync-to-production`
+package does the one-way, idempotent push of already-approved items to
+the production (Railway/Supabase) database. See `CLAUDE.md`'s own new
+section for the full list of real findings this surfaced — the summary
+here is what changed and how it was verified.
+
+**Before writing any code**, both CLIs' real flags and output shapes were
+checked against the actually-installed CLIs on this machine (`codex exec
+--help`, `claude --help`, and several real throwaway calls with safe
+flags — `--sandbox read-only --skip-git-repo-check`) rather than assumed.
+This surfaced two things that materially changed the design from the
+originally-approved plan: `codex exec --output-schema` gives real,
+server-side JSON-Schema-enforced output (not just a provider swap —
+genuinely more reliable than the old prose-instructed JSON), and both
+CLIs report a dollar-cost figure that is a list-price *estimate*, not
+what a subscription actually bills (`claude -p`'s `total_cost_usd` showed
+$0.32 for a one-line trivial reply). A Windows-specific `spawn` gotcha
+(`.cmd` shims need `shell: true`, which doesn't escape array args, which
+corrupted this repo's own path containing a space) was also found and
+fixed empirically, not from documentation, by writing a throwaway script
+and watching it actually fail first.
+
+**Three decisions confirmed with the user before finalizing the plan**,
+each a real scope fork: Railway's admin app deliberately stops receiving
+new `pending_review` items for now (sync only pushes approved ones) — the
+other provisioned reviewer has nothing to review there until a later,
+separate session; the embedding-dimension break (Voyage's existing
+vectors are a different size than the new local model's) gets only the
+required defensive skip-and-count fix, not a backfill, this session;
+batching stays minimal — `--count` is already the configurable batch
+size, and one CLI invocation is already atomic, so "resume after a usage
+limit" just means rerunning the command later, no new orchestration
+layer.
+
+**What changed, file by file:**
+
+- `tools/item-gen/src/openai-client.ts`, `voyage-client.ts`,
+  `fetch-types.ts` deleted (and their tests). New: `cli-exec.ts` (the
+  injectable process runner, Windows-safe quoting), `codex-cli-client.ts`,
+  `claude-cli-client.ts`, `local-embedding-client.ts`, `authoring-schema.ts`.
+- `run-generation.ts`'s authoring/solve call sites swap to
+  `callCodexCli`/`callClaudeCli`; the embedding call swaps to an injected
+  `LocalEmbedder`; the duplicate-check loop skips a mismatched-dimension
+  candidate and counts it (`GateReport.legacyEmbeddingsSkipped`, new).
+- `parse-authoring-response.ts`'s top-level contract changes from a bare
+  array to `{"items": [...]}`, required by the schema's `type: "object"`
+  root constraint — per-item parsing and the LaTeX-escape/trailing-comma
+  repair logic are unchanged.
+- `item-gen-cost.ts` gains two `MODEL_PRICING` entries (`'codex-cli'`,
+  `'claude-code-cli'`), both `$0` — no change to its arithmetic functions,
+  since they already only reject a *negative* cost, not a zero one.
+- New package `tools/sync-to-production` + new
+  `packages/db/src/sync-repository.ts` (the SQL lives in the repository
+  layer, matching `item-generation-repository.ts`'s own precedent):
+  `loadApprovedItemsForSync`, `resolveHierarchyIdsByNaturalKey` (by name
+  path, never a raw id), `upsertSyncedItem` (keyed on the pre-existing
+  `items.external_ref` column — no new migration needed), and
+  `replaceSyncedItemOptions`.
+- `CLAUDE.md`, root `.env.example` updated; `OPENAI_API_KEY`/`VOYAGE_API_KEY`
+  removed.
+
+**Verified end-to-end for real, twice, not just by the automated suite**:
+
+1. A live run against the real local dev database (objective 281, Use of
+   English, which already had 75 approved items with legacy Voyage
+   embeddings) produced a correctly-formed item through the real
+   Codex/Claude CLIs and the real local embedding model — auto-gated,
+   exactly $0.0000 cost, 384-dim embedding, and the dimension-mismatch
+   skip correctly fired 75 times rather than crashing.
+2. That item (and 94 other real approved items) was synced for real to a
+   second, genuinely independently-seeded local database (migrated and
+   seeded fresh, confirmed to assign different ids for the same
+   conceptual objective — English is subject 282/objective 281 on one,
+   1/1 on the other) standing in for production — never against the real
+   shared Railway/Supabase database, deliberately, to avoid touching a
+   live system other reviewers and the deployed admin app depend on
+   without being explicitly asked to. The synced row resolved its
+   foreign keys correctly, carried no `reviewer_id`, and had the full
+   audit trail in `provenance.syncedFrom`.
+
+Final gate: `pnpm typecheck` and `pnpm lint` clean across the monorepo.
+`pnpm test` against a local `jamb_prep_test`, full monorepo, one clean
+run: `apps/admin` 246/246, `apps/mobile` 33/33, `packages/db` 284/284,
+`apps/api` 162/162, `tools/item-gen` 62/62, `tools/sync-to-production`
+3/3 (new package) — 790/790 total, no flakes this run.

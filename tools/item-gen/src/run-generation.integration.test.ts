@@ -1,5 +1,6 @@
 import { afterAll, beforeEach, describe, expect, it } from 'vitest';
-import type { FetchImpl } from './fetch-types';
+import type { RunCliImpl } from './cli-exec';
+import type { LocalEmbedder } from './local-embedding-client';
 import { runGeneration, type RunGenerationDependencies } from './run-generation';
 
 process.env.PGPOOL_MAX ??= '10';
@@ -7,8 +8,9 @@ process.env.PGPOOL_MAX ??= '10';
 const hasDatabase = Boolean(process.env.DATABASE_URL);
 
 interface RecordedCall {
-  url: string;
-  body: Record<string, unknown>;
+  command: string;
+  args: string[];
+  stdin: string;
 }
 
 /** Pulls {label, text} pairs out of the solve prompt's OPTIONS block, so the fake solver survives permutation. */
@@ -22,41 +24,39 @@ function extractPromptOptions(content: string): { label: string; text: string }[
     .map((match) => ({ label: match[1]!, text: match[2]! }));
 }
 
-interface FakeApiConfig {
+interface FakeCliConfig {
   authoringItems: unknown[];
-  authoringUsage?: { prompt_tokens: number; completion_tokens: number };
+  authoringUsage?: { input_tokens: number; output_tokens: number };
   /** stem substring -> the option TEXT the fake solver should agree with (by content, not letter, so it survives rebalancing). */
   agreeWithTextByStemSubstring: Record<string, string>;
-  /** stem substring -> a fixed embedding vector. */
-  embeddingByStemSubstring: Record<string, number[]>;
 }
 
-function buildFakeFetch(config: FakeApiConfig): { fetchImpl: FetchImpl; calls: RecordedCall[] } {
+/** Fakes both CLIs behind one `RunCliImpl`, routed by command name -- `codex` is always the authoring call, `claude` is always the independent solve, in this pipeline. */
+function buildFakeRunCli(config: FakeCliConfig): { runCli: RunCliImpl; calls: RecordedCall[] } {
   const calls: RecordedCall[] = [];
 
-  const fetchImpl: FetchImpl = async (input, init) => {
-    const url = String(input);
-    const body = init?.body ? (JSON.parse(init.body as string) as Record<string, unknown>) : {};
-    calls.push({ url, body });
+  const runCli: RunCliImpl = async (command, args, stdin) => {
+    calls.push({ command, args, stdin });
 
-    if (url.includes('openai.com')) {
-      const messages = body.messages as { content: string }[];
-      const content = messages[0]!.content;
+    if (command === 'codex') {
+      const text = JSON.stringify({ items: config.authoringItems });
+      const usage = config.authoringUsage ?? { input_tokens: 500, output_tokens: 1500 };
+      const stdout = [
+        JSON.stringify({ type: 'thread.started', thread_id: 't1' }),
+        JSON.stringify({ type: 'turn.started' }),
+        JSON.stringify({
+          type: 'item.completed',
+          item: { id: 'item_0', type: 'agent_message', text },
+        }),
+        JSON.stringify({ type: 'turn.completed', usage }),
+      ].join('\n');
+      return { stdout, stderr: '', exitCode: 0 };
+    }
 
-      if (content.startsWith('You are an experienced Nigerian secondary school teacher')) {
-        return new Response(
-          JSON.stringify({
-            choices: [{ message: { content: JSON.stringify(config.authoringItems) } }],
-            usage: config.authoringUsage ?? { prompt_tokens: 500, completion_tokens: 1500 },
-          }),
-          { status: 200 },
-        );
-      }
-
-      // Independent solve call.
-      const stemMatch = /QUESTION:\n([\s\S]*?)\n\nOPTIONS:/.exec(content);
+    if (command === 'claude') {
+      const stemMatch = /QUESTION:\n([\s\S]*?)\n\nOPTIONS:/.exec(stdin);
       const stem = stemMatch?.[1]?.trim() ?? '';
-      const options = extractPromptOptions(content);
+      const options = extractPromptOptions(stdin);
       const agreeSubstringEntry = Object.entries(config.agreeWithTextByStemSubstring).find(
         ([substring]) => stem.includes(substring),
       );
@@ -64,34 +64,33 @@ function buildFakeFetch(config: FakeApiConfig): { fetchImpl: FetchImpl; calls: R
       const answerLabel =
         options.find((option) => option.text === agreeText)?.label ?? options[0]!.label;
 
-      return new Response(
-        JSON.stringify({
-          choices: [
-            { message: { content: JSON.stringify({ answer: answerLabel, reasoning: 'fake' }) } },
-          ],
-          usage: { prompt_tokens: 100, completion_tokens: 30 },
-        }),
-        { status: 200 },
-      );
+      const body = {
+        is_error: false,
+        subtype: 'success',
+        result: JSON.stringify({ answer: answerLabel, reasoning: 'fake' }),
+        usage: { input_tokens: 100, output_tokens: 30 },
+      };
+      return { stdout: JSON.stringify(body), stderr: '', exitCode: 0 };
     }
 
-    if (url.includes('voyageai.com')) {
-      const texts = body.input as string[];
-      const text = texts[0]!;
-      const substringEntry = Object.entries(config.embeddingByStemSubstring).find(([substring]) =>
-        text.includes(substring),
-      );
-      const embedding = substringEntry?.[1] ?? [0, 0, 1];
-
-      return new Response(JSON.stringify({ data: [{ embedding }], usage: { total_tokens: 20 } }), {
-        status: 200,
-      });
-    }
-
-    throw new Error(`fake fetch: unexpected URL ${url}`);
+    throw new Error(`fake runCli: unexpected command ${command}`);
   };
 
-  return { fetchImpl, calls };
+  return { runCli, calls };
+}
+
+/** Fakes the local embedder, stem-substring keyed, same spirit as `buildFakeRunCli`'s solve routing. */
+function buildFakeEmbedder(embeddingByStemSubstring: Record<string, number[]>): LocalEmbedder {
+  return {
+    async embed(texts: string[]): Promise<number[][]> {
+      return texts.map((text) => {
+        const entry = Object.entries(embeddingByStemSubstring).find(([substring]) =>
+          text.includes(substring),
+        );
+        return entry?.[1] ?? [0, 0, 1];
+      });
+    },
+  };
 }
 
 describe.runIf(hasDatabase)('runGeneration', () => {
@@ -132,7 +131,8 @@ describe.runIf(hasDatabase)('runGeneration', () => {
   });
 
   async function baseDeps(
-    fetchImpl: FetchImpl,
+    runCli: RunCliImpl,
+    embedder: LocalEmbedder,
     client: import('pg').PoolClient,
     random: () => number,
   ): Promise<RunGenerationDependencies> {
@@ -140,11 +140,9 @@ describe.runIf(hasDatabase)('runGeneration', () => {
     return {
       readClient: client,
       withTransaction,
-      fetchImpl,
-      openaiApiKey: 'test-key',
-      openaiModel: 'gpt-4.1',
-      voyageApiKey: 'test-voyage-key',
-      voyageModel: 'voyage-3',
+      runCli,
+      authoringOutputSchemaPath: '/fake/authoring-output-schema.json',
+      embedder,
       random,
       sleep: async () => {},
       now: () => new Date('2026-08-10T12:00:00.000Z'),
@@ -233,19 +231,19 @@ describe.runIf(hasDatabase)('runGeneration', () => {
 
   it('runs the full batch: agrees to auto_gated, disagrees to pending_review, schema failure to gate_failed', async () => {
     await withWorld(async ({ client, world }) => {
-      const { fetchImpl, calls } = buildFakeFetch({
+      const { runCli, calls } = buildFakeRunCli({
         authoringItems: [ITEM_FORCE, ITEM_HISTORY, ITEM_MISSING_RATIONALE],
         agreeWithTextByStemSubstring: {
           'SI unit of force': 'newton',
           'three laws of motion': 'Albert Einstein', // deliberately WRONG -> forces disagreement
         },
-        embeddingByStemSubstring: {
-          'SI unit of force': [1, 0, 0],
-          'three laws of motion': [0, 1, 0],
-        },
+      });
+      const embedder = buildFakeEmbedder({
+        'SI unit of force': [1, 0, 0],
+        'three laws of motion': [0, 1, 0],
       });
 
-      const deps = await baseDeps(fetchImpl, client, () => 0.5); // 0.5 >= 0.3 sample rate -> never sampled
+      const deps = await baseDeps(runCli, embedder, client, () => 0.5); // 0.5 >= 0.3 sample rate -> never sampled
       // Biology, not Physics -- deriveRiskTier tiers Physics/Mathematics/
       // Chemistry high as a whole category regardless of calculation
       // content (packages/db/risk-tier.ts), which would make an auto_gated
@@ -277,10 +275,10 @@ describe.runIf(hasDatabase)('runGeneration', () => {
       expect(autoGated.riskTier).toBe('low');
       expect(autoGated.sampledForReview).toBe(false);
 
-      // The solve call never happened for the schema-failed item -- verify
-      // by counting OpenAI calls: 1 authoring + 2 solves (not 3).
-      const openaiCalls = calls.filter((c) => c.url.includes('openai.com'));
-      expect(openaiCalls).toHaveLength(3); // 1 authoring + 2 solves
+      // The solve call never happened for the schema-failed item: 1 codex
+      // (authoring) + 2 claude (solves), not 3.
+      expect(calls.filter((c) => c.command === 'codex')).toHaveLength(1);
+      expect(calls.filter((c) => c.command === 'claude')).toHaveLength(2);
 
       // Rows actually landed with the right status in the database.
       const rows = await client.query<{ status: string; approval_route: string | null }>(
@@ -292,7 +290,7 @@ describe.runIf(hasDatabase)('runGeneration', () => {
     });
   }, 20000);
 
-  it('flags a near-duplicate of the live bank as gate_failed, without ever calling the solve API for it', async () => {
+  it('flags a near-duplicate of the live bank as gate_failed, without ever calling the solve CLI for it', async () => {
     await withWorld(async ({ client, world }) => {
       // Seed a pre-existing live item with a known embedding.
       const { insertGeneratedItem } = await import('@jamb/db');
@@ -326,14 +324,14 @@ describe.runIf(hasDatabase)('runGeneration', () => {
         existingItemId,
       ]);
 
-      const { fetchImpl, calls } = buildFakeFetch({
+      const { runCli, calls } = buildFakeRunCli({
         authoringItems: [ITEM_FORCE],
         agreeWithTextByStemSubstring: { 'SI unit of force': 'newton' },
-        // Same embedding as the existing item -> similarity 1.0, well above threshold.
-        embeddingByStemSubstring: { 'SI unit of force': [1, 0, 0] },
       });
+      // Same embedding as the existing item -> similarity 1.0, well above threshold.
+      const embedder = buildFakeEmbedder({ 'SI unit of force': [1, 0, 0] });
 
-      const deps = await baseDeps(fetchImpl, client, () => 0.5);
+      const deps = await baseDeps(runCli, embedder, client, () => 0.5);
       const report = await runGeneration(
         {
           subject: 'Physics',
@@ -352,24 +350,82 @@ describe.runIf(hasDatabase)('runGeneration', () => {
       });
       expect(report.items[0]?.duplicateSimilarity).toBeCloseTo(1, 6);
 
-      // No solve call was made for the flagged duplicate: 1 authoring + 1 embedding, 0 solves.
-      const openaiCalls = calls.filter((c) => c.url.includes('openai.com'));
-      expect(openaiCalls).toHaveLength(1);
+      // No solve call was made for the flagged duplicate: 1 codex (authoring), 0 claude (solves).
+      expect(calls.filter((c) => c.command === 'codex')).toHaveLength(1);
+      expect(calls.filter((c) => c.command === 'claude')).toHaveLength(0);
+    });
+  }, 20000);
+
+  it('skips a live-bank embedding with a mismatched dimension instead of crashing, and counts it', async () => {
+    await withWorld(async ({ client, world }) => {
+      // A pre-existing item with a Voyage-sized (legacy) embedding -- a
+      // different dimension from the new local model's, reproducing the
+      // provider-migration dimension break.
+      const { insertGeneratedItem } = await import('@jamb/db');
+      await insertGeneratedItem(client, {
+        subjectId: world.subjectId,
+        topicId: world.topicId,
+        subtopicId: world.subtopicId,
+        objectiveId: world.objectiveId,
+        stem: 'An existing item embedded by the old provider.',
+        explanation: 'x',
+        methodSteps: [],
+        cognitiveLevel: 'recall',
+        authorDifficulty: 0.3,
+        expectedTimeSeconds: 40,
+        riskTier: 'low',
+        independentSolveVerdict: 'agreed',
+        sampledForReview: false,
+        stemEmbedding: [1, 0, 0, 0, 0], // 5-dim "legacy" vector
+        inferenceCostUsd: 0.01,
+        provenance: {},
+        options: [
+          { label: 'A', text: 'x', isCorrect: true, distractorRationale: null },
+          { label: 'B', text: 'y', isCorrect: false, distractorRationale: 'r' },
+          { label: 'C', text: 'z', isCorrect: false, distractorRationale: 'r' },
+          { label: 'D', text: 'w', isCorrect: false, distractorRationale: 'r' },
+        ],
+        contributorId: null,
+        briefId: null,
+      });
+
+      const { runCli } = buildFakeRunCli({
+        authoringItems: [ITEM_FORCE],
+        agreeWithTextByStemSubstring: { 'SI unit of force': 'newton' },
+      });
+      // 3-dim "new model" vector -- a different length than the legacy one above.
+      const embedder = buildFakeEmbedder({ 'SI unit of force': [1, 0, 0] });
+
+      const deps = await baseDeps(runCli, embedder, client, () => 0.5);
+      const report = await runGeneration(
+        {
+          subject: 'Physics',
+          objectiveId: world.objectiveId,
+          count: 1,
+          difficultyTarget: 'moderate',
+          cognitiveLevel: 'recall',
+        },
+        deps,
+      );
+
+      expect(report.items).toHaveLength(1);
+      expect(report.items[0]?.outcome).not.toBe('gate_failed'); // not flagged as a duplicate of the unrelated legacy item
+      expect(report.legacyEmbeddingsSkipped).toBe(1);
     });
   }, 20000);
 
   it('samples a qualifying low-risk item for human review instead of auto-gating it', async () => {
     await withWorld(async ({ client, world }) => {
-      const { fetchImpl } = buildFakeFetch({
+      const { runCli } = buildFakeRunCli({
         authoringItems: [ITEM_FORCE],
         agreeWithTextByStemSubstring: { 'SI unit of force': 'newton' },
-        embeddingByStemSubstring: { 'SI unit of force': [1, 0, 0] },
       });
+      const embedder = buildFakeEmbedder({ 'SI unit of force': [1, 0, 0] });
 
       // 0.01 < 0.3 sample rate -> always sampled. Single item, so no
       // concurrency ambiguity about which random() call this is. Biology,
       // not Physics -- see the full-batch test's own comment on risk tiering.
-      const deps = await baseDeps(fetchImpl, client, () => 0.01);
+      const deps = await baseDeps(runCli, embedder, client, () => 0.01);
       const report = await runGeneration(
         {
           subject: 'Biology',
@@ -392,13 +448,13 @@ describe.runIf(hasDatabase)('runGeneration', () => {
 
   it('discards a structurally malformed authored item before ever inserting it', async () => {
     await withWorld(async ({ client, world }) => {
-      const { fetchImpl } = buildFakeFetch({
+      const { runCli } = buildFakeRunCli({
         authoringItems: [ITEM_FORCE, { stem: '' }], // second entry has no usable stem
         agreeWithTextByStemSubstring: { 'SI unit of force': 'newton' },
-        embeddingByStemSubstring: { 'SI unit of force': [1, 0, 0] },
       });
+      const embedder = buildFakeEmbedder({ 'SI unit of force': [1, 0, 0] });
 
-      const deps = await baseDeps(fetchImpl, client, () => 0.5);
+      const deps = await baseDeps(runCli, embedder, client, () => 0.5);
       const report = await runGeneration(
         {
           subject: 'Physics',
@@ -419,12 +475,12 @@ describe.runIf(hasDatabase)('runGeneration', () => {
 
   it("rejects a --subject that does not match the objective's real subject", async () => {
     await withWorld(async ({ client, world }) => {
-      const { fetchImpl } = buildFakeFetch({
+      const { runCli } = buildFakeRunCli({
         authoringItems: [ITEM_FORCE],
         agreeWithTextByStemSubstring: {},
-        embeddingByStemSubstring: {},
       });
-      const deps = await baseDeps(fetchImpl, client, () => 0.5);
+      const embedder = buildFakeEmbedder({});
+      const deps = await baseDeps(runCli, embedder, client, () => 0.5);
 
       await expect(
         runGeneration(
@@ -441,22 +497,27 @@ describe.runIf(hasDatabase)('runGeneration', () => {
     });
   });
 
-  it('apportions the full authoring cost across the inserted items and accounts for solve cost separately', async () => {
+  it('apportions $0 across the inserted items without dividing by zero, under subscription-based CLI pricing', async () => {
     await withWorld(async ({ client, world }) => {
-      const { fetchImpl } = buildFakeFetch({
+      const { runCli } = buildFakeRunCli({
         authoringItems: [ITEM_FORCE, ITEM_HISTORY],
-        authoringUsage: { prompt_tokens: 1_000_000, completion_tokens: 0 }, // exactly the per-million input rate in USD
+        // A large usage figure on purpose -- under per-token pricing this
+        // would have been a real, nonzero dollar cost; under the CLIs'
+        // fixed $0 MODEL_PRICING entries (item-gen-cost.ts), it must still
+        // come out to exactly $0, confirming the CLI pricing key is what's
+        // actually being charged against, not a real per-token rate.
+        authoringUsage: { input_tokens: 1_000_000, output_tokens: 0 },
         agreeWithTextByStemSubstring: {
           'SI unit of force': 'newton',
           'three laws of motion': 'Isaac Newton',
         },
-        embeddingByStemSubstring: {
-          'SI unit of force': [1, 0, 0],
-          'three laws of motion': [0, 1, 0],
-        },
+      });
+      const embedder = buildFakeEmbedder({
+        'SI unit of force': [1, 0, 0],
+        'three laws of motion': [0, 1, 0],
       });
 
-      const deps = await baseDeps(fetchImpl, client, () => 0.5);
+      const deps = await baseDeps(runCli, embedder, client, () => 0.5);
       const report = await runGeneration(
         {
           subject: 'Physics',
@@ -468,17 +529,11 @@ describe.runIf(hasDatabase)('runGeneration', () => {
         deps,
       );
 
-      // gpt-4.1's input rate is $2/million (item-gen-cost.ts) -> authoring call cost = $2.
-      expect(report.totalAuthoringCostUsd).toBeCloseTo(2, 6);
-      // Split evenly across the 2 inserted items: $1 each, plus each item's own (tiny) solve cost.
-      const perItemAuthoringShare = 2 / 2;
+      expect(report.totalAuthoringCostUsd).toBe(0);
+      expect(report.totalInferenceCostUsd).toBe(0);
       for (const item of report.items) {
-        expect(item.inferenceCostUsd).toBeGreaterThan(perItemAuthoringShare);
+        expect(item.inferenceCostUsd).toBe(0);
       }
-      expect(report.totalInferenceCostUsd).toBeCloseTo(
-        report.items.reduce((sum, item) => sum + (item.inferenceCostUsd ?? 0), 0),
-        6,
-      );
     });
   }, 20000);
 });

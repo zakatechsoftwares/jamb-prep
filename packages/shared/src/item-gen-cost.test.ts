@@ -35,6 +35,15 @@ describe('computeCallCostUsd', () => {
       /non-negative/i,
     );
   });
+
+  it('DECISION: codex-cli and claude-code-cli price at exactly $0, since both run under a flat subscription with no metered per-token billing', () => {
+    expect(computeCallCostUsd('codex-cli', { inputTokens: 1_000_000, outputTokens: 1_000_000 })).toBe(
+      0,
+    );
+    expect(
+      computeCallCostUsd('claude-code-cli', { inputTokens: 1_000_000, outputTokens: 1_000_000 }),
+    ).toBe(0);
+  });
 });
 
 describe('apportionAuthoringCost', () => {

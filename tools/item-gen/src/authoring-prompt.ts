@@ -67,11 +67,11 @@ CONSTRAINTS
 - If you cannot write a defensible item for this objective, return fewer
   items rather than padding.
 
-Return ONLY valid JSON, an array of objects with these keys:
-id, subject, topic, subtopic, objective, cognitive_level,
-author_difficulty (0-1), expected_time_seconds, stem, options {A,B,C,D},
-correct_option, distractor_rationale {A,B,C,D}, explanation,
-method_steps (array), contains_calculation (boolean — true if answering this
-item requires any arithmetic or algebraic calculation, false otherwise),
-status ("generated")`;
+Return an object with a single "items" key: an array of ${input.count}
+objects, each with cognitive_level, author_difficulty (0-1),
+expected_time_seconds, stem, options {A,B,C,D}, correct_option,
+distractor_rationale {A,B,C,D} (null for the correct option's own entry),
+explanation, method_steps (array), and contains_calculation (boolean — true
+if answering this item requires any arithmetic or algebraic calculation,
+false otherwise).`;
 }

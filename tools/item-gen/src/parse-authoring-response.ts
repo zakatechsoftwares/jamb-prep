@@ -130,13 +130,18 @@ export function parseAuthoringResponse(rawText: string): ParsedAuthoringResponse
     return { drafts: [], discardedCount: 0 };
   }
 
-  if (!Array.isArray(parsed)) {
+  // The authoring call's real contract: an object with a single "items"
+  // array (codex exec --output-schema requires the schema root to be
+  // `type: "object"` -- a bare top-level array is rejected server-side,
+  // confirmed by a real failing call before this shape was chosen).
+  const items = isRecord(parsed) && Array.isArray(parsed.items) ? parsed.items : null;
+  if (!items) {
     return { drafts: [], discardedCount: 0 };
   }
 
   const drafts: ItemDraft[] = [];
   let discardedCount = 0;
-  for (const raw of parsed) {
+  for (const raw of items) {
     const draft = tryParseDraft(raw);
     if (draft) {
       drafts.push(draft);
