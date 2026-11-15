@@ -1030,6 +1030,155 @@ calibration set are still not built; every account created here starts
   with the user: warn, not block). Bearer tokens are stateless, so signing
   out cannot revoke a token server-side; it only discards it from memory.
 
+## Local-first generation pipeline (follow-up to reviewer account management)
+
+`tools/item-gen` moved off metered per-token APIs entirely — authoring and
+the independent solve now run through the user's own ChatGPT/Claude
+subscriptions via headless `codex exec`/`claude -p`, embeddings run
+locally (no API key for either), and generation + review both moved back
+to local Postgres, with a new one-way sync tool publishing only approved
+items to the production (Railway/Supabase) database.
+
+- **Deliberate tradeoff, confirmed with the user before starting**: the
+  Railway-hosted admin app (where another reviewer's `content_lead`
+  account was provisioned in the deployment session) stops receiving new
+  `pending_review` items, since the sync script only ever pushes
+  already-approved ones. Railway becomes a read mirror of approved
+  content for now; reviving multi-reviewer remote review is a separate,
+  later session, not something this one tried to half-solve.
+- **Every real CLI flag/output shape here was verified against the actual
+  installed CLIs before writing a single parser against it** — not
+  assumed from training-data memory, which would have been meaningfully
+  wrong in at least two places (see the next two bullets). `codex login
+  status`/`claude auth status` confirmed both were signed in via
+  subscription (ChatGPT, Claude Pro respectively) before any of this was
+  built.
+- **`codex exec --output-schema <file>` gives real, server-side
+  JSON-Schema-enforced output** (OpenAI's structured-outputs feature) —
+  a genuine reliability upgrade over the old prose-instructed "Return
+  ONLY valid JSON," not just a provider swap. Two hard constraints
+  confirmed by real failing calls, not docs: the schema root must be
+  `type: "object"` (a bare top-level array gets a real 400, "schema must
+  be a JSON Schema of 'type: \"object\"'"), and every key in `properties`
+  must also appear in `required` (a non-required key gets its own real
+  400) — a field that's genuinely optional in content (the correct
+  option's own `distractor_rationale` entry) is expressed as
+  `type: ["string", "null"]` and required-but-nullable instead, confirmed
+  to work. See `authoring-schema.ts`'s own doc comment.
+  `parseAuthoringResponse`'s top-level contract changed from a bare array
+  to `{"items": [...]}` to match — its per-item parsing (`tryParseDraft`)
+  is otherwise unchanged, and so is its LaTeX-escape/trailing-comma repair
+  logic (still needed: the schema constrains *shape*, not whether the
+  model writes a raw invalid backslash inside a string value).
+- **Both CLIs report a dollar cost that is not what gets billed under a
+  subscription, confirmed by real calls, not assumed.** `claude -p
+  --output-format json` reported `total_cost_usd: 0.32` and a per-model
+  `costUSD` breakdown for a one-line trivial reply — a list-price
+  *estimate* driven by ~40K tokens of this CLI's own fixed tool/
+  system-prompt overhead, never what a Pro-subscription call actually
+  costs. `codex-cli-client.ts`/`claude-cli-client.ts` never read either
+  figure. `item-gen-cost.ts`'s `MODEL_PRICING` gets two new keys
+  (`'codex-cli'`, `'claude-code-cli'`), both pinned to exactly `$0` —
+  required no change to `computeCallCostUsd`/`apportionAuthoringCost`'s
+  own logic at all, since both already only guard against a *negative*
+  cost, not a zero one.
+- **`--bare` mode on `claude` must never be used here** — its own
+  `--help` text states it forces `ANTHROPIC_API_KEY`/`apiKeyHelper` auth
+  and never reads OAuth/subscription credentials, which would silently
+  reintroduce metered billing, exactly what this migration exists to
+  remove.
+- **The prompt always travels over stdin, never as a CLI argument** —
+  confirmed necessary, not just cleaner: this pipeline's prompts contain
+  backslashes, `{{OPTION:A}}`-style braces, currency symbols and
+  newlines, none of which survive a shell command line intact.
+- **Windows-specific, confirmed by a real `ENOENT` and a real corrupted
+  path, not assumed:** `codex`/`claude` resolve to npm-installed `.cmd`
+  shims, which `child_process.spawn` cannot execute without `shell:
+  true` — but Node does not escape array arguments under `shell: true`
+  (its own `DEP0190` deprecation warning says so), and this repo's own
+  path (`...\Saka Shittu Adeyemi\...`) contains a space, which silently
+  split into multiple argv entries on the far side without manual
+  quoting. `cli-exec.ts`'s `quoteForWindowsShell`, applied only on
+  `win32`, is the fix — POSIX never needs `shell: true` at all, so it
+  stays as simple as `shell: false` already was there. Verified for
+  real through the actual Node `child_process.spawn` path (not a shell
+  pipe) that Unicode (minus signs, superscripts) decodes correctly with
+  no mojibake — an earlier mojibake sighting turned out to be an
+  artifact of a bash/python test pipeline, not a real bug in the actual
+  implementation path.
+- **The embedding-dimension break this migration causes is real, not
+  hypothetical, and only gets the required defensive fix, by the user's
+  own choice — a backfill is a deliberate, separate follow-up.** Voyage's
+  existing live-bank embeddings are a different size than the new local
+  model's (`Xenova/all-MiniLM-L6-v2`, 384-dim); `cosineSimilarity` already
+  throws on a length mismatch, which would otherwise crash the very first
+  duplicate check against any pre-existing item in a subject with real
+  content. `processOneItem`'s duplicate loop now skips (never compares
+  against) a mismatched-dimension candidate and counts it —
+  `GateReport.legacyEmbeddingsSkipped`, the "a silent failure needs a
+  counter" rule applied here. Confirmed for real: a live run against
+  objective 281 (Use of English, which already has real approved
+  content) correctly skipped 75 legacy-dimension embeddings rather than
+  crashing.
+- **`local-embedding-client.ts` splits the untestable real model load
+  (`loadLocalEmbedder`, downloads/loads the ONNX model once per process)
+  from the testable post-processing (`createLocalEmbedder`, injected with
+  the loaded extractor function)** — the same split `cli-exec.ts`'s
+  `realRunCli`/`RunCliImpl` and `openai-client.ts`'s own `fetch`
+  dependency already established. The integration test suite never loads
+  a real model and so never needs network access to a model host.
+- **`tools/sync-to-production` is a new package, not a mode of
+  `tools/item-gen`** — a genuinely different operational concern (publish
+  already-settled rows once in a while, not part of the generation loop),
+  with its own two-pool CLI entrypoint. Its database access
+  (`sync-repository.ts`) lives in `packages/db`, not in the tool itself,
+  matching `item-generation-repository.ts`'s own precedent — "database
+  access through the repository layer only" applies here too, even though
+  no route handler is involved.
+- **Two independently-seeded databases cannot be trusted to share numeric
+  ids for the same conceptual objective — confirmed for real, not just in
+  theory**, by actually creating a second local database, running the
+  *same* `seed.ts`, and finding English's subject id is `282`/objective
+  `281` on one and `1`/`1` on the other. `resolveHierarchyIdsByNaturalKey`
+  resolves by `subject.name > topic.name > subtopic.name >
+  objective.description` instead of ever copying a raw foreign-key value
+  across, and throws loudly (naming the missing path) on a miss rather
+  than guessing.
+- **The sync upsert's `DO UPDATE SET` column list is deliberately split,
+  and this is the design's single most important correctness property:**
+  content columns (`stem`, `explanation`, `options`, `provenance`,
+  `version`, …) are always overwritten; `status`, `approval_route`,
+  `reviewer_id` and `reviewed_at` are never referenced in it at all — not
+  even via `COALESCE`. Once an item is live on the target, its own real
+  traffic can legitimately move `status` (the accuracy-threshold sweep's
+  quarantine rule, for instance) — a naive upsert that reset `status`
+  back to the source's "approved" on every re-sync would silently
+  un-quarantine a live item the target's own quality gates correctly
+  pulled. `reviewer_id` is never written on *either* path (absent from
+  the INSERT column list too) — the source's local reviewer id has no
+  meaning as a foreign key into the target's own `users` table; the local
+  reviewer identity and timestamp are instead folded into
+  `provenance.syncedFrom` (JSONB, no FK constraint) for audit only.
+- **Idempotent by construction, reusing an existing column rather than
+  adding one**: `items.external_ref TEXT UNIQUE` already existed exactly
+  for this ("stable external key... so imports and the seed script can
+  upsert idempotently," `migrations/0005_items.up.sql`) and `seed.ts`
+  already uses it this way. The sync sets `external_ref = 'local:' +
+  localItemId` and upserts on it — no new migration needed.
+- **Disclosed limitation, not silently patched around**: the sync is
+  additive/updating only, never retractive. An item approved, synced, and
+  later rejected/quarantined *locally* stays live on the target
+  indefinitely until a future session adds retraction logic.
+- **Verified end-to-end for real, twice** — once against the real local
+  dev database alone (a genuine Codex/Claude/local-embedding-model run
+  produced a correctly-formed, auto-gated item at exactly $0.0000 cost),
+  and once again by syncing 95 real approved items, including that one,
+  to a second, genuinely independently-seeded local database standing in
+  for production — never against the real shared Railway/Supabase
+  database, to avoid touching a live system other reviewers and the
+  deployed admin app depend on without the user explicitly asking for
+  that specific step.
+
 ## How I want you to work
 
 - Ask before installing a new dependency
