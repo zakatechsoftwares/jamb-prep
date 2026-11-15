@@ -4,6 +4,8 @@ packages:
   - 'tools/*'
 allowBuilds:
   esbuild: true
+  onnxruntime-node: true
+  protobufjs: true
 # React Native and the wider Expo ecosystem's own package.json manifests
 # under-declare a large number of their real runtime dependencies --
 # historically relied on npm's flat hoisting to make them ambiently
