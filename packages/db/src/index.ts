@@ -63,6 +63,21 @@ export {
   type GeneratedOptionInsert,
   type ObjectiveContext,
 } from './item-generation-repository';
+// Local-to-production sync's own database access (follow-up to the
+// subscription-CLI migration) — tools/sync-to-production is the only
+// consumer of these today.
+export {
+  loadApprovedItemsForSync,
+  resolveHierarchyIdsByNaturalKey,
+  upsertSyncedItem,
+  replaceSyncedItemOptions,
+  ObjectiveNotFoundByNaturalKeyError,
+  type ApprovedItemForSync,
+  type ObjectiveNaturalKey,
+  type ResolvedHierarchyIds,
+  type SyncOptionRow,
+  type UpsertSyncedItemInput,
+} from './sync-repository';
 // The contributor brief board (plan 7.12, canonical session 11, Phase 1).
 export {
   claimBrief,
